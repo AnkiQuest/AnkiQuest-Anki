@@ -31,7 +31,16 @@ where
         let one_len = one.len() + one_answered;
         let two_len = two.len() + two_answered;
         let ratio = (one_len + 1) as f32 / (two_len + 1) as f32;
-        Self::from_parts(one, two, one_answered, two_answered, one_len, two_len, ratio, 0.0)
+        Self::from_parts(
+            one,
+            two,
+            one_answered,
+            two_answered,
+            one_len,
+            two_len,
+            ratio,
+            0.0,
+        )
     }
 
     /// kuma3: `ones_per_two` fixes the spacing (else even, as [Self::new]).

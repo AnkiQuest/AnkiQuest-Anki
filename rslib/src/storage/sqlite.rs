@@ -162,9 +162,7 @@ fn attach_retrievability_cache_db(db: &Connection, collection_path: Option<&Path
         .map(retrievability_cache_path)
         .unwrap_or_else(|| PathBuf::from(":memory:"));
     if let Some(collection_path) = collection_path {
-        // kuma3: a failed move must not stop the collection opening; the cache is
-        // rebuilt at the new path.
-        let _ = relocate_retrievability_cache(collection_path, &cache_path);
+        relocate_retrievability_cache(collection_path, &cache_path)?;
     }
     let attach = || -> rusqlite::Result<()> {
         db.execute(

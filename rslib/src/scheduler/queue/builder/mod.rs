@@ -654,6 +654,7 @@ fn merge_new(
         ReviewMix::AfterReviews => Box::new(SizedChain::new(review_iter, new_iter)),
         // kuma3: a fixed "Reviews per new card" spacing resumes from today's
         // counts; otherwise the fork's tracked progress keeps the even mix
+        // (kept across RWKV queue rebuilds by invalidate_rwkv_review_queue)
         ReviewMix::MixWithReviews => Box::new(match reviews_per_new_card {
             Some(_) => Intersperser::resumed(
                 review_iter,
@@ -1197,8 +1198,10 @@ mod test {
 
     #[test]
     fn new_cards_stay_mixed_when_the_queue_is_rebuilt_after_every_answer() -> Result<()> {
-        for (reviews_per_new_card, expected) in [(None, "RRNRRRNRRR"), (Some(3), "RRRNRRRNRR")] {
+        for (reviews_per_new_card, expected) in [(None, "RRRNRRRNRR"), (Some(3), "RRRNRRRNRR")] {
             let mut col = Collection::new();
+            let mut deck = col.get_or_create_normal_deck("Default")?;
+            col.set_deck_rwkv_instant_order(&mut deck, ReviewCardOrder::Day);
             for _ in 0..8 {
                 CardAdder::new().due_dates(["0"]).add(&mut col);
             }
@@ -1220,7 +1223,7 @@ mod test {
                 });
                 col.answer_easy();
                 // RWKV-Instant rebuilds the queue after most answers
-                col.clear_study_queues();
+                col.invalidate_rwkv_review_queue();
             }
             assert_eq!(order, expected, "{reviews_per_new_card:?}");
         }

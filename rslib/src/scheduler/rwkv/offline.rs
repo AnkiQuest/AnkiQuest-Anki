@@ -717,7 +717,7 @@ impl Collection {
         self.state.rwkv_retrievability_scores = None;
         self.state.rwkv_count_cards.clear();
         self.state.addon_retention_populations.clear();
-        self.state.card_queues = None;
+        self.invalidate_rwkv_review_queue();
     }
 
     pub(crate) fn rwkv_prepare_offline(
@@ -759,7 +759,7 @@ impl Collection {
         // until the next successful prepare.
         let reviews_replayed = self.rwkv_offline_sync_history(&mut runtime)?;
         if reviews_replayed > 0 {
-            self.state.card_queues = None;
+            self.invalidate_rwkv_review_queue();
         }
         *REGISTERED_MODEL.lock().unwrap() = Some(runtime.model.clone());
         self.state.rwkv_offline = Some(runtime);
@@ -820,7 +820,7 @@ impl Collection {
         }
         if rebuild {
             // the retained queue was ordered with the old state's scores
-            self.state.card_queues = None;
+            self.invalidate_rwkv_review_queue();
         }
         let scored = result? as u32;
         Ok(RwkvOfflineInstantPassProgress {
@@ -870,7 +870,7 @@ impl Collection {
             let model = runtime.model.clone();
             drop(runtime);
             release_freed_memory();
-            self.state.card_queues = None;
+            self.invalidate_rwkv_review_queue();
             out.replay_total = self.rwkv_offline_start_build(model, Some(all))?;
             out.computing = true;
             out.started = true;
@@ -1197,7 +1197,7 @@ impl Collection {
                 "RWKV answer score"
             );
             if !patched || refresh_due {
-                self.state.card_queues = None;
+                self.invalidate_rwkv_review_queue();
             }
         }
     }
@@ -1592,7 +1592,7 @@ impl Collection {
             runtime.curve_s90.clear();
             self.state.rwkv_retrievability_scores = None;
             self.state.addon_retention_populations.clear();
-            self.state.card_queues = None;
+            self.invalidate_rwkv_review_queue();
         }
         let stamp = self.rwkv_offline_replay_stamp()?;
         if runtime.identity.is_some() && stamp.is_some() && stamp == runtime.checked_stamp {
@@ -1873,7 +1873,7 @@ impl Collection {
                     return None;
                 }
                 // queues built meanwhile have the standard order
-                self.state.card_queues = None;
+                self.invalidate_rwkv_review_queue();
                 Some(runtime)
             }
             Ok(Err(err)) => {
