@@ -828,7 +828,7 @@ impl Collection {
             require!(
                 rule.min_reps
                     .zip(rule.max_reps)
-                    .map_or(true, |(min, max)| min <= max),
+                    .is_none_or(|(min, max)| min <= max),
                 "FSRS simulator preset rule has invalid rep bounds"
             );
             require!(
@@ -841,7 +841,7 @@ impl Collection {
             require!(
                 rule.min_interval_days
                     .zip(rule.max_interval_days)
-                    .map_or(true, |(min, max)| min <= max),
+                    .is_none_or(|(min, max)| min <= max),
                 "FSRS simulator preset rule has invalid interval bounds"
             );
         }

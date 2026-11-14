@@ -281,6 +281,7 @@ class AnkiQt(QMainWindow):
         self.state: MainWindowState = "startup"
         self.opts = opts
         self.col: Collection | None = None
+        self._rwkv_builtin_sync_finishing = False
         self._outdated_fsrs7_preview_warning_shown = False
         self.taskman = TaskManager(self)
         self.media_syncer = MediaSyncer(self)
@@ -1035,6 +1036,10 @@ class AnkiQt(QMainWindow):
         if (changes.deck or changes.deck_config) and not self._legacy_reset_in_progress:
             from aqt import rwkv_scheduler
 
+            if changes.deck_config:
+                # An instant-only runtime gets a curve model once a preset
+                # uses RWKV-Curve; the recovery below rebuilds its state.
+                rwkv_scheduler.refresh_rwkv_runtime_models_after_preset_change(self)
             rwkv_scheduler.request_rwkv_state_cache_recovery(
                 self,
                 reason="deck or preset change",
@@ -1311,22 +1316,20 @@ title="{}" {}>{}</button>""".format(
             from aqt import rwkv_scheduler
 
             self.col.models._clear_cache()
-            gui_hooks.sync_did_finish()
+            self._rwkv_builtin_sync_finishing = True
+            try:
+                gui_hooks.sync_did_finish()
+            finally:
+                self._rwkv_builtin_sync_finishing = False
             self.reset()
 
             def finish_sync() -> None:
                 after_sync()
 
             if refresh_rwkv_state and remote_collection_changes.collection_changed:
-                ignored_review_candidates = (
-                    ()
-                    if remote_collection_changes.non_review_collection_changed
-                    else remote_collection_changes.review_ids
-                )
                 rwkv_scheduler.refresh_rwkv_state_after_sync(
                     self,
                     finish_sync,
-                    remote_review_ids=ignored_review_candidates,
                 )
             else:
                 finish_sync()
@@ -1337,6 +1340,35 @@ title="{}" {}>{}</button>""".format(
             on_done=on_collection_sync_finished,
             on_remote_collection_changes=note_remote_collection_changes,
         )
+
+    def _rwkv_sync_will_start(self) -> None:
+        if self.col is not None:
+            self.col._last_sync_remote_collection_changed = None
+
+    def _rwkv_sync_did_finish(self) -> None:
+        # The built-in sync already coordinates its own refresh and callback.
+        # Add-ons may call Collection.sync_collection directly instead.
+        if self._rwkv_builtin_sync_finishing:
+            return
+        col = self.col
+        if col is None or col.db is None:
+            return
+        if getattr(col, "_last_sync_remote_collection_changed", None) is False:
+            return
+
+        from aqt import rwkv_scheduler
+
+        def refresh_reviewer() -> None:
+            if (
+                self.col is col
+                and self.state == "review"
+                and rwkv_scheduler._rwkv_resident_state_ready(self)
+            ):
+                self.reviewer.op_executed(
+                    OpChanges(study_queues=True), None, focused=True
+                )
+
+        rwkv_scheduler.refresh_rwkv_state_after_sync(self, refresh_reviewer)
 
     def maybe_auto_sync_on_open_close(
         self,
@@ -1867,6 +1899,8 @@ title="{}" {}>{}</button>""".format(
         gui_hooks.av_player_did_end_playing.append(self.on_av_player_did_end_playing)
         gui_hooks.operation_did_execute.append(self.on_operation_did_execute)
         gui_hooks.focus_did_change.append(self.on_focus_did_change)
+        gui_hooks.sync_will_start.append(self._rwkv_sync_will_start)
+        gui_hooks.sync_did_finish.append(self._rwkv_sync_did_finish)
 
         self._activeWindowOnPlay: QWidget | None = None
 

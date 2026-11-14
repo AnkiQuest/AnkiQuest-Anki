@@ -964,7 +964,7 @@ impl Collection {
             let mut tree = self.storage.child_decks(&deck)?;
             tree.insert(0, deck);
             // built for tomorrow, nothing is reviewed yet: full minimums
-            let mut minimums = LimitTreeMap::build(&tree, &configs, tomorrow, false);
+            let mut minimums = LimitTreeMap::build(&tree, &configs, tomorrow, false, own);
             let ids: HashSet<_> = tree.iter().map(|deck| deck.id.0).collect();
             let mut not_due = Vec::new();
             for card in out.cards.iter().filter(|card| ids.contains(&card.deck_id)) {
@@ -976,12 +976,19 @@ impl Collection {
             }
             // the lowest recall first, as the deck count and the queue pull them
             not_due.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-            for (_, _, deck_id) in not_due {
-                if minimums
-                    .rwkv_review_minimum_remaining(deck_id)
-                    .unwrap_or(false)
-                {
-                    minimums.reserve_rwkv_reviews(deck_id, 1)?;
+            // the deepest subdeck minimums first, as the deck count fills them
+            let mut selected = HashSet::new();
+            for depth in minimums.rwkv_review_minimum_depths() {
+                for &(_, card_id, deck_id) in &not_due {
+                    if selected.contains(&card_id)
+                        || !minimums
+                            .rwkv_review_minimum_remaining_at_depth(deck_id, depth)
+                            .unwrap_or(false)
+                        || minimums.reserve_counted_rwkv_reviews(deck_id, 1)? == 0
+                    {
+                        continue;
+                    }
+                    selected.insert(card_id);
                     total += u32::from(deck_id == own);
                 }
             }

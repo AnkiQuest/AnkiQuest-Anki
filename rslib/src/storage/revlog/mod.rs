@@ -1924,6 +1924,11 @@ with latest_resets as (
     and r.id > coalesce(resets.reset_id, 0)
     and r.id > ({RWKV_HISTORY_RESET_AFTER_SQL})
     {ignored_clause}
+), pending_restarts as (
+  select e.cid
+  from eligible e
+  join cards c on c.id = e.cid
+  where c.type = 0
 ), retained_starts as (
   select
     cid,
@@ -1932,6 +1937,7 @@ with latest_resets as (
       min(id)
     ) as start_id
   from eligible
+  where cid not in (select cid from pending_restarts)
   group by cid
 )
 select e.id, e.cid, e.nid, e.deck_id, e.ease, e.time, e.type, e.interval_days,
@@ -2037,6 +2043,9 @@ order by e.id, e.cid"
         let (rows, active) = col.storage.rwkv_historical_review_rows(&[])?;
         assert!(active.is_empty());
         assert!(rows.iter().any(|row| row.is_learning_start));
+        assert!(rows
+            .iter()
+            .all(|row| row.card_id % 4 != 0 || row.review_id > 13_000));
         let eligible: usize = col.storage.db.query_row(
             "select count() from revlog r join cards c on c.id = r.cid
              where r.ease between 1 and 4 and r.type in (0, 1, 2, 3, 4, 5)

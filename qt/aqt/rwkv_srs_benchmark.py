@@ -11,14 +11,20 @@ import sys
 import threading
 import time
 import types
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
+from anki import scheduler_pb2
+from aqt.rwkv_answer_time import (
+    RwkvAnswerTimePrediction,
+    answer_time_prediction_from_native,
+)
 from aqt.rwkv_scheduler import (
     RwkvBackendCacheSnapshot,
     RwkvButtonProbabilities,
+    RwkvForecastCardInput,
     RwkvIntervalOverride,
     RwkvRecallPoint,
     RwkvReviewCandidate,
@@ -351,10 +357,14 @@ class EmbeddedRwkvReviewerBackend(RwkvStatefulReviewerBackend):
         max_interval_days: int = 36500,
         state_precision: str = "f32",
         model: str = "sm40",
+        instant_model_path: str | Path | None = None,
+        instant_model: str | None = None,
     ) -> None:
         del device, dtype
         self.state_precision = state_precision
         self.model_name = model
+        # A second small model beside `model` (RWKV-Instant's outputs).
+        self.instant_model_name = instant_model
         super().__init__(
             _RustRwkvRuntime(
                 model_path=Path(model_path),
@@ -362,6 +372,10 @@ class EmbeddedRwkvReviewerBackend(RwkvStatefulReviewerBackend):
                 max_interval_days=max_interval_days,
                 state_precision=state_precision,
                 model=model,
+                instant_model_path=(
+                    Path(instant_model_path) if instant_model_path is not None else None
+                ),
+                instant_model=instant_model,
             ),
         )
 
@@ -377,17 +391,32 @@ class _RustRwkvRuntime:
         max_interval_days: int,
         state_precision: str = "f32",
         model: str = "sm40",
+        instant_model_path: Path | None = None,
+        instant_model: str | None = None,
     ) -> None:
         from anki import _rsbridge
 
         rwkv_inference = getattr(_rsbridge, "RwkvInference")
-        self._process = rwkv_inference(
-            str(model_path),
-            target_retention,
-            max_interval_days,
-            state_precision,
-            model,
-        )
+        if (instant_model_path is None) != (instant_model is None):
+            raise ValueError("the instant RWKV model needs both a path and a name")
+        if instant_model_path is None:
+            self._process = rwkv_inference(
+                str(model_path),
+                target_retention,
+                max_interval_days,
+                state_precision,
+                model,
+            )
+        else:
+            self._process = rwkv_inference(
+                str(model_path),
+                target_retention,
+                max_interval_days,
+                state_precision,
+                model,
+                str(instant_model_path),
+                instant_model,
+            )
         self._process_lock = threading.RLock()
 
     def _locked_process(self) -> Any:
@@ -715,29 +744,7 @@ class _RustRwkvRuntime:
             ]
 
         build_start = time.monotonic()
-        rows = [
-            (
-                request.review_input.identity.card_id,
-                request.review_input.identity.note_id,
-                request.review_input.identity.deck_id,
-                request.review_input.identity.preset_id,
-                request.review_input.is_query,
-                request.review_input.ease,
-                request.review_input.duration_millis,
-                request.review_input.card_type,
-                request.review_input.day_offset,
-                request.review_input.current_elapsed_days,
-                request.review_input.current_elapsed_seconds,
-                *request.review_input.target_retentions,
-                request.review_input.enforce_grade_order,
-                _state_bytes(request.card_state),
-                _state_bytes(request.note_state),
-                _state_bytes(request.deck_state),
-                _state_bytes(request.preset_state),
-                _state_bytes(request.global_state),
-            )
-            for request in requests
-        ]
+        rows = [_rust_prediction_row(request) for request in requests]
         build_elapsed_ms = (time.monotonic() - build_start) * 1000
         predict_start = time.monotonic()
         logger.debug(
@@ -786,6 +793,27 @@ class _RustRwkvRuntime:
                 button_probabilities,
             ) in outputs
         ]
+
+    def has_answer_time_head(self) -> bool:
+        has_head = getattr(self._process, "has_answer_time_head", None)
+        return bool(has_head()) if callable(has_head) else False
+
+    def predict_answer_times(
+        self,
+        requests: Sequence[RwkvReviewPredictionRequest],
+        history_features: Sequence[Sequence[float]],
+    ) -> Sequence[RwkvAnswerTimePrediction | None]:
+        """Answer times of query requests from the optional answer-time head;
+        None without the head or for a query on the card's last review day."""
+        predict = getattr(self._process, "predict_answer_times", None)
+        if not callable(predict) or not self.has_answer_time_head():
+            return [None] * len(requests)
+        rows = [_rust_prediction_row(request) for request in requests]
+        with self._locked_process():
+            outputs = predict(rows, [list(row) for row in history_features])
+        if len(outputs) != len(requests):
+            raise ValueError("RWKV Rust answer-time prediction count mismatch")
+        return [answer_time_prediction_from_native(output) for output in outputs]
 
     def predict_retrievability_many(
         self,
@@ -1145,6 +1173,260 @@ class _RustRwkvRuntime:
             build_elapsed_ms + predict_elapsed_ms,
         )
         return output
+
+    def compare_workloads(
+        self,
+        *,
+        inputs: Sequence[tuple[int, RwkvReviewInput, int]],
+        background: Sequence[tuple[RwkvReviewInput, int, int, int, int]],
+        request: scheduler_pb2.SimulateFsrsReviewRequest,
+        input_scale: float,
+        review_model: object,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> object:
+        compare = getattr(self._process, "compare_workloads_from_warm_up", None)
+        if not callable(compare):
+            raise ValueError(
+                "RWKV Rust runtime does not support shared-learner comparisons"
+            )
+        rows = [
+            (
+                _workload_input_row(review),
+                (review.card_due or 0) - (review.day_offset or 0),
+                review.fsrs_memory_state,
+                review.fsrs_parameters or tuple(request.params),
+                review.fsrs_historical_retention or request.historical_retention or 0.9,
+            )
+            for _, review, _ in inputs
+        ]
+        with self._locked_process():
+            return compare(
+                rows,
+                30,
+                99,
+                max(1, int(request.rwkv_workload_target_step)),
+                int(request.days_to_simulate),
+                float(request.review_limit) / input_scale,
+                float(request.new_limit) / input_scale,
+                bool(request.new_cards_ignore_review_limit),
+                max(1, int(request.max_interval)),
+                int(request.review_order),
+                request.suspend_after_lapse_count
+                if request.HasField("suspend_after_lapse_count")
+                else None,
+                int(request.rwkv_comparison.learner),
+                int(request.rwkv_comparison.scenario),
+                max(1, int(request.rwkv_comparison.repetitions)),
+                input_scale,
+                tuple(getattr(review_model, "grade_seconds")),
+                _workload_bucket_probabilities(review_model),
+                [
+                    (_review_input_row(review), day, second, last_day, last_second)
+                    for review, day, second, last_day, last_second in background
+                ],
+                progress,
+            )
+
+    def forecast_workload(  # noqa: PLR0913
+        self,
+        *,
+        cards: Sequence[RwkvForecastCardInput],
+        groups: Sequence[tuple[int, int, int, int, int]],
+        days: int,
+        paths: int,
+        seed: int,
+        default_review_limit: int,
+        default_new_limit: int,
+        new_cards_ignore_review_limit: bool,
+        max_interval: int,
+        review_order: int,
+        suspend_after_lapses: int | None,
+        state_update_interval: int,
+        review_model: object,
+        single_step_answers: bool = False,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> object:
+        """Forecast daily workload bands from the resident warmed state."""
+        forecast = getattr(self._process, "forecast_workload_from_warm_up", None)
+        if not callable(forecast):
+            raise ValueError("RWKV Rust runtime does not support workload forecasts")
+        rows = [
+            (
+                _workload_input_row(card.review_input),
+                card.due_day,
+                int(card.group),
+                float(card.desired_retention),
+                int(card.scheduler),
+                card.review_input.fsrs_memory_state,
+                tuple(card.review_input.fsrs_parameters),
+                float(card.review_input.fsrs_historical_retention or 0.9),
+            )
+            for card in cards
+        ]
+        with self._locked_process():
+            return forecast(
+                rows,
+                list(groups),
+                int(days),
+                int(paths),
+                int(seed),
+                int(default_review_limit),
+                int(default_new_limit),
+                bool(new_cards_ignore_review_limit),
+                max(1, int(max_interval)),
+                int(review_order),
+                suspend_after_lapses,
+                max(1, int(state_update_interval)),
+                bool(single_step_answers),
+                tuple(getattr(review_model, "grade_seconds")),
+                _workload_bucket_probabilities(review_model),
+                progress,
+            )
+
+    def forecast_history_predictions(
+        self,
+        reviews: Sequence[RwkvReviewInput],
+        progress: Callable[[int, int], None] | None = None,
+    ) -> list[tuple[int, float]]:
+        replay = getattr(self._process, "forecast_history_predictions_packed", None)
+        if not callable(replay):
+            raise ValueError("RWKV runtime does not support forecast calibration")
+        with self._locked_process():
+            return cast(
+                list[tuple[int, float]],
+                replay(_packed_warm_up_reviews(reviews), progress),
+            )
+
+    def forecast_instant_workload(  # noqa: PLR0913
+        self,
+        *,
+        cards: Sequence[RwkvForecastCardInput],
+        decks: Sequence[bytes],
+        deck_configs: Sequence[bytes],
+        study_deck_id: int,
+        instant_decks: set[int],
+        timing_patterns: Sequence[Sequence[tuple[int, int]]],
+        timing_pattern_success_shares: Sequence[tuple[float, float, float]],
+        intervening_reviews: Mapping[int, int],
+        latest_answers_today: Mapping[int, tuple[int, int]],
+        days: int,
+        paths: int,
+        seed: int,
+        today: int,
+        new_cards_ignore_review_limit: bool,
+        fsrs_enabled: bool,
+        fsrs_learning_queues_disabled: bool,
+        fsrs_short_term_with_steps_enabled: bool,
+        learn_ahead_secs: int,
+        day_start_secs: int,
+        now_millis: int,
+        same_day_allowed: bool,
+        min_intervening_reviews: int,
+        min_elapsed_secs: int,
+        refresh_interval: int,
+        candidate_refresh_enabled: bool,
+        candidate_refresh_limit: int,
+        precompute_next_card: bool,
+        review_order: int,
+        review_model: object,
+        progress: Callable[[int, int], None] | None = None,
+        scenario_sigma: float | None = None,
+        day_progress: Callable[[int, int, Sequence[float]], None] | None = None,
+        stratified_answers: bool = False,
+        stratified_scale: float = 1.0,
+        stratified_bias_sd: float = 0.0,
+        stratified_review_variance: float = 0.0,
+        review_time_model: tuple[
+            float, Sequence[tuple[float, float, float, float, float] | None]
+        ]
+        | None = None,
+    ) -> object:
+        forecast = getattr(
+            self._process, "forecast_instant_workload_from_warm_up", None
+        )
+        if not callable(forecast):
+            raise ValueError("RWKV Rust runtime does not support Instant forecasts")
+        rows = [
+            (
+                _workload_input_row(card.review_input),
+                int(card.due_day or 0),
+                int(card.group),
+                float(card.desired_retention),
+                intervening_reviews.get(card.review_input.identity.card_id),
+                int(card.review_input.card_queue or 0),
+                (
+                    (int(card.review_input.card_due or 0) - day_start_secs) * 1000
+                    if card.review_input.card_queue == 1
+                    else int(card.due_day or 0) * 86_400_000
+                ),
+                int(card.review_input.remaining_steps or 0),
+                max(0, int(card.review_input.card_due or 0)),
+                card.review_input.fsrs_memory_state,
+                tuple(card.review_input.fsrs_parameters),
+                bool(fsrs_enabled),
+                card.group in instant_decks,
+                latest_answers_today.get(card.review_input.identity.card_id),
+                float(card.review_input.fsrs_historical_retention or 0.9),
+            )
+            for card in cards
+        ]
+        with self._locked_process():
+            args = (
+                rows,
+                list(decks),
+                list(deck_configs),
+                int(study_deck_id),
+                [list(pattern) for pattern in timing_patterns],
+                list(timing_pattern_success_shares),
+                int(days),
+                int(paths),
+                int(seed),
+                int(today),
+                bool(new_cards_ignore_review_limit),
+                bool(fsrs_learning_queues_disabled),
+                bool(fsrs_short_term_with_steps_enabled),
+                int(learn_ahead_secs),
+                int(now_millis),
+                bool(same_day_allowed),
+                int(min_intervening_reviews),
+                int(min_elapsed_secs),
+                int(refresh_interval),
+                bool(candidate_refresh_enabled),
+                int(candidate_refresh_limit),
+                bool(precompute_next_card),
+                int(review_order),
+                tuple(getattr(review_model, "grade_seconds")),
+                _workload_bucket_probabilities(review_model),
+                progress,
+            )
+            if review_time_model is not None:
+                return forecast(
+                    *args,
+                    scenario_sigma,
+                    day_progress,
+                    stratified_answers,
+                    stratified_scale,
+                    stratified_bias_sd,
+                    stratified_review_variance,
+                    review_time_model,
+                )
+            if stratified_answers:
+                return forecast(
+                    *args,
+                    scenario_sigma,
+                    day_progress,
+                    True,
+                    stratified_scale,
+                    stratified_bias_sd,
+                    stratified_review_variance,
+                )
+            if day_progress is not None:
+                return forecast(*args, scenario_sigma, day_progress)
+            return (
+                forecast(*args, scenario_sigma)
+                if scenario_sigma is not None
+                else forecast(*args)
+            )
 
     def snapshot(self, review_input: RwkvReviewInput) -> object:
         identity = review_input.identity
@@ -1567,6 +1849,30 @@ def _report_warmup_progress(
 ) -> None:
     if progress is not None:
         progress(RwkvWarmUpProgress(processed_reviews=processed, total_reviews=total))
+
+
+def _rust_prediction_row(request: RwkvReviewPredictionRequest) -> tuple:
+    review_input = request.review_input
+    return (
+        review_input.identity.card_id,
+        review_input.identity.note_id,
+        review_input.identity.deck_id,
+        review_input.identity.preset_id,
+        review_input.is_query,
+        review_input.ease,
+        review_input.duration_millis,
+        review_input.card_type,
+        review_input.day_offset,
+        review_input.current_elapsed_days,
+        review_input.current_elapsed_seconds,
+        *review_input.target_retentions,
+        review_input.enforce_grade_order,
+        _state_bytes(request.card_state),
+        _state_bytes(request.note_state),
+        _state_bytes(request.deck_state),
+        _state_bytes(request.preset_state),
+        _state_bytes(request.global_state),
+    )
 
 
 def _state_bytes(state: object | None) -> bytes | None:

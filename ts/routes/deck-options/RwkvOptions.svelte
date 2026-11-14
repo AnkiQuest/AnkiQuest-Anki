@@ -18,6 +18,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import type Modal from "bootstrap/js/dist/modal";
 
     import DynamicallySlottable from "$lib/components/DynamicallySlottable.svelte";
+    import CheckBox from "$lib/components/CheckBox.svelte";
     import HelpModal from "$lib/components/HelpModal.svelte";
     import Item from "$lib/components/Item.svelte";
     import SettingTitle from "$lib/components/SettingTitle.svelte";
@@ -37,6 +38,9 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     const config = state.currentConfig;
     const defaults = state.defaults;
+    const rwkvRespectSubdeckMinimums = state.rwkvRespectSubdeckMinimums;
+    const rwkvApplyRespectSubdeckMinimumsToChildren =
+        state.rwkvApplyRespectSubdeckMinimumsToChildren;
     const newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit;
     const reviewFuzzEnabled = state.reviewFuzzEnabled;
     const reviewFuzzBase = state.reviewFuzzBase;
@@ -115,9 +119,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             title: tr.deckConfigRwkvReviewMinimumReviewsPerDay(),
             help: tr.deckConfigRwkvReviewMinimumReviewsPerDayTooltip(),
         },
+        rwkvRespectSubdeckMinimums: {
+            title: tr.deckConfigRwkvReviewRespectSubdeckMinimums(),
+            help: tr.deckConfigRwkvReviewRespectSubdeckMinimumsTooltip(),
+        },
         rwkvCandidateRefresh: {
             title: tr.deckConfigRwkvReviewCandidateRefresh(),
             help: tr.deckConfigRwkvReviewCandidateRefreshTooltip(),
+        },
+        rwkvPrecomputeNextCard: {
+            title: tr.deckConfigRwkvReviewPrecomputeNextCard(),
+            help: tr.deckConfigRwkvReviewPrecomputeNextCardTooltip(),
         },
         rwkvRefreshInterval: {
             title: tr.deckConfigRwkvReviewRefreshInterval(),
@@ -267,6 +279,23 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                     </SpinBoxFloatRow>
                 </div>
 
+                <Item>
+                    <SwitchRow
+                        bind:value={$rwkvRespectSubdeckMinimums}
+                        defaultValue={false}
+                    >
+                        <SettingTitle
+                            on:click={() =>
+                                openSettingHelp("rwkvRespectSubdeckMinimums")}
+                        >
+                            {tr.deckConfigRwkvReviewRespectSubdeckMinimums()}
+                        </SettingTitle>
+                    </SwitchRow>
+                    <CheckBox bind:value={$rwkvApplyRespectSubdeckMinimumsToChildren}>
+                        {tr.deckConfigRwkvApplyRespectSubdeckMinimumsToChildren()}
+                    </CheckBox>
+                </Item>
+
                 <h2 class="rwkv-subheading">Same-Day Repeats</h2>
 
                 <RwkvRepeatSpacing
@@ -378,6 +407,16 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
                 {#if $config.rwkvReviewInstantOrderEnabled}
                     <h2 class="rwkv-subheading">RWKV-Instant</h2>
+                    <SwitchRow
+                        bind:value={$config.rwkvReviewPrecomputeNextCard}
+                        defaultValue={defaults.rwkvReviewPrecomputeNextCard}
+                    >
+                        <SettingTitle
+                            on:click={() => openSettingHelp("rwkvPrecomputeNextCard")}
+                        >
+                            {tr.deckConfigRwkvReviewPrecomputeNextCard()}
+                        </SettingTitle>
+                    </SwitchRow>
                     <SwitchRow
                         bind:value={$config.rwkvReviewCandidateRefreshEnabled}
                         defaultValue={defaults.rwkvReviewCandidateRefreshEnabled}

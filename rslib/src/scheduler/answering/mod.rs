@@ -8,6 +8,9 @@ mod relearning;
 mod review;
 mod revlog;
 
+#[cfg(test)]
+mod preview_s90_tests;
+
 use anki_i18n::I18n;
 use fsrs::NextStates;
 use fsrs::FSRS;
@@ -699,12 +702,7 @@ impl Collection {
 
         // Older imports and unlogged resets can leave a new card with active
         // history. Preview answers do not start a new learning sequence.
-        if original.ctype == CardType::New
-            && !matches!(
-                current_state,
-                CardState::Filtered(FilteredState::Preview(_))
-            )
-        {
+        if original.ctype == CardType::New && !is_preview {
             self.prepare_rwkv_new_card_reset(&mut updater.card)?;
         }
 

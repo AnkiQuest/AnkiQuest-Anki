@@ -33,7 +33,6 @@ impl StatePrecision {
         match value {
             "f32" => Ok(Self::F32),
             "int8" => Ok(Self::Int8),
-            "int4" => Ok(Self::Int4),
             "cards_int4_notes_int8" => Ok(Self::Int4CardsInt8Notes),
             _ => Err(invalid_state()),
         }
@@ -79,11 +78,16 @@ impl StatePrecision {
 }
 
 impl ModuleState {
-    pub(super) fn decoded(&self) -> Cow<'_, Self> {
+    pub(super) fn try_decoded(&self) -> io::Result<Cow<'_, Self>> {
         match &self.packed {
-            Some(bytes) => Cow::Owned(decode(bytes).expect("packed state was validated on load")),
-            None => Cow::Borrowed(self),
+            Some(bytes) => decode(bytes).map(Cow::Owned),
+            None => Ok(Cow::Borrowed(self)),
         }
+    }
+
+    pub(super) fn decoded(&self) -> Cow<'_, Self> {
+        self.try_decoded()
+            .expect("packed state was validated on load")
     }
 
     pub(super) fn into_decoded(self) -> Self {
@@ -150,7 +154,10 @@ fn read_shift(cursor: &mut Cursor<'_>) -> io::Result<Vec<f32>> {
             if value.is_finite() {
                 Ok(value)
             } else {
-                Err(invalid_state())
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid RWKV compact state: non-finite shift",
+                ))
             }
         })
         .collect()
@@ -179,7 +186,10 @@ pub(super) fn decode(bytes: &[u8]) -> io::Result<ModuleState> {
         for row in packed.chunks_exact(precision.row_bytes()) {
             let scale = f32::from_le_bytes(row[..4].try_into().unwrap());
             if !scale.is_finite() || scale <= 0.0 {
-                return Err(invalid_state());
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid RWKV compact state: non-finite or non-positive matrix scale",
+                ));
             }
             let invalid_code = if precision == StatePrecision::Int8 {
                 row[4..].contains(&128)
@@ -187,7 +197,10 @@ pub(super) fn decode(bytes: &[u8]) -> io::Result<ModuleState> {
                 row[4..].iter().any(|byte| byte & 15 == 8 || byte >> 4 == 8)
             };
             if invalid_code {
-                return Err(invalid_state());
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid RWKV compact state: out-of-range matrix code",
+                ));
             }
         }
         let channel_shift = read_shift(&mut cursor)?;
@@ -200,7 +213,10 @@ pub(super) fn decode(bytes: &[u8]) -> io::Result<ModuleState> {
             let mut matrix = vec![0.0; matrix_count];
             decode_matrix(precision, packed, &mut matrix);
             if matrix.iter().any(|value| !value.is_finite()) {
-                return Err(invalid_state());
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid RWKV compact state: non-finite matrix value",
+                ));
             }
             Some(TimeState {
                 x_shift,

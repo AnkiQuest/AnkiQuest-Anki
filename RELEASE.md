@@ -10,6 +10,7 @@ repeated here unless they materially affect a fork feature.
 - Add user-visible fork changes to **Unreleased** in the same commit as the
   change.
 - Split each release into **User facing changes** and **Technical details**.
+  Group **User facing changes** under **New Features** and **Fixes**; keep storage optimizations, historical model benchmarks and implementation details in **Technical details**.
   Describe practical outcomes in the first section. Put implementation context,
   upstream references, compatibility notes, measurements, and verification in
   the second section.
@@ -32,33 +33,230 @@ repeated here unless they materially affect a fork feature.
 
 ## Unreleased
 
-Changes since the last normal release, [build 102](https://github.com/JSchoreels/anki/releases/tag/26.09.3%2Bfsrs7.build.102). The application version remains `26.09.3+fsrs7`.
+Changes since the last normal release, [build 110](https://github.com/JSchoreels/anki/releases/tag/26.09.3%2Bfsrs7.build.110). The application version is `26.09.4+fsrs7`, incorporating [Anki 26.09.4](https://github.com/ankitects/anki/releases/tag/26.09.4).
 
 ### User facing changes
 
+#### New Features
+
+- **Choose an RWKV model size.** Deck Options offers Big, Small and Tiny cards with estimated memory and disk use, accuracy and relative replay time. Small is the default. At the default storage precision, Tiny's combined Curve and Instant state uses about 5.3 KB per card and note instead of Small's 7.1 KB, or 26% less, with a small accuracy tradeoff. Each size uses its own Curve and Instant models; **Use one model for RWKV** reduces state use when both schedulers are enabled.
+
+- **Switch models without reopening the profile.** Saving a choice now offers to rebuild RWKV state immediately when the underlying models change. If the model layout stays the same, the existing state is kept.
+
+- **More accurate Big and Small Instant predictions.** Each size has a model trained for the instant recall query. For Big, held-out Instant LogLoss fell from 0.276183 to 0.275894. With both RWKV schedulers enabled, the dedicated Big model adds a second state; **Use one model for RWKV** retains single-model state use.
+
+- **See estimated answer time.** When the Small Curve model is active, Card Info can show typical answer time by button and the expected answer time for cards last reviewed on an earlier day. On held-out reviews, its time LogLoss was 17.3% lower than a per-button running-median baseline.
+
+- **Compare FSRS-6 models in statistics add-ons.** Current predictions use each home deck's saved FSRS-6 parameters; historical comparisons use held-out predictions trained on earlier review folds. Preparing the comparison does not change card state or overwrite the active model's prediction cache.
+
+- **Forecast RWKV-Instant workloads.** Compatible add-ons can simulate Instant reviews using recent answer timing and outcomes, daily limits, learning steps and selected review order. The graph can show simulated days as they finish; larger forecasts may still take time.
+
+- **Support smoother RWKV recall forecasts.** Compatible add-ons can project recall at several future times without holding the collection worker throughout scoring. In an offscreen test with an updated forecast add-on and 8,747 cards, the longest sampled collection-task wait during repeated refreshes fell from 19.2 seconds to 1.1 milliseconds. Overlapping identical requests share work, and predictions wait for the RWKV backend between batches.
+
+#### Fixes
+
+- **Correct FSRS training and simulations.** FSRS-7 optimization with same-day reviews disabled now preserves valid model parameters. FSRS-6 simulations keep stability from falling on a Hard answer, and initial stabilities stay ordered by answer button. Re-optimize an affected preset to obtain corrected parameters.
+
+- **Balance Instant minimum reviews across the selected deck.** The minimum chooses the lowest-recall cards across its subdecks. The deck-specific **Also honor subdeck minimums** option retains separate minimums where desired.
+
+- **Avoid unnecessary RWKV state reloads.** When a change such as selecting a deck leaves the review history untouched, Anki can confirm that the resident state still matches instead of loading it again. One collection avoided about 1.4 seconds of CPU work.
+
+- **Keep RWKV state reliable after template changes and sync.** Fix a crash caused by applying an answer twice after editing a card template, and refresh state after a sync add-on receives remote changes.
+
+- **Improve Instant forecasts.** Respect daily limits, use the model's actual queue scores, estimate answer duration from recent review history and recall, and calibrate the range of answer outcomes. In one 28,925-card measurement, a two-day single-path forecast fell from 66.5 to 45.7 seconds; in a separate backtest, the estimated review time improved from 12.3 to 9.6 seconds against 9.6 seconds observed.
+
+- **Optimize FSRS faster with less memory.** On a copied deck with 188,183 rated reviews, optimization without the optional health check or Dynamic DR fell from 1.57 to 0.36 seconds and peak process memory from 259 to 165 MiB. A subsequent improvement reduced a comparable run from 365 to 316 ms and 167 to 114 MiB. Results matched the earlier implementation.
+
+- **Reduce FSRS calibration memory.** On the same deck, generating final-fit predictions and five validation folds used 125 MiB instead of 236 MiB, with matching prediction rows.
+
+- **Honor answer-button retention rules with RWKV-Curve.** Dynamic Desired Retention grade rules now select the RWKV target without replacing its button intervals with FSRS estimates.
+
+- **Speed up normal sync uploads.** Pending small changes are combined into fewer requests; the improvement depends on the number of changes and network latency.
+
+- **Include Anki 26.09.4 security fixes.** Address shared-deck code-execution vulnerabilities involving embedded editor content and macOS **Show in Folder**, and update bundled certificate and installer dependencies.
+
+### Technical details
+
+- **RWKV model family:** Big uses SM91s2 for Curve and SM99 for Instant, Small uses SM92 and SM98, and Tiny uses SM106 and SM101. A paired runtime replays both models; Instant-only configurations use only the Instant model and fall back to FSRS for intervals. Model identities determine whether cached state must be rebuilt. Small's SM92 has the answer-time head; Big and Tiny do not. Details and accuracy methodology: [family wiring](https://github.com/JSchoreels/anki/blob/main/docs/rwkv-sm114-2026-11-13.MD) and [answer-time evaluation](https://github.com/JSchoreels/anki/blob/main/docs/rwkv-answer-time-2026-11-01.MD).
+
+- **Model-size timing:** On one Windows collection copy with 13,980 reviewed cards and 225,132 reviews, estimated cold state builds with both schedulers were 23.3 seconds for Big, 7.8 seconds for Small and 7.2 seconds for Tiny. These estimates add a separately measured Python cost to native replay; actual time depends on hardware and collection. See the [benchmark and methodology](https://github.com/JSchoreels/anki/blob/main/docs/rwkv-speed-test-2026-11-14.MD).
+
+- **FSRS-6 comparison API:** Current scores use the home-deck config's saved parameters; an independent calculation returns saved-model and chronological validation-fold predictions without writing either to Anki's prediction cache. Add-on-owned caches can use the history and rollover fingerprint to detect changes. See [FSRS presets](https://github.com/JSchoreels/anki/blob/main/docs/fsrs-presets.MD#fsrs-6-comparisons).
+
+- **FSRS fixes:** Backport upstream [initial-stability ordering](https://github.com/open-spaced-repetition/fsrs-rs/pull/477), [FSRS-6 Hard-answer simulation](https://github.com/open-spaced-repetition/fsrs-rs/pull/479), and [FSRS-7 training without same-day reviews](https://github.com/open-spaced-repetition/fsrs-rs/pull/481). These changes do not switch the fork to the separate compact FSRS-6 training optimization.
+
+- **FSRS optimization and calibration:** Reuse compact histories for FSRS-7 training and FSRS-6/7 evaluation and calibration. Skip simulator preparation when Dynamic DR is disabled and avoid duplicating health-check items. Compact per-review predictions were merged upstream in [fsrs-rs #471](https://github.com/open-spaced-repetition/fsrs-rs/pull/471); the fork remains pinned to a specific revision with the fixes above. See [performance](https://github.com/JSchoreels/anki/blob/main/docs/fsrs-compact-performance.MD), [calibration profile](https://github.com/JSchoreels/anki/blob/main/docs/fsrs-compact-prediction-profile-2026-11-03.MD) and [optimization profile](https://github.com/JSchoreels/anki/blob/main/docs/fsrs-optimization-profile-2026-11-03.MD).
+
+- **RWKV ordering, sync and forecasting:** The selected deck's minimum is filled by absolute retrievability, with child minimums applied only when enabled. The forecast uses measured recall error, sampled answer outcomes, recent durations and the configured queue refresh. Standard sync hooks trigger reconciliation after remote changes, and invalid compact state reports its scope instead of panicking.
+
+- **Recall projection API:** Add-ons can request future recall from the resident RWKV state, with cancellation and stale-state detection. Calls do not start a historical replay when the state is cold. The offscreen comparison sampled a collection task every 250 ms while refreshing the deck list three times; the legacy path completed 6 samples and the updated add-on completed 80. The add-on update is separate from this Anki release. See [RWKV recall projection](https://github.com/JSchoreels/anki/blob/main/docs/rwkv.MD#recall-projection-add-on-api).
+
+- **Security and dependencies:** Update Ammonia from 4.1.8 to 4.1.9 for [RUSTSEC-2026-0533](https://rustsec.org/advisories/RUSTSEC-2026-0533); Anki uses the default sanitizer configuration, which the advisory says is not affected. Update `pulldown-cmark` for [RUSTSEC-2026-0433](https://rustsec.org/advisories/RUSTSEC-2026-0433), and include upstream fixes for [GHSA-j9v5-m549-cg6c](https://github.com/ankitects/anki/security/advisories/GHSA-j9v5-m549-cg6c) and [GHSA-gfvm-4968-jp9m](https://github.com/ankitects/anki/security/advisories/GHSA-gfvm-4968-jp9m).
+
+- **Normal sync uploads:** Combine up to four existing collection chunks when their combined serialized request is below 512 KiB. The sync transaction and wire format are unchanged.
+
+## 26.09.3+fsrs7.build.110 — 2026-11-01
+
+Changes since the last normal release, [build 107](https://github.com/JSchoreels/anki/releases/tag/26.09.3%2Bfsrs7.build.107). The application version remains `26.09.3+fsrs7`.
+
+### User facing changes
+
+#### New Features
+
+- **Choose when RWKV-Instant updates the review order.** The new Advanced option **Precompute next card before this card answer** is on by default and uses the existing queue for the next card. Turn it off to refresh the full retrievability order after each answer before the next card appears.
+
+- **Default small RWKV model: small model, leak-free, cool-down from epoch 25 (SM63).** It replaces SM56 with the same size (**331,511 parameters, 8.3× fewer than the big model**, about 4.6 KB of state per card and note instead of 25.7 KB) and was trained without the signal that a card is deleted later, which live Anki never has. On the 732-user held-out set, with leak-free inputs for every model, its Curve / Instant LogLoss is **0.30003 / 0.27654**: **+0.12% / +0.12%** against the shipped big model and **+0.36% / +0.28%** against the big model (1 leak-free epoch). Against SM56 on the same inputs both heads are lower (−0.000630 Curve, −0.000908 Instant; clear of zero on all three held-out sets). **Use Smaller Model** now selects it; a successful Deck Options save upgrades SM40, SM36, SM55, SM56 or the earlier SM72 cool-downs (from epoch 15 and from epoch 20) to it, and Legacy stays available. Reopen the profile to apply it.
+
+- **Compare RWKV and FSRS with a shared simulated learner.** The comparison starts both schedulers from the same cards and due dates, offers FSRS-based and RWKV-based learners, and can simulate temporary or persistent changes in performance. It replays recent reviews on other cards as background activity, and lets you switch between FSRS and RWKV estimates of the same simulated answers without rerunning. It shows matched-memory time estimates and lets you increase the sample size, retention resolution and number of paired runs.
+
+- **See where FSRS and RWKV agree on scheduler efficiency.** An optional comparison runs both answer models on the same prepared data and shows whether both memory estimators favor the same scheduler at each tested retention. Run additional horizons to add rows to the agreement table.
+
+- **Faster RWKV/FSRS comparisons.** Independent simulation runs can execute concurrently. Runtime depends on the collection, the amount of replayed background activity, and the computer.
+
+- **Faster RWKV review statistics for compatible add-ons.** A batched native replay API lets Search Stats Extended compare recall with and without each review immediately or at a chosen later time without querying each answer separately.
+
+- **Clearer RWKV model help.** The model descriptions and links now appear directly below **Use Smaller Model** in Deck Options → RWKV → Advanced.
+
+#### Fixes
+
+- **Keep RWKV-Instant review order up to date as time passes.** Full queue updates now use the current elapsed time for each card, so recently failed cards can return to their expected position without syncing.
+
+- **Keep preview reviews from changing saved memory estimates.** Answering a card in a preview-only filtered deck no longer applies RWKV-Curve stability or a desired-retention override to the card.
+
+- **Avoid reusing an earlier RWKV prediction when a card returns.** If a fresh prediction is unavailable for a new presentation, the answer no longer receives metadata from that card's previous presentation.
+
+- **Preserve final desired-retention targets from compatible add-ons.** A per-answer target explicitly marked as final is stored as supplied instead of being mapped through Dynamic Desired Retention a second time.
+
+- **Faster RWKV-Instant refreshes with Dynamic Desired Retention.** With precomputation off, preparing and predicting a warm full-deck queue on a copied collection with 7,449 candidates fell from a median of 157 ms to 117 ms. The complete delay between cards also includes score installation and the UI transition.
+
+- **Faster Dynamic Desired Retention during review.** Warm single-card RWKV target lookups took a median of about 140 ms before and less than 1 ms after on ten sampled cards from a copied collection with 7,449 review candidates. Full-deck refreshes still depend on the configured rules and collection size.
+
+- **Fewer temporary Unknown RWKV values in Card Info.** Its background requests can briefly wait for another prediction to finish, and discard results if the model state changes during the wait.
+
+- **Removed the full int4 RWKV storage option.** Int4 note state could diverge on long note histories (one 9,539-step sequence reached about 1e32 by step 6000 and overflowed at step 6843). Storage choices are now f32, int8, and the default int4 cards + int8 notes. A profile that saved the full int4 choice uses the default after restarting, and its cached state is rebuilt from review history.
+
+- **Include older synchronized reviews in RWKV.** Reviews received from another device are now included even when they are more than eight days old. Anki rebuilds affected RWKV states when needed, which can make the first refresh after sync take longer.
+
+- **More reliable RWKV simulation results.** The standalone simulator updates RWKV after every answer by default, honors grade-order settings in its native path, and displays actual simulated review counts instead of forcing them to rise with retention. Comparison tooltips now show the correct relative change.
+
+- **Stop repeated RWKV recovery after re-importing a deck as new.** Re-imported new cards start fresh in RWKV, including cards whose old history ended in Learning, while their previous review logs remain available. Imports with scheduling retain their source history. Existing caches rebuild once, and reset boundaries survive ordinary card edits on older clients.
+
+- **New cards stay mixed with RWKV reviews.** Queue refreshes preserve progress through **Mix with reviews**, preventing new cards from being repeatedly postponed behind cards added to meet **Minimum reviews per day**.
+
+- **Draft builds no longer offer older published updates.** Automatic checks and Tools → Check for Updates compare the full fork build number, preventing a newer draft from prompting to install an older or equal published build with the same application version. Newer builds continue to be offered.
+
+- **Updated security dependencies.** This build includes patched Zstandard components and an updated Markdown parser to address reported security issues.
+
+### Technical details
+
+- **RWKV elapsed-time refresh:** Full queue scoring recalculates cached candidates' elapsed times from their last-review or creation timestamps. On synthetic decks, median input preparation over nine updates with one simulated newly answered card each changed from 1.19 ms to 5.54 ms for 2,000 cards and from 2.45 ms to 27.26 ms for 10,000 cards. Every cached input needed updating; these measurements exclude prediction, score installation and UI transitions.
+
+- **RWKV review ordering:** The default reuses the previously computed score map and refreshes in the background. Disabling precomputation refreshes the full candidate set after each answer, independent of the interval and approximate-candidate settings. Card Info waits up to 100 ms for prediction access off the UI thread and retries if the state changes or remains busy.
+
+- **Dynamic Desired Retention lookups:** RWKV uses the provider's single-card API for one-card work and falls back to the bulk API when necessary. Searches that require `cid:` and exact FSRS metrics prepare those metrics only for the specified cards; other searches retain their existing behavior. On the same copied collection with a warm provider, the ten-card median was 141 ms for the previous one-card bulk lookup and 0.25 ms for the new RWKV lookup. Full-deck rule resolution remained about 316 ms with the tested rules, separate from the approximately 40 ms prediction stage with the earlier SM72 cool-down from epoch 15.
+
+- **RWKV queue input preparation:** Dynamic Desired Retention targets are applied while constructing native review inputs, avoiding a second copy of each changed input, and stable preset IDs use a bounded cache. Twelve alternating, warm measurements with session-cached rules gave medians of 157 ms before and 117 ms after, including prediction with the earlier SM72 cool-down from epoch 15 and excluding score installation and UI transitions. All 7,449 inputs and predictions matched when compared on the same frozen card data.
+
+- **Full int4 state precision removed:** `int4` is no longer in the supported precision list or accepted by the native parser, so a stored `int4` falls back to `cards_int4_notes_int8` in the profile helper, and Deck Options rejects it as unsupported. The int4 matrix codec remains for the card half of the default policy. Precision is part of the replay identity (`statePrecision`), so caches written in full int4 do not match and are rebuilt rather than reused.
+
+- **RWKV history recovery:** Post-sync validation uses the full retained history, restores a matching checkpoint when available, and otherwise replays from the beginning. Caches that previously excluded synchronized reviews are rebuilt once on their next load.
+
+- **SM72 integration:** import the verified [SM72 package, cool-down from epoch 25](https://github.com/JSchoreels/anki-rwkv/tree/420a111c48cbf321b0cd45c3ff55a23b94411e28/artifacts/models) (profile key `sm72e25`; 25 constant-LR epochs on all 8,000 users, then a one-epoch 32k Muon cool-down, distilled from the big model (1 leak-free epoch)). Against the cool-down from epoch 20 (`sm72e20`, [release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm72e20-2026-10-29), kept bundled with the cool-down from epoch 15, `sm72`) it is better on Instant with an interval clear of zero on all three held-out sets (−0.000104 on the 732-user set) and on Curve in the point estimate (−0.000158 [−0.000364, +0.000014] on the 732-user set; clear of zero on the 464-user set only). A new key keeps state cached with the earlier weights from being reused. Its architecture export is byte-identical to SM56's, so it shares the small engine, state codecs and storage precisions. With any SM72 cool-down selected, the runtime forces the missing note, deck and preset flags (inputs 13–15) to zero in the review, bulk-replay, scalar-query and batched-query paths; other models keep their feature path. Canonical history already excludes deleted cards' reviews, so the release's nearest-card deck rule never applies. Native parity on the full 14,403-row release vectors is 3.5e−6 (f32 weights) / 3.3e−6 (INT8 weights). Earlier releases' upstream scores used inputs with the leak and are not directly comparable. See the [SM72 cool-down from epoch 25 integration report](docs/rwkv-sm72e25-2026-10-30.MD), the [cool-down from epoch 20 report](docs/rwkv-sm72e20-2026-10-29.MD) and the [earlier SM72 report](docs/rwkv-sm72-2026-10-28.MD).
+
+- **Shared-learner workload comparison:** Both policies use the same learner assumptions, grade costs, limits, background reviews and per-card random quantiles. Both models score each policy's answers and its matching no-target-review baseline. The simulator reports sampling, estimated FSRS states and the number of historical background answers. Simulated memory remains model-dependent, and the day-level comparison omits simulated learning steps, easy days, dynamic retention and the live RWKV-Instant queue.
+
+- **Scheduler agreement:** The optional two-answer-model comparison holds one prepared card sample, background history and RWKV resident state for both answer models. For each retention and horizon it compares net memorized gain per hour for both schedulers, under each combination of answer and memory model. A displayed 0.0% difference is treated as a tie; nonpositive FSRS efficiency or missing review time makes that comparison unavailable.
+
+- **Comparison performance:** Independent runs execute concurrently within an estimated worker-memory budget that includes copied background-card state, and identical scheduler/learner state is reused within a run. Replaying the background adds work proportional to the number of historical answers and simulated runs.
+
+- **RWKV re-import reset boundaries:** A versioned collection-config mirror protects each boundary when an older client rewrites card data. On normal sync, newer clients reconcile a stale mirror and upload the result; scheduled exports include the effective boundary, and import, undo and redo preserve the intended history. Boundaries already stored only in card data are mirrored when the collection opens. Full-sync replacement and packages exported directly from older clients still follow those clients' normal data-retention behavior. Genuine history and preset-routing changes continue to trigger safe recovery.
+
+- **RWKV review replay:** Packed, batched queries can use per-answer elapsed times and scheduler days before or after each historical answer without advancing recurrent state for the query. Scope and query inputs are validated before replay. Native tests compare both engine families with independent frozen-state queries across state precisions and chunk boundaries.
+
+- **RWKV queue mixing:** Queue refreshes retain the new/review mixing progress, including when the minimum-review queue is extended.
+
+- **Zstandard security update:** Update `zstd` to 0.14.3, `zstd-safe` to 8.2.0 and `zstd-sys` to 2.1.2, together with `async-compression` 0.4.51 and `compression-codecs` 0.4.46. This addresses [RUSTSEC-2026-0391](https://rustsec.org/advisories/RUSTSEC-2026-0391), [RUSTSEC-2026-0398](https://rustsec.org/advisories/RUSTSEC-2026-0398), [RUSTSEC-2026-0403](https://rustsec.org/advisories/RUSTSEC-2026-0403) and [RUSTSEC-2026-0410](https://rustsec.org/advisories/RUSTSEC-2026-0410), which were detected by the Linux CI dependency audit.
+
+- **Markdown parser security update:** Update `pulldown-cmark` to 0.13.5 for [RUSTSEC-2026-0414](https://rustsec.org/advisories/RUSTSEC-2026-0414).
+
+## 26.09.3+fsrs7.build.107 — 2026-10-24
+
+### SM56: a new small RWKV model
+
+SM56 is the new default small RWKV model in this release: **331,511 parameters, 8.3× fewer than the big model**, with both RWKV-Curve and RWKV-Instant. Its LogLoss is within **0.5% of the big model on 723 held-out users**; Legacy remains available.
+
+**Matched benchmark: 723 held-out users from the 732-user standard set. Lower LogLoss is better.**
+
+| Model                      |        Curve LogLoss |      Instant LogLoss |
+| -------------------------- | -------------------: | -------------------: |
+| Big model (same 723 users) |              0.30139 |              0.27786 |
+| **SM56 small model**       | **0.30242 (+0.34%)** | **0.27917 (+0.47%)** |
+
+Relative percentages are versus the big model on those same 723 users, as reported upstream. These results use INT8 weights and INT8 card/note state (w8+s8). Desktop Anki keeps f32 weights and your saved state precision; the table does not measure every desktop precision mode.
+
+[Model Factory: results and comparisons](https://jschoreels.github.io/anki-rwkv/factory.html) · [anki-rwkv project](https://github.com/JSchoreels/anki-rwkv) · [SM56 upstream release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm56-2026-10-24)
+
+---
+
+### Release highlights in screenshots
+
+<a href="https://raw.githubusercontent.com/JSchoreels/anki/96af4ca9d214e71743b1186fd2ceab1a7e7e3f32/docs/release-assets/build-107/rwkv-settings.png"><img width="320" align="top" alt="Simplified RWKV settings" src="https://raw.githubusercontent.com/JSchoreels/anki/96af4ca9d214e71743b1186fd2ceab1a7e7e3f32/docs/release-assets/build-107/rwkv-settings.png"></a> <a href="https://raw.githubusercontent.com/JSchoreels/anki/96af4ca9d214e71743b1186fd2ceab1a7e7e3f32/docs/release-assets/build-107/sm56-advanced.png"><img width="320" align="top" alt="SM56 model and Advanced controls" src="https://raw.githubusercontent.com/JSchoreels/anki/96af4ca9d214e71743b1186fd2ceab1a7e7e3f32/docs/release-assets/build-107/sm56-advanced.png"></a> <a href="https://raw.githubusercontent.com/JSchoreels/anki/96af4ca9d214e71743b1186fd2ceab1a7e7e3f32/docs/release-assets/build-107/intraday-learning-order.png"><img width="320" align="top" alt="Intraday learning and review order" src="https://raw.githubusercontent.com/JSchoreels/anki/96af4ca9d214e71743b1186fd2ceab1a7e7e3f32/docs/release-assets/build-107/intraday-learning-order.png"></a>
+
+1. **Simplified RWKV settings.** Instant, Curve and maintenance tools stay visible. Advanced controls are grouped at the bottom.
+2. **SM56 by default, with Legacy still available.** Use Smaller Model selects SM56. Open the help for the model legend and results links; queue and comparison controls are in Advanced.
+3. **Choose where intraday learning appears.** Mix learning with reviews, or show it before or after reviews.
+
+_Example settings shown. Click a screenshot to view it full size._
+
+---
+
+Changes since [build 102](https://github.com/JSchoreels/anki/releases/tag/26.09.3%2Bfsrs7.build.102). The application version remains `26.09.3+fsrs7`.
+
+### User facing changes
+
+#### New Features
+
+- **SM56 is the default small RWKV model.**
+  - Powers both RWKV-Instant and RWKV-Curve, with f32, INT8, INT4, or mixed INT4 cards + INT8 notes (the default).
+  - Preserves saved storage precision; weights and computation remain f32.
+  - On the upstream matched 723-user benchmark, Curve / Instant LogLoss is **0.148% / 0.061% lower than SM55**. The comparison uses INT8 weights and states, as in the table above.
+  - In Deck Options → RWKV → Advanced, turn on **Use Smaller Model** for SM56 or turn it off for Legacy.
+
+- **Simpler RWKV Deck Options.**
+  - A collapsed **Advanced** section groups the model switch, approximate queue updates, queue refresh frequency and comparison controls.
+  - The model help entry explains both models and links to the Model Factory results and matched backup comparison.
+  - Tighter Instant descriptions and an aligned minimum-reviews row reduce clutter. The sorting recommendation is removed; storage precision is hidden and preserved.
+  - A successful Save upgrades previously selected SM40, SM36 or SM55 to SM56. Discard leaves the saved model unchanged.
+
+- **Choose when due same-day learning appears.**
+  - Deck Options → Display Order offers **Show before reviews**, **Mix with reviews**, or **Show after reviews**.
+  - Before and After move due learning/relearning cards as a group, preserving retrievability or Relative Overdueness sorting within each group.
+  - Mix preserves the shared sorted order and is the default. The choice syncs with the deck preset.
+
+- **Automatic updates for portable builds.**
+  - Receive automatic update notifications or use **Tools → Check for Updates**.
+  - Accept an update to download the matching archive, close Anki, replace the application and restart with the existing data folder.
+  - Failed installation or early startup restores the previous application. Older portable builds need one manual upgrade to gain this flow.
+
+- **Separate RWKV state rebuilding from calibration preparation.**
+  - **Build Cache** rebuilds review state only, avoiding a second historical prediction replay (21.1 s in the observed run) and FSRS calibration rebuilding.
+  - **Prepare Calibration Data** refreshes both models’ historical predictions and validation folds while preserving the active RWKV review state.
+
+- **Choose the RWKV model for each profile.**
+  - The model switch applies to all decks in the local profile and does not sync.
+  - After saving a different model, reopen the profile to rebuild RWKV state from review history.
+
+#### Fixes
+
 - **Remove the one-minute RWKV-Curve fallback.** When predicted recall is already at or below the target at one second, Curve now returns a one-second interval and S90 instead of one minute. This also prevents an immediately due answer from appearing later than another sub-minute answer. Configured minimum intervals and learning/relearning steps still apply.
 
-- **Simpler RWKV Deck Options.** A collapsed Advanced section now groups the “Use Smaller Model” switch, approximate queue updates, queue refresh frequency and comparison controls. The switch is on by default for SM56; turning it off selects Legacy. Its help entry explains both models and links to the Model Factory results and matched backup comparison, replacing the separate model-name line. Instant descriptions use tighter spacing, the minimum-reviews row aligns with the other controls, and the sorting recommendation line is removed. Storage precision is hidden and preserved. Previously saved SM40, SM36 or SM55 choices become SM56 after a successful Deck Options save; discarding leaves them unchanged.
-
-- **SM56 is the default small RWKV model.** On the upstream matched 723-user comparison, it lowers Curve / Instant LogLoss by 0.148% / 0.061% relative to SM55, bringing it within 0.34% / 0.47% of the big model. Turn on “Use Smaller Model” in Deck Options → RWKV → Advanced, save and reopen the profile to use SM56. Storage precision stays unchanged.
-
 - **Learn ahead works with FSRS review sorting.** Relative Overdueness and ascending/descending retrievability now respect the Learn ahead limit for learning and relearning cards once no other cards remain to study. A limit of zero continues to require the full delay.
-
-- **Automatic updates for portable builds.** Portable Anki now offers automatic notifications and Tools → Check for Updates. Accepting downloads and prepares the matching archive, closes Anki normally, replaces the application, and restarts it with the existing data folder in place. Failed installation or early bootstrap restores the previous application. Older portable builds need one manual upgrade to gain this flow.
 
 - **Preserve literal comparison characters in searches.** Escape `<`, `>`, or `=` to search for text such as `x\<5` without triggering a numeric field comparison. Numeric comparisons, including equality, and the existing bracket range syntax continue to work; normalizing a search preserves its meaning.
 
 - **Card Info recovers from a busy RWKV backend.** Temporarily unavailable RWKV values retry automatically with bounded delays, so reopening the window is no longer needed after background inference finishes.
 
-- **Store RWKV cards at INT4 while keeping notes at INT8.** RWKV defaults to “int4 cards + int8 notes” storage for all five bundled models when no supported precision choice is saved. On the measured 224,022-answer collection, the SM40 cache shrank from 67.4 MB with INT8 to 53.1 MB with mixed storage (21% smaller), while rebuilding and saving took about the same time (2.96 s versus 2.92 s). Explicitly saved precision choices are preserved; the storage selector is now hidden.
-
-- **Separate RWKV state rebuilding from calibration preparation.** Build Cache now rebuilds only RWKV review state, avoiding the second historical prediction replay (21.1 s in the observed run) and FSRS calibration rebuild. Use Prepare Calibration Data to refresh both models’ historical predictions and validation folds; it preserves the active RWKV review state.
-
 - **Restore rebuilt RWKV caches correctly.** Desktop cache validation now accepts the schema written by both native models, fixing the “state-cache store identity mismatch” warning and avoiding needless rebuilds after reopening a profile. Rebuild logs also identify the active model and state precision during state and calibration replay.
-
-- **Choose the RWKV model for each profile.** The model switch in Deck Options → RWKV → Advanced applies to all decks in the local profile and does not sync. Reopen the profile after saving a different model to rebuild RWKV state from review history.
-
-- **Smaller, faster bundled RWKV model.** The experimental SM40 integration rebuilds the complete native state and final cache for the measured 224,022-answer collection in 3.64 s with f32 state versus 10.86 s for the legacy model with f32 state (11.92 s with legacy INT8); cache size falls from 1211.6 MB to 192.0 MB. Existing profile precision choices are preserved; SM40 INT8 uses a 67.4 MB cache and rebuilds in 3.91 s. Instant log loss is 0.060% higher than legacy f32 on matched interday reviews, with improved ordinary calibration; the legacy model still wins the paired UM+ comparisons.
 
 - **Correct dynamic FSRS presets during Deck Options recalculation.** Bulk memory-state updates now use each card's first matching Dynamic Preset Selection rule and its model parameters, retention settings, and history cutoff. Previously, every card used the home-deck preset. Optional rescheduling uses the same matched model; recalculating without rescheduling still preserves intervals and due dates.
 
@@ -82,24 +280,29 @@ Changes since the last normal release, [build 102](https://github.com/JSchoreels
 
 - **RWKV cache fixes: stale calibration data, corrupt cache file, slower startups over time.** After an RWKV model or precision change, the calibration graph, the FSRS-vs-RWKV comparison and Search Stats Extended now recompute their RWKV predictions instead of showing the previous model's. A damaged retrievability cache file no longer stops the profile from opening: it is recreated (a cache held by another running Anki still reports "Anki already open"). Startup no longer slows down as reviews pile up since the last full state save: once 10,000 reviews are waiting to be replayed, they are written into the state store (about 3.5s per 50,000 reviews before). FSRS calibration rows are rebuilt correctly when two presets share a name, and adding a preset no longer discards the RWKV Memorised history cache.
 
-- **Choose when due same-day learning appears without changing review sorting.** Deck Options → Display Order now offers Intraday learning/review order with Show before reviews, Mix with reviews, and Show after reviews. Before and After move due same-day learning/relearning as a group while retaining ascending/descending retrievability or Relative Overdueness within each group. Mix preserves the shared sorted order and is the default. The choice syncs with the deck preset.
 - **Updated security dependencies.** This build includes patched HTML sanitization, asynchronous I/O, TLS and ZIP libraries, addressing newly reported CSS URL filtering, Unix file-descriptor handling, TLS handling, distrusted certificate authorities and archive extraction issues.
 
 ### Technical details
+
+- **Mixed RWKV storage and cache size:** RWKV defaults to “int4 cards + int8 notes” storage for all five bundled models when no supported precision choice is saved. On the measured 224,022-answer collection, the SM40 cache shrank from 67.4 MB with INT8 to 53.1 MB with mixed storage (21% smaller), while rebuilding and saving took about the same time (2.96 s versus 2.92 s). Explicitly saved precision choices are preserved; the storage selector is now hidden.
+
+- **Earlier SM40 measurements:** The experimental SM40 integration rebuilds the complete native state and final cache for the measured 224,022-answer collection in 3.64 s with f32 state versus 10.86 s for the legacy model with f32 state (11.92 s with legacy INT8); cache size falls from 1211.6 MB to 192.0 MB. Existing profile precision choices are preserved; SM40 INT8 uses a 67.4 MB cache and rebuilds in 3.91 s. Instant log loss is 0.060% higher than legacy f32 on matched interday reviews, with improved ordinary calibration; the legacy model still wins the paired UM+ comparisons.
 
 - **Tokio security update:** raise the workspace minimum and lock Tokio from 1.52.1 to 1.53.3, addressing [RUSTSEC-2026-0386](https://github.com/RustSec/advisory-db/blob/main/crates/tokio/RUSTSEC-2026-0386.md). The Linux release CI detected the unsafe file-descriptor constructor advisory during `cargo deny check`; retain the audit policy and all existing checks.
 
 - **RWKV settings layout:** reuse the existing profile settings save contract and preset queue fields, with no new schema or precision changes. Ordinary save requests translate SM40/SM36/SM55 to SM56 without mutating pending state; parameter-only optimization is excluded, and the desktop still persists choices only after successful configuration saves. Runtime support for older models remains available.
 
-- **SM56 integration:** import the verified [SM56 release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm56-2026-10-24), trained for ten base epochs on all 8,000 users followed by the 8,000-user Muon decay. Architecture and reference code are byte-identical to SM55; the native engines, features and state codecs are unchanged. Upstream matched-user scores use w8+s8, while desktop computation retains f32 weights with the saved state precision (mixed INT4 cards / INT8 notes by default). On the existing backup’s 176,943 interday reviews at the desktop precision, SM56 versus SM55 is +0.051% Curve / −0.013% Instant LogLoss; the upstream gain is not uniform on this collection. See the [SM56 integration report](docs/rwkv-sm56-2026-10-24.MD) for provenance, parity, cache checks and the five-model comparison.
+- **SM56 integration:** import the verified [SM56 release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm56-2026-10-24), trained for ten base epochs on all 8,000 users followed by the 8,000-user Muon decay. Architecture and reference code are byte-identical to SM55; the native engines, features and state codecs are unchanged. Upstream matched-user scores use w8+s8, while desktop computation retains f32 weights with the saved state precision (mixed INT4 cards / INT8 notes by default). On the existing backup’s 176,943 interday reviews at the desktop precision, SM56 versus SM55 is +0.051% Curve / −0.013% Instant LogLoss; the upstream gain is not uniform on this collection. See the [SM56 integration report](https://github.com/JSchoreels/anki/blob/95396c9ca1ae570601e977e851f2ab82e5d2fc98/docs/rwkv-sm56-2026-10-24.MD) for provenance, parity, cache checks and the five-model comparison.
 
-- **SM55 integration:** import the verified [SM55 release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm55-2026-10-22), trained with an 8,000-user Muon final decay. Its architecture is byte-identical to SM36 and SM40, so it shares the existing native specialization and state codecs. Preserve f32 compute weights and state precision. The upstream scores use w8+s8 on matched held-out users; the desktop uses f32 weights and mixed INT4-card/INT8-note state by default. On one backup's 176,943 matched interday reviews, SM55's Curve / Instant losses are 0.023% / 0.009% higher than SM36's, while both remain below SM40's. See the [integration report](docs/rwkv-sm55-2026-10-22.MD) for provenance, native/reference parity and the matched collection comparison.
+- **SM56 state precision and verification:** f32 stores card/note matrices at full precision; INT8 and INT4 quantize both card and note matrices; mixed storage uses INT4 cards and INT8 notes. These policies apply in RAM and on disk, while weights, arithmetic and shared scopes stay f32. Quantized modes retain f16 shifts and f32 row scales. All four policies are covered by native restore tests and desktop checkpoint, answer/undo and workload round trips. Native f32/INT8 weight-container parity is a separate reference check; it is not an INT4-weight compute mode. The complete [CI matrix](https://github.com/JSchoreels/anki/actions/runs/40092590192) and [release workflow](https://github.com/JSchoreels/anki/actions/runs/40093773358) passed for build 107, commit `95396c9ca1ae570601e977e851f2ab82e5d2fc98`, producing all 12 installer/portable packages.
 
-- **SM36 integration:** import the verified [SM36 Muon release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm36-2026-10-22), reuse SM40's identical native architecture and preserve f32 compute weights with the existing state codecs. Model selection and weight-content identity invalidate prior checkpoints when switching models. Verify the released fp32/int8 vectors, all model/precision checkpoint and undo/workload roundtrips, and the real Qt model selector. The upstream many-user scores use w8+s8; they are not a new many-user evaluation of the desktop's f32-weight mixed-state mode. See the [integration report](docs/rwkv-sm36-2026-10-22.MD).
+- **SM55 integration:** import the verified [SM55 release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm55-2026-10-22), trained with an 8,000-user Muon final decay. Its architecture is byte-identical to SM36 and SM40, so it shares the existing native specialization and state codecs. Preserve f32 compute weights and state precision. The upstream scores use w8+s8 on matched held-out users; the desktop uses f32 weights and mixed INT4-card/INT8-note state by default. On one backup's 176,943 matched interday reviews, SM55's Curve / Instant losses are 0.023% / 0.009% higher than SM36's, while both remain below SM40's. See the [integration report](https://github.com/JSchoreels/anki/blob/95396c9ca1ae570601e977e851f2ab82e5d2fc98/docs/rwkv-sm55-2026-10-22.MD) for provenance, native/reference parity and the matched collection comparison.
+
+- **SM36 integration:** import the verified [SM36 Muon release](https://github.com/JSchoreels/anki-rwkv/releases/tag/small-model-sm36-2026-10-22), reuse SM40's identical native architecture and preserve f32 compute weights with the existing state codecs. Model selection and weight-content identity invalidate prior checkpoints when switching models. Verify the released fp32/int8 vectors, all model/precision checkpoint and undo/workload roundtrips, and the real Qt model selector. The upstream many-user scores use w8+s8; they are not a new many-user evaluation of the desktop's f32-weight mixed-state mode. See the [integration report](https://github.com/JSchoreels/anki/blob/95396c9ca1ae570601e977e851f2ab82e5d2fc98/docs/rwkv-sm36-2026-10-22.MD).
 
 - **FSRS learn-ahead queue:** retain the shared ordering of due cards, then admit future intraday learning/relearning cards within the configured learn-ahead window after the main queue is exhausted. RWKV-Instant selection and repeat-spacing guards remain unchanged.
 
-- **Portable update routing:** retain opt-in asset selection and verified downloads under the current portable data folder. Add fresh-directory ZIP/TAR-Zstandard extraction, an application-file manifest, and a staged-runtime helper that waits for normal shutdown, retains rollback files, and checks restart acknowledgement. Keep profile data and unrelated top-level files in place. Cover edition/CPU selection, archive validation, cancellation, native extraction, helper bootstrap, process handoff, rollback and Qt controls. See [portable update behavior and recovery](docs/portable-updates.MD).
+- **Portable update routing:** retain opt-in asset selection and verified downloads under the current portable data folder. Add fresh-directory ZIP/TAR-Zstandard extraction, an application-file manifest, and a staged-runtime helper that waits for normal shutdown, retains rollback files, and checks restart acknowledgement. Keep profile data and unrelated top-level files in place. Cover edition/CPU selection, archive validation, cancellation, native extraction, helper bootstrap, process handoff, rollback and Qt controls. See [portable update behavior and recovery](https://github.com/JSchoreels/anki/blob/95396c9ca1ae570601e977e851f2ab82e5d2fc98/docs/portable-updates.MD).
 
 - **Mixed RWKV state precision:** quantize card matrices at INT4 and note matrices at INT8, retain f16 shifts and f32 shared state, and reuse the existing state codec for both models. The timing comparison uses the same prepared history in three alternating fresh optimized processes per mode, measuring native replay plus the final durable cache save; it excludes history preparation, calibration and intermediate recovery checkpoints. These timings do not measure accuracy.
 
@@ -109,7 +312,7 @@ Changes since the last normal release, [build 102](https://github.com/JSchoreels
 
 - Align the desktop RWKV store reader with native schema 5. Add native-to-desktop checkpoint integration coverage for Legacy and SM40, including metadata, parent chains, orphan pruning and fresh-runtime prediction restoration.
 
-- Port the 331,511-parameter SM40 model to the native scalar, batched and bulk runtimes, including its interleaved layers, power-mixture curve, one-layer note state and exported f32/int8 weight containers. Compile both specialized native architectures from shared engine source, dispatch per profile, tag cache and undo state by model, and verify both published reference users plus matched reconstruction, calibration and UM+ measurements. The Cargo feature only selects the primary offline benchmark architecture; desktop builds support both models. The [dual-model follow-up](docs/rwkv-dual-model-2026-10-20.MD) confirms bit-identical full-history predictions for all four model/precision combinations. See [the SM40 report](docs/rwkv-sm40-2026-10-20.MD) for definitions, limits and provenance.
+- Port the 331,511-parameter SM40 model to the native scalar, batched and bulk runtimes, including its interleaved layers, power-mixture curve, one-layer note state and exported f32/int8 weight containers. Compile both specialized native architectures from shared engine source, dispatch per profile, tag cache and undo state by model, and verify both published reference users plus matched reconstruction, calibration and UM+ measurements. The Cargo feature only selects the primary offline benchmark architecture; desktop builds support both models. The [dual-model follow-up](https://github.com/JSchoreels/anki/blob/95396c9ca1ae570601e977e851f2ab82e5d2fc98/docs/rwkv-dual-model-2026-10-20.MD) confirms bit-identical full-history predictions for all four model/precision combinations. See [the SM40 report](https://github.com/JSchoreels/anki/blob/95396c9ca1ae570601e977e851f2ab82e5d2fc98/docs/rwkv-sm40-2026-10-20.MD) for definitions, limits and provenance.
 
 - **Deck Options FSRS routing:** resolve affected non-new cards in a batch before writes, then group them by the resolved preset for the existing memory-state replay and rescheduler. Preserve home-deck interval/fuzz limits, unmatched-card retention overrides, disable-FSRS behavior, transaction rollback, and undo/redo. Regression coverage mixes FSRS-6 and FSRS-7 overlays with overlapping interval rules and a home-deck fallback.
 
@@ -124,6 +327,8 @@ Changes since the last normal release, [build 102](https://github.com/JSchoreels
 - **Intraday queue ordering:** group admitted due intraday cards before or after the remaining queue after exact scoring, daily-limit admission, and sibling selection; Mix keeps the shared ordering. Future steps outside the configured learn-ahead window still wait. Store `intraday_learning_mix` in deck-config extra data under `jschoreels.deckoptions`, using the existing ReviewMix values and no new protobuf field. Earlier enabled toggles map to Before and migrate on the next Deck Options save. Regression coverage includes all three modes with FSRS 6/7, current-card preservation, limits, new-card mixing, opaque-client preset edits, sync round trips, and browser save/reload.
 - **Undo-restored reviewer card:** the reviewer snapshots the restored card's scheduling fields (deck, original deck, queue, type, due, original due, interval, remaining steps) and stops ignoring study-queue refreshes once they change; flag-only edits keep the card. The backend re-pins the shown card when it rebuilds an existing queue for a ready deferred RWKV review or an intraday re-sort, and `Scheduler.counts()` fetches counts only, so it no longer marks a different card as shown.
 - **Dependency security:** update Ammonia from 4.1.4 to 4.1.8, rustls from 0.23.45 to 0.23.46, rustls-webpki from 0.103.15 to 0.103.16, webpki-roots from 1.0.7 to 1.0.10, and ZIP from 4.6.1 to 9.0.5. These include fixes for [Ammonia CSS URL matching](https://rustsec.org/advisories/RUSTSEC-2026-0373.html), [rustls session debug output](https://rustsec.org/advisories/RUSTSEC-2026-0346.html), [ECH rejection](https://rustsec.org/advisories/RUSTSEC-2026-0347.html), [certificate decompression](https://rustsec.org/advisories/RUSTSEC-2026-0348.html), [key-exchange downgrade](https://rustsec.org/advisories/RUSTSEC-2026-0349.html), distrusted emSign certificates in [rustls-webpki](https://rustsec.org/advisories/RUSTSEC-2026-0382.html) and [webpki-roots](https://rustsec.org/advisories/RUSTSEC-2026-0381.html), and ZIP extraction [permission bits](https://rustsec.org/advisories/RUSTSEC-2026-0367.html), [symlink targets](https://rustsec.org/advisories/RUSTSEC-2026-0368.html) and [permission changes through symlinks](https://rustsec.org/advisories/RUSTSEC-2026-0369.html). Ammonia also includes the earlier [CSS URL escaping](https://rustsec.org/advisories/RUSTSEC-2021-0157.html) and [SVG animation filtering](https://rustsec.org/advisories/RUSTSEC-2021-0158.html) fixes. Anki's sanitization helpers retain the default tag and attribute policy.
+
+**Full Changelog**: https://github.com/JSchoreels/anki/compare/26.09.3+fsrs7.build.102...26.09.3+fsrs7.build.107
 
 ## 26.09.3+fsrs7.build.102 — 2026-10-12
 

@@ -644,31 +644,32 @@ def _extract_addon_request(path: str) -> LocalFileRequest | NotFound | None:
         return None
 
     addon_path = path[len(prefix) :]
+    not_found_error = NotFound(message=f"couldn't locate item in add-on folder {path}")
 
     try:
         manager = aqt.mw.addonManager
     except AttributeError as error:
         if dev_mode:
             print(f"_redirectWebExports: {error}")
-        return None
+        return not_found_error
 
     try:
         addon, sub_path = addon_path.split("/", 1)
     except ValueError:
-        return None
+        return not_found_error
     if not addon:
-        return None
+        return not_found_error
 
     pattern = manager.getWebExports(addon)
     if not pattern:
-        return None
+        return not_found_error
 
     if re.fullmatch(pattern, sub_path):
         return LocalFileRequest(
             root=manager.addonsFolder(), path=addon_path, untrusted=False
         )
 
-    return NotFound(message=f"couldn't locate item in add-on folder {path}")
+    return not_found_error
 
 
 def _extract_request(
@@ -693,7 +694,7 @@ def congrats_info() -> bytes:
 
 
 def get_deck_configs_for_update() -> bytes:
-    from aqt.rwkv_model import model_for_profile
+    from aqt.rwkv_model import model_for_profile, single_model_for_profile
     from aqt.rwkv_precision import state_precision_for_profile
 
     output = deck_config_pb2.DeckConfigsForUpdate()
@@ -704,6 +705,11 @@ def get_deck_configs_for_update() -> bytes:
     output.rwkv_profile_settings.state_precision = state_precision_for_profile(
         aqt.mw.pm.profile
     )
+    output.rwkv_profile_settings.single_model = single_model_for_profile(
+        aqt.mw.pm.profile
+    )
+    output.rwkv_collection_counts.cards = aqt.mw.col.card_count()
+    output.rwkv_collection_counts.notes = aqt.mw.col.note_count()
     return output.SerializeToString()
 
 
@@ -726,14 +732,33 @@ def _on_update_deck_configs_success(
         input.mode == UpdateDeckConfigsMode.UPDATE_DECK_CONFIGS_MODE_COMPUTE_ALL_PARAMS
     )
     if not is_compute_all and input.HasField("rwkv_profile_settings"):
-        from aqt.rwkv_model import RWKV_MODEL_KEY
+        from aqt.rwkv_model import (
+            RWKV_MODEL_KEY,
+            RWKV_OLD_SPECIALIZED_INSTANT_MODEL_KEY,
+            RWKV_SINGLE_MODEL_KEY,
+            model_for_profile,
+            single_model_for_profile,
+        )
         from aqt.rwkv_precision import RWKV_STATE_PRECISION_KEY
 
         profile = aqt.mw.pm.profile
         assert profile is not None
+        previous_profile = dict(profile)
+        models_changed = (
+            model_for_profile(profile) != input.rwkv_profile_settings.model
+            or single_model_for_profile(profile)
+            != input.rwkv_profile_settings.single_model
+        )
         profile[RWKV_MODEL_KEY] = input.rwkv_profile_settings.model
         profile[RWKV_STATE_PRECISION_KEY] = input.rwkv_profile_settings.state_precision
+        profile[RWKV_SINGLE_MODEL_KEY] = input.rwkv_profile_settings.single_model
+        # The former opt-in toggle meant the opposite: never read again.
+        profile.pop(RWKV_OLD_SPECIALIZED_INSTANT_MODEL_KEY, None)
         aqt.mw.pm.save()
+        if models_changed:
+            aqt.rwkv_scheduler.rwkv_profile_models_did_change(
+                aqt.mw, previous_profile=previous_profile
+            )
     if not is_compute_all and isinstance(
         window := aqt.mw.app.activeModalWidget(), DeckOptionsDialog
     ):
@@ -1215,7 +1240,10 @@ def open_link() -> bytes:
     req = generic_pb2.String()
     req.ParseFromString(request.data)
     url = req.val
-    aqt.mw.taskman.run_on_main(lambda: openLink(url))
+    if url.startswith("https:"):
+        aqt.mw.taskman.run_on_main(lambda: openLink(url))
+    else:
+        logger.warning("refused to open non-https link: %s", url)
     return b""
 
 
@@ -1363,6 +1391,14 @@ def rwkv_workload_progress() -> bytes:
     return aqt.rwkv_scheduler.rwkv_workload_progress_bytes()
 
 
+def rwkv_workload_available() -> bytes:
+    # False on an instant-only runtime (no RWKV-Curve model): Deck Options
+    # shows why instead of starting a simulation that cannot run.
+    return generic_pb2.Bool(
+        val=aqt.rwkv_scheduler.rwkv_workload_simulation_available()
+    ).SerializeToString()
+
+
 def save_custom_colours() -> bytes:
     colors = [
         QColorDialog.customColor(i).name(QColor.NameFormat.HexRgb)
@@ -1414,6 +1450,7 @@ def card_stats() -> bytes:
         card=card,
         fallback_source=_card_stats_fallback_retrievability_source(response),
         request_retry=request_rwkv_retry,
+        wait_for_backend=True,
     ):
         rows.append(CardInfoRow(label=label, value=value))
 
@@ -1496,6 +1533,7 @@ post_handler_list = [
     rwkv_workload_result,
     cancel_rwkv_workload,
     rwkv_workload_progress,
+    rwkv_workload_available,
     get_profile_config_json,
     set_profile_config_json,
     get_meta_json,

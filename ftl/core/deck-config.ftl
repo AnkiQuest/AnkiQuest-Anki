@@ -344,32 +344,56 @@ deck-config-hard-interval-tooltip = The multiplier applied to a review interval 
 deck-config-new-interval-tooltip = The multiplier applied to a review interval when answering `Again`.
 deck-config-minimum-interval-tooltip = The minimum interval given to a review card after answering `Again`.
 
-## RWKV model and recurrent state precision. Keep f32, int8 and int4 unchanged.
+## RWKV model and recurrent state precision. Keep f32, int8 and int4 cards + int8 notes unchanged.
 
 deck-config-rwkv-model-and-storage = Model and storage
-deck-config-rwkv-profile-settings-scope = Applies to all decks in this profile on this computer. These settings do not sync. Save and reopen the profile to apply changes and rebuild RWKV state from review history.
+deck-config-rwkv-profile-settings-scope = Applies to all decks in this profile on this computer. These settings do not sync. Saving a different model prompts you to rebuild RWKV state when needed.
 deck-config-rwkv-precision = Storage precision
 deck-config-rwkv-model = Prediction model
-deck-config-rwkv-model-legacy = Legacy - Bigger Model
 deck-config-rwkv-model-sm40 = SM40 — smaller model
 deck-config-rwkv-model-sm36 = SM36 Muon
 deck-config-rwkv-model-sm55 = SM55 — previous smaller model
-deck-config-rwkv-model-sm56 = New - Smaller Model
-deck-config-rwkv-use-smaller-model = Use Smaller Model
-deck-config-rwkv-model-help = About prediction models
-deck-config-rwkv-model-off = Off — Legacy - Bigger Model
-deck-config-rwkv-model-on = On — New - Smaller Model
-deck-config-rwkv-model-smaller-description = SM56, the default smaller model.
-deck-config-rwkv-model-bigger-description = The original model. Uses more memory and takes longer.
-deck-config-rwkv-model-migration = Previously saved SM40, SM36 and SM55 choices switch to SM56 when you save.
-deck-config-rwkv-model-explanation = New - Smaller Model (SM56) is the default. Saved Legacy choices are preserved; older small models switch to SM56 on Save.
+deck-config-rwkv-model-sm56 = Previous smaller model (SM56)
+deck-config-rwkv-model-sm72 = Previous smaller model (SM72, cool-down from epoch 15)
+deck-config-rwkv-model-sm72e20 = Previous smaller model (SM72, cool-down from epoch 20)
+deck-config-rwkv-model-sm92 = Show-time retrain of the release (SM92)
+deck-config-rwkv-model-big = Big
+deck-config-rwkv-model-small = Small
+deck-config-rwkv-model-tiny = Tiny
+deck-config-rwkv-model-size-heading = Model size
+deck-config-rwkv-model-estimate-summary = Estimated model state for { $cards } cards and { $notes } notes.
+deck-config-rwkv-model-estimate-no-counts = Estimated model state
+deck-config-rwkv-model-per-card-note = { $size } per card + note
+deck-config-rwkv-model-state-ram-disk = Estimated state RAM / disk
+deck-config-rwkv-model-state-unavailable = Estimate unavailable
+deck-config-rwkv-model-both-separate = Both schedulers · separate models
+deck-config-rwkv-model-both-shared = Both schedulers · one shared model
+deck-config-rwkv-model-curve-only = Curve only
+deck-config-rwkv-model-instant-only = Instant only
+deck-config-rwkv-model-logloss = LogLoss
+deck-config-rwkv-model-curve-label = Curve
+deck-config-rwkv-model-instant-label = Instant
+deck-config-rwkv-model-baseline = Baseline
+deck-config-rwkv-model-not-used = Not used
+deck-config-rwkv-model-rebuild-baseline = Model replay time: baseline
+deck-config-rwkv-model-rebuild-saving = About { $percent }% less model replay time
+deck-config-rwkv-model-loss-legend = LogLoss is relative to Big with the same scheduler settings; lower is better.
+deck-config-rwkv-model-estimates-help = About these estimates
+deck-config-rwkv-model-estimates-explanation = State estimates use this profile's card and note counts and the selected storage precision. They include model state only, not model weights, shared state, cache overhead, or other Anki memory and disk use. Actual usage can be lower when some cards have no state.
+deck-config-rwkv-model-estimates-loss = Factory LogLoss comes from 722 held-out users; the figures can vary across collections.
+deck-config-rwkv-model-estimates-rebuild = Replay-time comparisons use a synthetic benchmark at the default state precision. They exclude history loading and cache writes; your results depend on your computer and review history.
+deck-config-rwkv-model-sm92-description = Kept from an earlier version: one model for both schedulers. Pick a size above to switch.
+deck-config-rwkv-single-model = Use one model for RWKV
+deck-config-rwkv-single-model-explanation = When your presets use both RWKV-Instant and RWKV-Curve (including as Instant's fallback), each normally uses its own model of the chosen size. Turn this on to use the size's Curve model for both: it uses less memory, but Instant predictions are slightly less accurate.
+deck-config-rwkv-single-model-instant-only = If you use Instant without Curve, the size's Instant model always runs alone. FSRS supplies due dates and memory states, and RWKV workload simulation is unavailable.
+deck-config-rwkv-workload-needs-curve = RWKV workload simulation needs RWKV-Curve. Turn on RWKV-Curve in a preset (as its scheduler or as RWKV-Instant's fallback) and save to simulate RWKV workload.
+deck-config-rwkv-model-size-migration = Older small models saved by earlier versions switch to Small when you save.
 # Preserve the links and URL variables.
 deck-config-rwkv-model-results = Results: <a href="{ $factory }">Model Factory results</a> · <a href="{ $backup }">Matched backup comparison</a>
 deck-config-rwkv-f32 = f32 — full precision fallback
 deck-config-rwkv-int8 = int8 — cards and notes
-deck-config-rwkv-int4 = int4 — experimental, reduced accuracy
 deck-config-rwkv-int4-cards-int8-notes = int4 cards + int8 notes — default
-deck-config-rwkv-precision-explanation = Applies to card and note state in memory and on disk for this profile. Computation remains at full precision. Both int4 options save more memory but can change predictions; int4 cards + int8 notes keeps note state at int8.
+deck-config-rwkv-precision-explanation = Applies to card and note state in memory and on disk for this profile. Computation remains at full precision. int4 cards + int8 notes saves more memory but can change predictions; note state stays at int8.
 
 deck-config-rwkv-description =
     RWKV is a neural network designed to improve predictions of retrievability:
@@ -411,23 +435,38 @@ deck-config-rwkv-review-instant-order-tooltip =
 deck-config-rwkv-review-minimum-reviews-per-day = Minimum reviews per day
 deck-config-rwkv-review-minimum-reviews-per-day-tooltip =
     If RWKV-Instant finds fewer reviews than this daily target, pull forward the
-    lowest-retrievability review cards until the target is met. Reviews already
-    completed today count toward the target, including reviews completed in
-    subdecks when this deck is studied. Subdeck targets are also respected when
-    studying a parent deck. The normal maximum review limits and same-day repeat
-    safeguards still apply. Set this to 0 to let RWKV alone decide how many
-    reviews are ready.
+    lowest-retrievability review cards from this deck and its subdecks until the
+    target is met. Reviews already completed today count toward the target. The
+    normal maximum review limits and same-day repeat safeguards still apply.
+deck-config-rwkv-review-respect-subdeck-minimums = Also honor subdeck minimums
+deck-config-rwkv-apply-respect-subdeck-minimums-to-children = Apply this setting to all subdecks on save
+deck-config-rwkv-review-respect-subdeck-minimums-tooltip =
+    When studying this deck, also meet the minimum reviews set on its direct
+    subdecks. A subdeck can also honor its own subdecks' minimums by enabling
+    this option. Reviews selected for subdeck minimums count toward this deck's
+    minimum, but may add reviews beyond it. Turn this off to use this deck's
+    minimum across its whole tree. This option belongs to the deck, not its
+    preset; you can apply it to all subdecks when saving.
 deck-config-rwkv-review-candidate-refresh = Use faster, approximate queue updates
 deck-config-rwkv-review-candidate-refresh-tooltip =
     After the first full update, RWKV rechecks only the cards most likely to
     appear next. This makes queue updates faster for large decks, but other
     cards keep an older estimate until a later update. Anki automatically bounds
-    the number rechecked at once.
+    the number rechecked at once. This setting applies when precomputation is on.
+deck-config-rwkv-review-precompute-next-card = Precompute next card before this card answer
+deck-config-rwkv-review-precompute-next-card-tooltip =
+    Use the queue scores computed before your answer to choose the next card,
+    then update the scores in the background. This can show the next card
+    faster, but it may not have the lowest retrievability after your answer.
+    When disabled with retrievability ordering, Anki updates the full queue after
+    every answer before showing the next card. Anki also waits when the queue
+    must be rebuilt.
 deck-config-rwkv-review-refresh-interval = Update the RWKV queue every
 deck-config-rwkv-review-refresh-interval-tooltip =
     How many answers to wait between RWKV queue updates. 1 updates the queue
     after every answer. Higher values reduce the work RWKV does while you
-    review, but the queue may use older estimates between updates.
+    review, but the queue may use older estimates between updates. With
+    precomputation off and retrievability ordering, Anki updates after every answer.
 deck-config-rwkv-review-refresh-on-exit = Update the RWKV queue after reviewing
 deck-config-rwkv-review-refresh-on-exit-tooltip =
     If you answered at least one card, update the RWKV estimates in the
@@ -740,6 +779,59 @@ deck-config-fsrs-simulator-split-by-preset = Split by active preset
 deck-config-fsrs-simulator-ratio-tooltip2 = { $time } net memorized cards per hour
 deck-config-fsrs-simulator-weighted-memorized-tooltip = { $memorized } R*f(S)
 deck-config-fsrs-simulator-weighted-ratio-tooltip = { $time } net R*f(S) per hour
+
+## Experimental FSRS/RWKV shared-learner comparison.
+
+deck-config-rwkv-comparison-learner = Simulated learner
+deck-config-rwkv-comparison-learner-fsrs = FSRS-based learner
+deck-config-rwkv-comparison-learner-rwkv = RWKV-based learner
+deck-config-rwkv-comparison-scorer = Estimate memorized with
+deck-config-rwkv-comparison-scenario = Performance scenario
+deck-config-rwkv-comparison-steady = Steady
+deck-config-rwkv-comparison-temporary-drop = Temporary drop: −15 points in the middle third
+deck-config-rwkv-comparison-persistent-drop = Persistent drop: −15 points after the first third
+deck-config-rwkv-comparison-temporary-improvement = Temporary improvement: +10 points in the middle third
+deck-config-rwkv-comparison-steady-short = steady
+deck-config-rwkv-comparison-temporary-drop-short = temporary drop
+deck-config-rwkv-comparison-persistent-drop-short = persistent drop
+deck-config-rwkv-comparison-temporary-improvement-short = temporary improvement
+deck-config-rwkv-comparison-sample = Sampled cards (0 for all)
+deck-config-rwkv-comparison-step = Retention step (percentage points)
+deck-config-rwkv-comparison-runs = Paired simulation runs
+deck-config-rwkv-comparison-both-learners = Compare both answer models
+deck-config-rwkv-comparison-graph-learner = Answer model for graph
+deck-config-rwkv-comparison-both-run-learner = both answer models
+deck-config-rwkv-comparison-graph-answer-note = The graph shows the selected answer model for paired runs. Single-model runs keep their original answer model.
+deck-config-rwkv-comparison-agreement-min-retention = Minimum retention shown in agreement (%)
+deck-config-rwkv-comparison-agreement-title = Scheduler agreement on net efficiency
+deck-config-rwkv-comparison-agreement-help =
+    Each cell compares RWKV scheduling with FSRS scheduling at the same requested retention.
+    The two lines use FSRS and RWKV to predict answers; each line shows the percentage change using FSRS and RWKV to estimate memory, in that order.
+    A winner requires all four comparisons to agree. Differences shown as 0.0% count as ties. A percentage is unavailable if review time is zero or FSRS efficiency is not positive.
+    These are unsmoothed simulated averages, not proof of a real-world advantage; small differences may be noise. Smoothing the graph does not change this table.
+    To compare horizons, change Days to simulate and run again. Each row keeps its own settings and card sample.
+deck-config-rwkv-comparison-agreement-run = Run { $run }: { $preset }, { $days } days
+deck-config-rwkv-comparison-agreement-retention = Requested retention
+deck-config-rwkv-comparison-agreement-fsrs = FSRS scheduler higher
+deck-config-rwkv-comparison-agreement-rwkv = RWKV scheduler higher
+deck-config-rwkv-comparison-agreement-mixed = Mixed / tied
+deck-config-rwkv-comparison-agreement-unavailable = Unavailable
+deck-config-rwkv-comparison-agreement-fsrs-answers = FSRS answers
+deck-config-rwkv-comparison-agreement-rwkv-answers = RWKV answers
+deck-config-rwkv-comparison-agreement-memory-order = Memory estimates: FSRS / RWKV
+deck-config-rwkv-comparison-agreement-empty = No tested retentions at or above the minimum.
+deck-config-rwkv-comparison-agreement-both-help = Running both answer models takes longer; each uses the same cards, starting state, scenario, and background reviews.
+deck-config-rwkv-comparison-assumptions =
+    Both schedulers use the same cards, starting due dates, simulated learner and average time per grade. Both models estimate memory from each scheduler's simulated answers; change the scoring model without rerunning.
+    The last year of reviews on other cards is replayed as fixed background activity for RWKV, including in the no-review baseline. The learner and background remain assumptions, and sampled results are estimates. One paired run can be noisy.
+    More cards, finer steps, background reviews and more runs take longer. Review ordering is approximated.
+    The day-level comparison excludes simulated learning and relearning steps, easy days, dynamic retention, preset switching and the RWKV-Instant queue.
+deck-config-rwkv-comparison-run-details = Run { $run }, { $preset }, { $learner }, { $scenario }: { $sampled } of { $total } cards simulated; { $estimated } sampled cards used estimated FSRS states; { $background } reviews in the one-year background pattern; { $days } days, { $runs } paired runs, { $step }-point retention step.
+deck-config-rwkv-comparison-matched-memory-help =
+    The chart compares the same requested retention, which can produce different simulated memory.
+    Below, each FSRS point is matched with the cheapest RWKV point on the tested grid with at least as much simulated memory.
+    Negative savings mean RWKV took more time; unmatched targets are excluded. Selecting the cheapest point can make savings look optimistic when runs are noisy.
+deck-config-rwkv-comparison-no-memory-match = No tested points matched in simulated memory.
 
 ## Messages related to the FSRS scheduler’s health check. The health check determines whether the correlation between FSRS predictions and your memory is good or bad. It can be optionally triggered as part of the "Optimize" function.
 

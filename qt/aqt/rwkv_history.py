@@ -18,6 +18,54 @@ from anki.errors import Interrupted
 from aqt import rwkv_scheduler as scheduler
 
 
+def history_fingerprint_request(
+    reviewer: object, ignored_review_ids: Set[int]
+) -> scheduler_pb2.RwkvHistoricalReviewFingerprintRequest:
+    """The canonical history selection the full replay uses."""
+    return scheduler_pb2.RwkvHistoricalReviewFingerprintRequest(
+        ignored_review_ids=sorted(ignored_review_ids),
+        dynamic_preset_replay=(
+            scheduler._rwkv_dynamic_preset_replay_enabled_for_collection(reviewer)
+        ),
+        stable_preset_ids=scheduler._rwkv_history_stable_preset_ids(reviewer),
+        first_review_uses_creation_by_config_id=(
+            scheduler._rwkv_first_review_uses_creation_by_config_id(reviewer)
+        ),
+    )
+
+
+def review_input_from_row(
+    row: scheduler_pb2.RwkvHistoricalReviewInputsResponse.Review,
+) -> scheduler.RwkvReviewInput:
+    """Convert one canonical history row for replay."""
+    state_kind, normal_state_kind = scheduler._historical_review_state_kinds(
+        row.review_kind
+    )
+    return scheduler.RwkvReviewInput(
+        identity=scheduler.RwkvReviewIdentity(
+            card_id=row.card_id,
+            note_id=row.note_id,
+            deck_id=row.deck_id,
+            preset_id=row.preset_id,
+        ),
+        is_query=False,
+        ease=row.ease,
+        duration_millis=row.duration_millis,
+        card_type=row.card_type,
+        card_queue=scheduler._historical_review_queue(row.review_kind),
+        card_due=None,
+        interval_days=row.interval_days,
+        ease_factor=row.ease_factor,
+        reps=None,
+        lapses=None,
+        day_offset=row.day_offset,
+        current_state_kind=state_kind,
+        current_normal_state_kind=normal_state_kind,
+        current_elapsed_days=row.elapsed_days,
+        current_elapsed_seconds=row.elapsed_seconds,
+    )
+
+
 def full_review_inputs(
     reviewer: object,
     build: Callable[
@@ -37,16 +85,7 @@ def full_review_inputs(
     )
     elapsed_source = scheduler.RwkvFirstReviewElapsedSource
     request = scheduler_pb2.RwkvHistoricalReviewInputsRequest(
-        history=scheduler_pb2.RwkvHistoricalReviewFingerprintRequest(
-            ignored_review_ids=sorted(ignored_review_ids),
-            dynamic_preset_replay=(
-                scheduler._rwkv_dynamic_preset_replay_enabled_for_collection(reviewer)
-            ),
-            stable_preset_ids=scheduler._rwkv_history_stable_preset_ids(reviewer),
-            first_review_uses_creation_by_config_id=(
-                scheduler._rwkv_first_review_uses_creation_by_config_id(reviewer)
-            ),
-        ),
+        history=history_fingerprint_request(reviewer, ignored_review_ids),
         # An absent override selects each deck's policy; False explicitly
         # selects missing elapsed time for every first review.
         first_review_uses_creation=(
@@ -76,34 +115,7 @@ def full_review_inputs(
     reviews = []
     review_ids = []
     for row in response.reviews:
-        state_kind, normal_state_kind = scheduler._historical_review_state_kinds(
-            row.review_kind
-        )
-        reviews.append(
-            scheduler.RwkvReviewInput(
-                identity=scheduler.RwkvReviewIdentity(
-                    card_id=row.card_id,
-                    note_id=row.note_id,
-                    deck_id=row.deck_id,
-                    preset_id=row.preset_id,
-                ),
-                is_query=False,
-                ease=row.ease,
-                duration_millis=row.duration_millis,
-                card_type=row.card_type,
-                card_queue=scheduler._historical_review_queue(row.review_kind),
-                card_due=None,
-                interval_days=row.interval_days,
-                ease_factor=row.ease_factor,
-                reps=None,
-                lapses=None,
-                day_offset=row.day_offset,
-                current_state_kind=state_kind,
-                current_normal_state_kind=normal_state_kind,
-                current_elapsed_days=row.elapsed_days,
-                current_elapsed_seconds=row.elapsed_seconds,
-            )
-        )
+        reviews.append(review_input_from_row(row))
         review_ids.append(row.review_id)
 
     def history(

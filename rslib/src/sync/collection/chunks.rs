@@ -56,6 +56,19 @@ pub struct Chunk {
     pub notes: Vec<NoteEntry>,
 }
 
+impl Chunk {
+    fn note_field_bytes(&self) -> usize {
+        self.notes.iter().map(|note| note.fields.len()).sum()
+    }
+
+    fn append(&mut self, mut next: Chunk) {
+        self.revlog.append(&mut next.revlog);
+        self.cards.append(&mut next.cards);
+        self.notes.append(&mut next.notes);
+        self.done = next.done;
+    }
+}
+
 #[derive(Serialize_tuple, Deserialize, Debug)]
 pub struct NoteEntry {
     pub id: NoteId,
@@ -157,9 +170,15 @@ impl NormalSyncer<'_> {
         state: &ClientSyncState,
     ) -> Result<()> {
         let mut ids = self.col.get_chunkable_ids(state.pending_usn)?;
+        let mut pending = None;
 
         loop {
-            let chunk: Chunk = self.col.get_chunk(&mut ids, Some(state.server_usn))?;
+            let chunk = self.col.get_upload_chunk(
+                &mut ids,
+                state.server_usn,
+                &mut pending,
+                MAX_UPLOAD_BATCH_BYTES,
+            )?;
             let done = chunk.done;
 
             debug!(
@@ -220,7 +239,7 @@ impl Collection {
         let mut applied = AppliedChunk::default();
         for entry in entries {
             let existing_card = self.storage.get_card(entry.id)?;
-            let proceed = existing_card.as_ref().map_or(true, |existing_card| {
+            let proceed = existing_card.as_ref().is_none_or(|existing_card| {
                 !existing_card.usn.is_pending_sync(pending_usn) || existing_card.mtime < entry.mtime
             });
             if !proceed {
@@ -238,7 +257,7 @@ impl Collection {
                     applied.rwkv_mirror_added = true;
                 }
             }
-            applied.card_identity_changed |= existing_card.map_or(true, |existing_card| {
+            applied.card_identity_changed |= existing_card.is_none_or(|existing_card| {
                 existing_card.note_id != card.note_id
                     || existing_card.original_or_current_deck_id()
                         != card.original_or_current_deck_id()
@@ -288,6 +307,52 @@ impl Collection {
         })
     }
 
+    /// Combine small chunks to reduce upload round trips. An oversized original
+    /// chunk is still sent on its own, preserving the existing payload
+    /// behavior.
+    fn get_upload_chunk(
+        &self,
+        ids: &mut ChunkableIds,
+        server_usn: Usn,
+        pending: &mut Option<Chunk>,
+        max_bytes: usize,
+    ) -> Result<Chunk> {
+        let mut chunk = match pending.take() {
+            Some(chunk) => chunk,
+            None => self.get_chunk(ids, Some(server_usn))?,
+        };
+        if chunk.done {
+            return Ok(chunk);
+        }
+        // JSON escaping cannot make note fields smaller. Avoid serializing a
+        // large original chunk a second time when it cannot be combined.
+        if chunk.note_field_bytes() >= max_bytes {
+            return Ok(chunk);
+        }
+
+        // The sum of separately serialized chunks, plus the request wrapper
+        // and separators, is an upper bound on their combined JSON size.
+        let mut bytes = serde_json::to_vec(&chunk)?.len() + 16;
+        for _ in 1..MAX_UPLOAD_BATCH_CHUNKS {
+            if chunk.done || bytes >= max_bytes {
+                break;
+            }
+            let next = self.get_chunk(ids, Some(server_usn))?;
+            if next.note_field_bytes() >= max_bytes {
+                *pending = Some(next);
+                break;
+            }
+            let next_bytes = serde_json::to_vec(&next)?.len() + 3;
+            if bytes.saturating_add(next_bytes) > max_bytes {
+                *pending = Some(next);
+                break;
+            }
+            bytes += next_bytes;
+            chunk.append(next);
+        }
+        Ok(chunk)
+    }
+
     /// Fetch a chunk of ids from `ids`, returning the referenced objects.
     pub(in crate::sync) fn get_chunk(
         &self,
@@ -319,9 +384,7 @@ impl Collection {
                 break;
             }
         }
-        if limit > 0 {
-            chunk.done = true;
-        }
+        chunk.done = ids.revlog.is_empty() && ids.notes.is_empty() && ids.cards.is_empty();
 
         // remove pending status
         if !self.server {
@@ -487,6 +550,8 @@ impl Usn {
 }
 
 pub const CHUNK_SIZE: usize = 250;
+const MAX_UPLOAD_BATCH_CHUNKS: usize = 4;
+const MAX_UPLOAD_BATCH_BYTES: usize = 512 * 1024;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApplyChunkRequest {
@@ -495,18 +560,97 @@ pub struct ApplyChunkRequest {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use fsrs::FSRS;
     use serde_json::json;
 
     use super::*;
     use crate::card::FsrsMemoryState;
     use crate::deckconfig::FsrsVersion;
+    use crate::notes::AddNoteRequest;
     use crate::revlog::RevlogReviewKind;
     use crate::scheduler::fsrs::params::tests::revlog;
     use crate::scheduler::fsrs::preset::tagged_test_overlay;
     use crate::scheduler::fsrs::preset::FsrsPresetId;
     use crate::scheduler::fsrs::preset::FSRS_PRESET_OVERLAY_CONFIG_KEY;
     use crate::tests::NoteAdder;
+
+    #[test]
+    fn upload_batches_keep_all_records_when_the_size_limit_defers_a_chunk() -> Result<()> {
+        let mut col = Collection::new();
+        let notetype = col.basic_notetype();
+        let mut requests = (0..600)
+            .map(|index| {
+                let mut note = notetype.new_note();
+                note.set_field(0, format!("note {index}"))?;
+                Ok(AddNoteRequest {
+                    note,
+                    deck_id: DeckId(1),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        col.add_notes(&mut requests)?;
+        let expected_notes: HashSet<_> = requests.iter().map(|request| request.note.id).collect();
+        let expected_cards = col.storage.get_all_card_ids()?;
+        let mut sample_ids = col.get_chunkable_ids(Usn(-1))?;
+        let mut tiny_ids = col.get_chunkable_ids(Usn(-1))?;
+        let mut small_ids = col.get_chunkable_ids(Usn(-1))?;
+        let mut large_ids = col.get_chunkable_ids(Usn(-1))?;
+        let sample = col.get_chunk(&mut sample_ids, None)?;
+        // One chunk fits, but looking ahead to the next one must defer it.
+        let small_limit = serde_json::to_vec(&sample)?.len() + 17;
+        let mut exact_boundary = ChunkableIds {
+            revlog: vec![],
+            cards: vec![],
+            notes: sample_ids.notes[..CHUNK_SIZE].to_vec(),
+        };
+        let last_chunk = col.get_chunk(&mut exact_boundary, None)?;
+        assert_eq!(last_chunk.notes.len(), CHUNK_SIZE);
+        assert!(last_chunk.done);
+
+        let interrupted: Result<()> = col.transact_no_undo(|col| {
+            let mut ids = col.get_chunkable_ids(Usn(-1))?;
+            let mut pending = None;
+            col.get_upload_chunk(&mut ids, Usn(7), &mut pending, small_limit)?;
+            assert!(pending.is_some());
+            Err(AnkiError::Interrupted)
+        });
+        assert!(matches!(interrupted, Err(AnkiError::Interrupted)));
+        let after_rollback = col.get_chunkable_ids(Usn(-1))?;
+        assert_eq!(after_rollback.notes.len(), expected_notes.len());
+        assert_eq!(after_rollback.cards.len(), expected_cards.len());
+
+        for (ids, limit, expected_batch_sizes) in [
+            (&mut tiny_ids, 1, vec![250, 250, 250, 250, 200]),
+            (&mut small_ids, small_limit, vec![250, 250, 250, 250, 200]),
+            (&mut large_ids, MAX_UPLOAD_BATCH_BYTES, vec![1000, 200]),
+        ] {
+            let mut pending = None;
+            let mut batch_sizes = vec![];
+            let mut notes = HashSet::new();
+            let mut cards = HashSet::new();
+            loop {
+                let chunk = col.get_upload_chunk(ids, Usn(7), &mut pending, limit)?;
+                batch_sizes.push(chunk.notes.len() + chunk.cards.len());
+                for note in chunk.notes {
+                    assert!(notes.insert(note.id));
+                }
+                for card in chunk.cards {
+                    assert!(cards.insert(card.id));
+                }
+                if chunk.done {
+                    break;
+                }
+                assert!(batch_sizes.len() <= 5);
+            }
+            assert!(pending.is_none());
+            assert_eq!(batch_sizes, expected_batch_sizes);
+            assert_eq!(notes, expected_notes);
+            assert_eq!(cards, expected_cards);
+        }
+        Ok(())
+    }
 
     #[test]
     fn card_sync_roundtrip_preserves_rwkv_history_reset_boundary() {

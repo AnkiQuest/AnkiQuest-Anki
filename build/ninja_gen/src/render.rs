@@ -31,16 +31,20 @@ impl Build {
         .unwrap();
 
         writeln!(&mut buf, "builddir = {}", self.buildroot.as_str()).unwrap();
-        writeln!(
-            &mut buf,
-            // MAIN_SEPARATOR: CreateProcess rejects a relative "out/rust/..." path
-            // on Windows 11 24H2 (the kuma3 desktop PC)
-            "runner = $builddir{sep}rust{sep}{}{sep}{}",
+        let runner = format!(
+            "$builddir/rust/{}/{}",
             profile_output_dir(self.build_profile),
-            with_exe("runner"),
-            sep = std::path::MAIN_SEPARATOR
-        )
-        .unwrap();
+            with_exe("runner")
+        );
+        // Ninja starts every command through CreateProcess, which on recent
+        // Windows builds no longer finds a relative program path written with
+        // forward slashes (out/rust/release/runner.exe); backslashes work.
+        let runner = if cfg!(windows) {
+            runner.replace('/', "\\")
+        } else {
+            runner
+        };
+        writeln!(&mut buf, "runner = {runner}").unwrap();
         for (key, value) in &self.variables {
             writeln!(&mut buf, "{key} = {value}").unwrap();
         }

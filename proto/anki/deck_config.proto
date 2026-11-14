@@ -208,6 +208,7 @@ message DeckConfig {
     bool rwkv_review_enforce_grade_order = 83;
     uint32 rwkv_review_minimum_reviews_per_day = 84;
     bool same_day_reviews_ignore_review_limit = 85;
+    bool rwkv_review_precompute_next_card = 86;
 
     bool disable_autoplay = 23;
     uint32 cap_answer_time_to_secs = 24;
@@ -266,6 +267,9 @@ message DeckConfigsForUpdate {
       bool new_today_active = 6;
       // Deck-specific desired retention override
       optional float desired_retention = 7;
+      // Deck-specific RWKV option; absent when older clients save options.
+      optional bool rwkv_respect_subdeck_minimums = 8;
+      bool rwkv_apply_respect_subdeck_minimums_to_children = 9;
     }
     string name = 1;
     int64 config_id = 2;
@@ -297,11 +301,29 @@ message DeckConfigsForUpdate {
   float review_fuzz_factor_long = 20;
   // Desktop-local settings supplied by the GUI, never stored in the collection.
   RwkvProfileSettings rwkv_profile_settings = 21;
+  // Desktop-only inputs for the RWKV model-state estimate.
+  RwkvCollectionCounts rwkv_collection_counts = 22;
+}
+
+message RwkvCollectionCounts {
+  uint64 cards = 1;
+  uint64 notes = 2;
 }
 
 message RwkvProfileSettings {
+  // The model size: "legacy" (Big), "sm72e25" (Small, the default) or "tiny"
+  // (Tiny); older small model keys and "sm92" are preserved values.
   string model = 1;
   string state_precision = 2;
+  // Was the opt-in specialized_instant_model, whose meaning single_model
+  // reverses.
+  reserved 3;
+  // Opt-out: with RWKV-Instant and RWKV-Curve both in use, run one model for
+  // both schedulers instead of RWKV-Instant's own model (Small: the show-time
+  // instant-only model, stage 2, SM98; Tiny: the smaller instant-only model,
+  // SM101) beside the release (two model states, the default). Ignored for
+  // RWKV-Instant without RWKV-Curve: the instant model alone.
+  bool single_model = 4;
 }
 
 enum UpdateDeckConfigsMode {

@@ -736,6 +736,14 @@
     "repository": "https://github.com/orlp/foldhash"
   },
   {
+    "authors": "Orson Peters <orsonpeters@gmail.com>",
+    "description": "A fast, non-cryptographic, minimally DoS-resistant hashing algorithm.",
+    "license": "Zlib",
+    "license_file": null,
+    "name": "foldhash",
+    "repository": "https://github.com/orlp/foldhash"
+  },
+  {
     "authors": "Steven Fackler <sfackler@gmail.com>",
     "description": "A framework for Rust wrappers over C APIs",
     "license": "Apache-2.0 OR MIT",
@@ -912,12 +920,12 @@
     "repository": "https://github.com/rust-lang/hashbrown"
   },
   {
-    "authors": "kyren <kerriganw@gmail.com>",
+    "authors": null,
     "description": "HashMap-like containers that hold their key-value pairs in a user controllable order",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "hashlink",
-    "repository": "https://github.com/kyren/hashlink"
+    "repository": "https://github.com/djc/hashlink"
   },
   {
     "authors": "Sean McArthur <sean@seanmonstar.com>",
@@ -1848,14 +1856,6 @@
     "repository": "https://github.com/dtolnay/prettyplease"
   },
   {
-    "authors": "Gianmarco Garrisi <gianmarcogarrisi@tutanota.com>",
-    "description": "A Priority Queue implemented as a heap with a function to efficiently change the priority of an item.",
-    "license": "LGPL-3.0-or-later OR MPL-2.0",
-    "license_file": null,
-    "name": "priority-queue",
-    "repository": "https://github.com/garro95/priority-queue"
-  },
-  {
     "authors": "Bastian Köcher <git@kchr.de>",
     "description": "Replacement for crate (macro_rules keyword) in proc-macros",
     "license": "Apache-2.0 OR MIT",
@@ -2152,12 +2152,12 @@
     "repository": "https://github.com/briansmith/ring"
   },
   {
-    "authors": "Mikhail Vorotilov <mikhail.vorotilov@gmail.com>",
-    "description": "Library of well known algorithms for numerical root finding.",
-    "license": "BSD-2-Clause",
+    "authors": null,
+    "description": "Helping to implement SQLite VFS.",
+    "license": "MIT",
     "license_file": null,
-    "name": "roots",
-    "repository": "https://github.com/vorot/roots"
+    "name": "rsqlite-vfs",
+    "repository": "https://github.com/Spxg/sqlite-wasm-rs"
   },
   {
     "authors": "The rusqlite developers",
@@ -2528,6 +2528,14 @@
     "repository": "https://github.com/mvdnes/spin-rs.git"
   },
   {
+    "authors": "Spxg <noz@live.com>",
+    "description": "`wasm32-unknown-unknown` bindings to the libsqlite3 library.",
+    "license": "MIT",
+    "license_file": null,
+    "name": "sqlite-wasm-rs",
+    "repository": "https://github.com/Spxg/sqlite-wasm-rs"
+  },
+  {
     "authors": "Robert Grosse <n210241048576@gmail.com>",
     "description": "An unsafe marker trait for types like Box and Rc that dereference to a stable address even when moved, and hence can be used with libraries such as owning_ref and rental.",
     "license": "Apache-2.0 OR MIT",
@@ -2564,22 +2572,6 @@
     "description": "Helpful macros for working with enums and strings",
     "license": "MIT",
     "license_file": null,
-    "name": "strum",
-    "repository": "https://github.com/Peternator7/strum"
-  },
-  {
-    "authors": "Peter Glotfelty <peter.glotfelty@microsoft.com>",
-    "description": "Helpful macros for working with enums and strings",
-    "license": "MIT",
-    "license_file": null,
-    "name": "strum_macros",
-    "repository": "https://github.com/Peternator7/strum"
-  },
-  {
-    "authors": "Peter Glotfelty <peter.glotfelty@microsoft.com>",
-    "description": "Helpful macros for working with enums and strings",
-    "license": "MIT",
-    "license_file": null,
     "name": "strum_macros",
     "repository": "https://github.com/Peternator7/strum"
   },
@@ -2598,6 +2590,14 @@
     "license_file": null,
     "name": "symlink",
     "repository": "https://gitlab.com/chris-morgan/symlink"
+  },
+  {
+    "authors": "David Tolnay <dtolnay@gmail.com>",
+    "description": "Parser for Rust source code",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "name": "syn",
+    "repository": "https://github.com/dtolnay/syn"
   },
   {
     "authors": "David Tolnay <dtolnay@gmail.com>",
@@ -3408,14 +3408,6 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
-    "description": "Rust for Windows",
-    "license": "Apache-2.0 OR MIT",
-    "license_file": null,
-    "name": "windows-sys",
-    "repository": "https://github.com/microsoft/windows-rs"
-  },
-  {
     "authors": null,
     "description": "Rust for Windows",
     "license": "Apache-2.0 OR MIT",
@@ -3778,7 +3770,7 @@
   {
     "authors": "Alexandre Bury <alexandre.bury@gmail.com>",
     "description": "Binding for the zstd compression library.",
-    "license": "MIT",
+    "license": "BSD-3-Clause",
     "license_file": null,
     "name": "zstd",
     "repository": "https://github.com/gyscos/zstd-rs"
@@ -3786,7 +3778,7 @@
   {
     "authors": "Alexandre Bury <alexandre.bury@gmail.com>",
     "description": "Safe low-level bindings for the zstd compression library.",
-    "license": "Apache-2.0 OR MIT",
+    "license": "BSD-3-Clause",
     "license_file": null,
     "name": "zstd-safe",
     "repository": "https://github.com/gyscos/zstd-rs"
@@ -3794,7 +3786,7 @@
   {
     "authors": "Alexandre Bury <alexandre.bury@gmail.com>",
     "description": "Low-level bindings for the zstd compression library.",
-    "license": "Apache-2.0 OR MIT",
+    "license": "BSD-3-Clause",
     "license_file": null,
     "name": "zstd-sys",
     "repository": "https://github.com/gyscos/zstd-rs"

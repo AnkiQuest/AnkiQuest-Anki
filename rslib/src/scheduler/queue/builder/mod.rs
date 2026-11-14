@@ -25,6 +25,7 @@ use super::DeferredRwkvReview;
 use super::LearningQueueEntry;
 use super::MainQueueEntry;
 use super::MainQueueEntryKind;
+use super::NewReviewMixProgress;
 use crate::card::CardQueue;
 use crate::card::FsrsMemoryState;
 use crate::collection::RwkvReviewQueueScoreEntry;
@@ -177,6 +178,7 @@ pub(super) struct QueueBuilder {
     r_sorted_intraday_learning: Vec<DueCard>,
     pinned_card_id: Option<CardId>,
     deferred_rwkv_reviews: HashMap<CardId, DeferredRwkvReview>,
+    new_review_mix_progress: NewReviewMixProgress,
     limits: LimitTreeMap,
     load_balancer: Option<LoadBalancer>,
     context: Context,
@@ -217,6 +219,7 @@ impl QueueBuilder {
             &config_map,
             timing.days_elapsed,
             new_cards_ignore_review_limit,
+            deck_id,
         );
         // the reservation only lowers RWKV review minimums: without any, skip
         // its scan of every card
@@ -228,6 +231,23 @@ impl QueueBuilder {
             }
         }
         let sort_options = sort_options(&root_deck, &config_map);
+        let new_review_mix_progress = col
+            .state
+            .card_queues
+            .as_ref()
+            .map(|queues| queues.new_review_mix_progress)
+            .or(col.state.pending_new_review_mix)
+            .filter(|progress| {
+                sort_options.uses_rwkv_review_order()
+                    && progress.deck_id == deck_id
+                    && progress.day == timing.days_elapsed
+            })
+            .unwrap_or(NewReviewMixProgress {
+                deck_id,
+                day: timing.days_elapsed,
+                new_answered: 0,
+                review_answered: 0,
+            });
         let same_day_reviews_may_ignore_limit = config_map
             .values()
             .any(|config| config.inner.same_day_reviews_ignore_review_limit);
@@ -283,6 +303,7 @@ impl QueueBuilder {
             r_sorted_intraday_learning: Vec::new(),
             pinned_card_id: None,
             deferred_rwkv_reviews: HashMap::new(),
+            new_review_mix_progress,
             limits,
             load_balancer,
             context: Context {
@@ -475,6 +496,7 @@ impl QueueBuilder {
             self.context.sort_options.reviews_per_new_card,
             reviews_done.max(0) as usize,
             new_done.max(0) as usize,
+            self.new_review_mix_progress,
         );
         let main_iter: Box<dyn ExactSizeIterator<Item = MainQueueEntry>> =
             match self.context.sort_options.intraday_learn_mix {
@@ -516,6 +538,7 @@ impl QueueBuilder {
             deferred_rwkv_reviews: self.deferred_rwkv_reviews,
             rwkv_learning_repeat_guards,
             blocked_rwkv_learning_cards: HashSet::new(),
+            new_review_mix_progress: self.new_review_mix_progress,
         }
     }
 }
@@ -622,19 +645,30 @@ fn merge_new(
     reviews_per_new_card: Option<u32>,
     reviews_done: usize,
     new_done: usize,
+    progress: NewReviewMixProgress,
 ) -> Box<dyn ExactSizeIterator<Item = MainQueueEntry>> {
     let new_iter = new.into_iter().map(Into::into);
 
     match mode {
         ReviewMix::BeforeReviews => Box::new(SizedChain::new(new_iter, review_iter)),
         ReviewMix::AfterReviews => Box::new(SizedChain::new(review_iter, new_iter)),
-        ReviewMix::MixWithReviews => Box::new(Intersperser::resumed(
-            review_iter,
-            new_iter,
-            reviews_per_new_card,
-            reviews_done,
-            new_done,
-        )),
+        // kuma3: a fixed "Reviews per new card" spacing resumes from today's
+        // counts; otherwise the fork's tracked progress keeps the even mix
+        ReviewMix::MixWithReviews => Box::new(match reviews_per_new_card {
+            Some(_) => Intersperser::resumed(
+                review_iter,
+                new_iter,
+                reviews_per_new_card,
+                reviews_done,
+                new_done,
+            ),
+            None => Intersperser::with_progress(
+                review_iter,
+                new_iter,
+                progress.review_answered,
+                progress.new_answered,
+            ),
+        }),
     }
 }
 
@@ -3211,6 +3245,223 @@ mod test {
     }
 
     #[test]
+    fn rwkv_minimum_uses_selected_deck_across_subdecks() -> Result<()> {
+        let mut col = Collection::new();
+        let mut parent = DeckAdder::new("parent").add(&mut col);
+        let mut lower = DeckAdder::new("parent::lower").add(&mut col);
+        let mut higher = DeckAdder::new("parent::higher").add(&mut col);
+        for deck in [&mut parent, &mut lower, &mut higher] {
+            col.set_deck_rwkv_review_order_with_desired_retention(
+                deck,
+                ReviewCardOrder::RetrievabilityAscending,
+                0.75,
+            );
+            col.set_deck_rwkv_minimum_reviews(deck.id, 2);
+        }
+        col.set_deck_rwkv_minimum_reviews(lower.id, 1);
+        col.set_deck_rwkv_minimum_reviews(higher.id, 1);
+
+        let timing = col.timing_today()?;
+        let mut add_card = |deck_id| {
+            add_memory_state_card(
+                &mut col,
+                deck_id,
+                CardQueue::Review,
+                CardType::Review,
+                timing.days_elapsed as i32 + 7,
+                2 * 86_400,
+                30.0,
+            )
+        };
+        let first = add_card(lower.id)?;
+        let second = add_card(lower.id)?;
+        let high = add_card(higher.id)?;
+        col.set_rwkv_review_queue_score_entries(
+            parent.id,
+            [(first, 0.80), (second, 0.85), (high, 0.95)]
+                .into_iter()
+                .map(|(card_id, retrievability)| {
+                    (
+                        card_id,
+                        RwkvReviewQueueScoreEntry {
+                            retrievability,
+                            target_retention: Some(0.75),
+                            intervening_reviews: None,
+                        },
+                    )
+                })
+                .collect(),
+        )?;
+
+        assert_eq!(col.queue_as_ids(parent.id), vec![first, second]);
+
+        parent.set_rwkv_respect_subdeck_minimums(true)?;
+        col.add_or_update_deck(&mut parent)?;
+        assert_eq!(col.queue_as_ids(parent.id), vec![first, high]);
+        parent.set_rwkv_respect_subdeck_minimums(false)?;
+        col.add_or_update_deck(&mut parent)?;
+
+        let usn = col.usn()?;
+        col.update_deck_stats(
+            timing.days_elapsed,
+            usn,
+            anki_proto::scheduler::UpdateStatsRequest {
+                deck_id: parent.id.0,
+                review_delta: 2,
+                ..Default::default()
+            },
+        )?;
+        assert!(col.queue_as_ids(parent.id).is_empty());
+        assert_eq!(col.queue_as_ids(higher.id), vec![high]);
+
+        col.set_deck_rwkv_minimum_reviews(higher.id, 0);
+        col.update_deck_stats(
+            timing.days_elapsed,
+            usn,
+            anki_proto::scheduler::UpdateStatsRequest {
+                deck_id: parent.id.0,
+                review_delta: -2,
+                ..Default::default()
+            },
+        )?;
+        col.set_config_bool(BoolKey::ApplyAllParentLimits, true, false)?;
+        assert!(col.queue_as_ids(higher.id).is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn rwkv_subdeck_minimums_follow_each_level_option() -> Result<()> {
+        let mut col = Collection::new();
+        let mut language = DeckAdder::new("Language").add(&mut col);
+        let mut japanese = DeckAdder::new("Language::Japanese").add(&mut col);
+        let mut english = DeckAdder::new("Language::English").add(&mut col);
+        let mut japanese_vocab = DeckAdder::new("Language::Japanese::Vocab").add(&mut col);
+        let mut japanese_sentences = DeckAdder::new("Language::Japanese::Sentences").add(&mut col);
+        let mut english_vocab = DeckAdder::new("Language::English::Vocab").add(&mut col);
+        let mut english_sentences = DeckAdder::new("Language::English::Sentences").add(&mut col);
+        for deck in [
+            &mut language,
+            &mut japanese,
+            &mut english,
+            &mut japanese_vocab,
+            &mut japanese_sentences,
+            &mut english_vocab,
+            &mut english_sentences,
+        ] {
+            col.set_deck_rwkv_review_order_with_desired_retention(
+                deck,
+                ReviewCardOrder::RetrievabilityAscending,
+                0.75,
+            );
+            col.set_deck_rwkv_minimum_reviews(deck.id, 1);
+        }
+        col.set_deck_rwkv_minimum_reviews(language.id, 2);
+        language.set_rwkv_respect_subdeck_minimums(true)?;
+        col.add_or_update_deck(&mut language)?;
+        let timing = col.timing_today()?;
+        let mut add_card = |deck_id| {
+            add_memory_state_card(
+                &mut col,
+                deck_id,
+                CardQueue::Review,
+                CardType::Review,
+                timing.days_elapsed as i32 + 7,
+                2 * 86_400,
+                30.0,
+            )
+        };
+        let japanese_low = add_card(japanese_vocab.id)?;
+        let japanese_high = add_card(japanese_sentences.id)?;
+        let english_low = add_card(english_vocab.id)?;
+        let english_high = add_card(english_sentences.id)?;
+        col.set_rwkv_review_queue_score_entries(
+            language.id,
+            [
+                (japanese_low, 0.80),
+                (japanese_high, 0.96),
+                (english_low, 0.85),
+                (english_high, 0.97),
+            ]
+            .into_iter()
+            .map(|(card_id, retrievability)| {
+                (
+                    card_id,
+                    RwkvReviewQueueScoreEntry {
+                        retrievability,
+                        target_retention: Some(0.75),
+                        intervening_reviews: None,
+                    },
+                )
+            })
+            .collect(),
+        )?;
+
+        assert_eq!(
+            col.queue_as_ids(language.id),
+            vec![japanese_low, english_low]
+        );
+
+        japanese.set_rwkv_respect_subdeck_minimums(true)?;
+        col.add_or_update_deck(&mut japanese)?;
+        assert_eq!(
+            col.queue_as_ids(language.id),
+            vec![japanese_low, english_low, japanese_high]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rwkv_minimum_uses_lowest_recall_with_relative_overdueness() -> Result<()> {
+        let mut col = Collection::new();
+        let mut deck = DeckAdder::new("parent").add(&mut col);
+        col.set_deck_rwkv_instant_order(&mut deck, ReviewCardOrder::RelativeOverdueness);
+        col.set_deck_rwkv_minimum_reviews(deck.id, 1);
+        let timing = col.timing_today()?;
+        let lower_recall = add_memory_state_card(
+            &mut col,
+            deck.id,
+            CardQueue::Review,
+            CardType::Review,
+            timing.days_elapsed as i32 + 7,
+            2 * 86_400,
+            30.0,
+        )?;
+        let higher_recall = add_memory_state_card(
+            &mut col,
+            deck.id,
+            CardQueue::Review,
+            CardType::Review,
+            timing.days_elapsed as i32 + 7,
+            2 * 86_400,
+            30.0,
+        )?;
+        col.set_rwkv_review_queue_score_entries(
+            deck.id,
+            HashMap::from([
+                (
+                    lower_recall,
+                    RwkvReviewQueueScoreEntry {
+                        retrievability: 0.80,
+                        target_retention: Some(0.75),
+                        intervening_reviews: None,
+                    },
+                ),
+                (
+                    higher_recall,
+                    RwkvReviewQueueScoreEntry {
+                        retrievability: 0.90,
+                        target_retention: Some(0.89),
+                        intervening_reviews: None,
+                    },
+                ),
+            ]),
+        )?;
+
+        assert_eq!(col.queue_as_ids(deck.id), vec![lower_recall]);
+        Ok(())
+    }
+
+    #[test]
     fn rwkv_minimum_counts_reviews_moved_to_filtered_decks() -> Result<()> {
         let mut col = Collection::new();
         let mut source = DeckAdder::new("Source").add(&mut col);
@@ -4018,6 +4269,146 @@ mod test {
                 "Card Info score installed: {with_card_info_score}"
             );
             assert!(col.get_next_card()?.is_none());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rwkv_score_refresh_preserves_minimum_new_review_mix() -> Result<()> {
+        for (mode, new_count, expected) in [
+            (ReviewMix::MixWithReviews, 1, "RRRRRRRRRRNRRRRRRRRRR"),
+            (ReviewMix::MixWithReviews, 4, "RRRRNRRRRNRRRRNRRRRNRRRR"),
+            (ReviewMix::BeforeReviews, 4, "NNNNRRRRRRRRRRRRRRRRRRRR"),
+            (ReviewMix::AfterReviews, 4, "RRRRRRRRRRRRRRRRRRRRNNNN"),
+        ] {
+            for preserve_current_card in [false, true] {
+                let mut col = Collection::new();
+                let mut deck = col.get_or_create_normal_deck("Default")?;
+                col.set_current_deck(deck.id)?;
+                col.set_deck_rwkv_review_order_with_desired_retention(
+                    &mut deck,
+                    ReviewCardOrder::RetrievabilityAscending,
+                    0.9,
+                );
+                let mut config = col
+                    .get_deck_config(deck.config_id().unwrap(), false)?
+                    .unwrap();
+                config.inner.new_mix = mode as i32;
+                config.inner.rwkv_review_minimum_reviews_per_day = 20;
+                col.add_or_update_deck_config(&mut config)?;
+                for _ in 0..new_count {
+                    CardAdder::new().add(&mut col);
+                }
+                let timing = col.timing_today()?;
+                let mut scores = HashMap::new();
+                for _ in 0..20 {
+                    let card_id = add_memory_state_card(
+                        &mut col,
+                        deck.id,
+                        CardQueue::Review,
+                        CardType::Review,
+                        timing.days_elapsed as i32 + 7,
+                        2 * 86_400,
+                        30.0,
+                    )?;
+                    scores.insert(card_id, 0.95);
+                }
+                col.set_rwkv_review_queue_scores(deck.id, scores.clone())?;
+                assert_eq!(col.counts(), [new_count, 0, 20]);
+
+                let mut shown = String::new();
+                for _ in 0..20 + new_count {
+                    let card = col.get_next_card()?.unwrap().card;
+                    shown.push(if card.queue == CardQueue::New {
+                        'N'
+                    } else {
+                        'R'
+                    });
+                    col.answer_easy();
+                    scores.remove(&card.id);
+                    let current_card = if preserve_current_card {
+                        col.get_next_card()?.map(|queued| queued.card.id)
+                    } else {
+                        None
+                    };
+                    col.set_rwkv_review_queue_scores(deck.id, scores.clone())?;
+                    if let Some(card_id) = current_card {
+                        col.rebuild_queued_cards_preserving_current_card(card_id)?;
+                        assert_eq!(col.get_next_card()?.unwrap().card.id, card_id);
+                    }
+                }
+
+                assert_eq!(
+                    shown, expected,
+                    "{mode:?}, preserve current: {preserve_current_card}"
+                );
+                assert!(col.get_next_card()?.is_none());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rwkv_new_review_mix_preserves_progress_after_undo_and_redo() -> Result<()> {
+        let mut col = Collection::new();
+        let mut deck = col.get_or_create_normal_deck("Default")?;
+        col.set_current_deck(deck.id)?;
+        col.set_deck_rwkv_instant_order(&mut deck, ReviewCardOrder::Day);
+        for _ in 0..2 {
+            CardAdder::new().add(&mut col);
+        }
+        for _ in 0..6 {
+            CardAdder::new().due_dates(["0"]).add(&mut col);
+        }
+        let expected = col.queued_card_ids(20)?;
+
+        for answered in 1..=expected.len() {
+            col.answer_easy();
+            col.undo()?;
+            col.redo()?;
+            col.invalidate_rwkv_review_queue();
+
+            assert_eq!(col.queued_card_ids(20)?, expected[answered..]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rwkv_new_review_mix_resets_after_normal_queue_invalidation() -> Result<()> {
+        for switch_deck in [false, true] {
+            let mut col = Collection::new();
+            let mut deck = col.get_or_create_normal_deck("Default")?;
+            let other = col.get_or_create_normal_deck("Other")?;
+            col.set_current_deck(deck.id)?;
+            col.set_deck_rwkv_instant_order(&mut deck, ReviewCardOrder::Day);
+            for _ in 0..2 {
+                CardAdder::new().add(&mut col);
+            }
+            for _ in 0..6 {
+                CardAdder::new().due_dates(["0"]).add(&mut col);
+            }
+            col.answer_easy();
+            col.invalidate_rwkv_review_queue();
+            if switch_deck {
+                col.set_current_deck(other.id)?;
+                col.set_current_deck(deck.id)?;
+            } else {
+                col.clear_study_queues();
+            }
+
+            let shown: String = col
+                .get_queued_cards(20, false, true)?
+                .cards
+                .iter()
+                .map(|queued| {
+                    if queued.card.queue == CardQueue::New {
+                        'N'
+                    } else {
+                        'R'
+                    }
+                })
+                .collect();
+            assert_eq!(shown, "RRNRRNR", "switch deck: {switch_deck}");
         }
         Ok(())
     }

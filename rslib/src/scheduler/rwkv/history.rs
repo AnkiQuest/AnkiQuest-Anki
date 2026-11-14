@@ -1,7 +1,10 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+use anki_proto::scheduler::rwkv_answer_time_history_features_response::Card as AnswerTimeCard;
 use anki_proto::scheduler::rwkv_historical_review_inputs_response::Review;
+use anki_proto::scheduler::RwkvAnswerTimeHistoryFeaturesRequest;
+use anki_proto::scheduler::RwkvAnswerTimeHistoryFeaturesResponse;
 use anki_proto::scheduler::RwkvHistoricalReviewIdentity;
 use anki_proto::scheduler::RwkvHistoricalReviewInputsRequest;
 use anki_proto::scheduler::RwkvHistoricalReviewInputsResponse;
@@ -67,6 +70,36 @@ impl Collection {
         output.metadata = Some(metadata);
         output.active_ignored_review_ids = fingerprint.active_ignored_review_ids;
         Ok(output)
+    }
+
+    /// The answer-time head's history features of each requested card after
+    /// the whole canonical RWKV history, in one pass and without building
+    /// the review rows.
+    pub(crate) fn rwkv_answer_time_history_features(
+        &mut self,
+        input: RwkvAnswerTimeHistoryFeaturesRequest,
+    ) -> Result<RwkvAnswerTimeHistoryFeaturesResponse> {
+        let mut history = crate::rwkv::AnswerTimeHistory::new();
+        let _ = self.visit_rwkv_historical_reviews(
+            input.history.unwrap_or_default(),
+            RwkvHistoricalReplayOptions::default(),
+            |review, _hash, _is_checkpoint| {
+                let row = review.row;
+                history.push(row.card_id, row.ease, row.duration_millis);
+            },
+        )?;
+        Ok(RwkvAnswerTimeHistoryFeaturesResponse {
+            cards: input
+                .card_ids
+                .into_iter()
+                .map(|card_id| AnswerTimeCard {
+                    card_id,
+                    // Elapsed days 0: the runtime sets the query's own.
+                    features: history.features(card_id, 0).to_vec(),
+                })
+                .collect(),
+            review_count: history.reviews(),
+        })
     }
 }
 
@@ -294,6 +327,76 @@ mod tests {
     }
 
     #[test]
+    fn historical_inputs_prepare_new_cards_with_old_review_logs() -> Result<()> {
+        let mut col = Collection::new();
+        let mut card = Card::new(NoteId(10), 0, DeckId(1), 0);
+        col.add_card(&mut card)?;
+        let start = 1_700_000_000_000;
+        for (offset, kind) in [RevlogReviewKind::Learning, RevlogReviewKind::Review]
+            .into_iter()
+            .enumerate()
+        {
+            col.storage.add_revlog_entry(
+                &RevlogEntry {
+                    id: RevlogId(start + offset as i64),
+                    cid: card.id,
+                    button_chosen: 3,
+                    interval: 1,
+                    ease_factor: 2_500,
+                    review_kind: kind,
+                    ..Default::default()
+                },
+                false,
+            )?;
+        }
+
+        assert!(col
+            .rwkv_historical_review_inputs(Default::default())?
+            .reviews
+            .is_empty());
+        assert_eq!(
+            col.rwkv_historical_review_fingerprint(Default::default())?
+                .review_count,
+            0
+        );
+        // A Learning-only history is also excluded for a new card.
+        let history = col.rwkv_historical_review_inputs(RwkvHistoricalReviewInputsRequest {
+            history: Some(scheduler::RwkvHistoricalReviewFingerprintRequest {
+                ignored_review_ids: vec![start + 1],
+                ..Default::default()
+            }),
+            ..Default::default()
+        })?;
+        assert!(history.reviews.is_empty());
+
+        // Reinstating scheduling makes the old history relevant again.
+        card.ctype = CardType::Review;
+        col.storage.update_card(&card)?;
+        assert_eq!(
+            col.rwkv_historical_review_inputs(Default::default())?
+                .reviews
+                .len(),
+            2
+        );
+        card.rwkv_history_reset_after = Some(start);
+        col.storage.update_card(&card)?;
+        let retained = col.rwkv_historical_review_inputs(Default::default())?;
+        assert_eq!(retained.reviews.len(), 1);
+        assert_eq!(retained.reviews[0].review_id, start + 1);
+        // Borrowing a new card into a filtered deck does not restore old history.
+        card.ctype = CardType::New;
+        card.original_deck_id = DeckId(1);
+        col.storage.update_card(&card)?;
+        assert_eq!(
+            col.rwkv_historical_review_inputs(Default::default())?
+                .reviews
+                .len(),
+            0
+        );
+        Ok(())
+    }
+
+    #[test]
     fn historical_inputs_use_forget_boundary_before_relearning() -> Result<()> {
         let mut col = Collection::new();
         let mut card = Card::new(NoteId(10), 0, DeckId(1), 0);
@@ -421,6 +524,64 @@ mod tests {
         assert_eq!(checkpoint.previous_interval_days_by_card[&first.id.0], 4);
         assert_eq!(checkpoint.previous_interval_days_by_card[&second.id.0], 2);
         assert_ne!(Some(checkpoint), history.metadata);
+        Ok(())
+    }
+
+    #[test]
+    fn answer_time_history_features_follow_the_canonical_history() -> Result<()> {
+        let mut col = Collection::new();
+        let mut first = Card::new(NoteId(10), 0, DeckId(1), 0);
+        let mut second = Card::new(NoteId(20), 0, DeckId(1), 0);
+        first.ctype = CardType::Review;
+        second.ctype = CardType::Review;
+        col.add_card(&mut first)?;
+        col.add_card(&mut second)?;
+        let day = 86_400_000;
+        let start = 1_700_000_000_000;
+        let reviews = [
+            (first.id, 0, 3, 4_000),
+            (second.id, 1, 1, 0),
+            (first.id, 3, 4, 2_500),
+            (second.id, 4, 3, 9_000),
+        ];
+        for (card, offset, button, millis) in reviews {
+            col.storage.add_revlog_entry(
+                &RevlogEntry {
+                    id: RevlogId(start + offset * day),
+                    cid: card,
+                    usn: Usn(0),
+                    button_chosen: button,
+                    interval: 1,
+                    ease_factor: 2_500,
+                    taken_millis: millis,
+                    review_kind: RevlogReviewKind::Review,
+                    ..Default::default()
+                },
+                false,
+            )?;
+        }
+        let output =
+            col.rwkv_answer_time_history_features(RwkvAnswerTimeHistoryFeaturesRequest {
+                history: None,
+                card_ids: vec![first.id.0, second.id.0, 999],
+            })?;
+        // The same rows the warm-up replays, pushed in order.
+        let canonical = col.rwkv_historical_review_inputs(Default::default())?;
+        assert_eq!(canonical.reviews.len(), 4);
+        let mut expected = crate::rwkv::AnswerTimeHistory::new();
+        for review in &canonical.reviews {
+            expected.push(review.card_id, review.ease, review.duration_millis);
+        }
+        assert_eq!(output.review_count, 4);
+        for (card, row) in [first.id.0, second.id.0, 999]
+            .into_iter()
+            .zip(&output.cards)
+        {
+            assert_eq!(row.card_id, card);
+            assert_eq!(row.features, expected.features(card, 0).to_vec());
+        }
+        // An unseen card has no time of its own.
+        assert_eq!(&output.cards[2].features[3..6], &[1.0, 1.0, 1.0]);
         Ok(())
     }
 }

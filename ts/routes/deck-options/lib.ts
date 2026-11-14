@@ -29,9 +29,22 @@ import { fsrsParamDiagnostics } from "./fsrs-param-diagnostics";
 
 export type DeckOptionsId = bigint;
 
+/** RWKV model sizes, stored in the profile's model key (qt/aqt/rwkv_model.py). */
+export const RWKV_MODEL_BIG = "legacy";
+export const RWKV_MODEL_SMALL = "sm72e25";
+export const RWKV_MODEL_TINY = "tiny";
+/** Older small models (and the default small model (SM63) by its own value):
+ * still run until a save, which stores Small instead. */
+export const RWKV_OLDER_SMALL_MODELS = ["sm40", "sm36", "sm55", "sm56", "sm72", "sm72e20", "sm63"];
+
 export interface ConfigWithCount {
     config: DeckConfig;
     useCount: number;
+}
+
+export interface RwkvSchedulerUsage {
+    curve: boolean;
+    instant: boolean;
 }
 
 /** Info for showing the top selector */
@@ -75,16 +88,25 @@ type AllConfigs =
             | "reviewFuzzFactorLong"
         >
     >
-    & { currentConfig: DeckConfig_Config; rwkvProfileSettings: RwkvProfileSettings };
+    & {
+        currentConfig: DeckConfig_Config;
+        rwkvProfileSettings: RwkvProfileSettings;
+        rwkvRespectSubdeckMinimums: boolean;
+        rwkvApplyRespectSubdeckMinimumsToChildren: boolean;
+    };
 
 export class DeckOptionsState {
     readonly currentConfig: Writable<DeckConfig_Config>;
     readonly rwkvProfileSettings: Writable<RwkvProfileSettings>;
+    readonly rwkvCollectionCounts: { cards: number; notes: number } | undefined;
+    readonly rwkvSchedulerUsage: Writable<RwkvSchedulerUsage> = writable({ curve: false, instant: false });
     readonly currentAuxData: Writable<Record<string, unknown>>;
     readonly configList: Readable<ConfigListEntry[]>;
     readonly cardStateCustomizer: Writable<string>;
     readonly currentDeck: DeckConfigsForUpdate_CurrentDeck;
     readonly deckLimits: Writable<DeckConfigsForUpdate_CurrentDeck_Limits>;
+    readonly rwkvRespectSubdeckMinimums: Writable<boolean>;
+    readonly rwkvApplyRespectSubdeckMinimumsToChildren: Writable<boolean> = writable(false);
     readonly defaults: DeckConfig_Config;
     readonly addonComponents: Writable<DynamicSvelteComponent[]>;
     readonly newCardsIgnoreReviewLimit: Writable<boolean>;
@@ -125,10 +147,16 @@ export class DeckOptionsState {
         this.currentDeck = data.currentDeck!;
         this.rwkvProfileSettings = writable(
             data.rwkvProfileSettings ?? new RwkvProfileSettings({
-                model: "sm56",
+                model: RWKV_MODEL_SMALL,
                 statePrecision: "cards_int4_notes_int8",
             }),
         );
+        this.rwkvCollectionCounts = data.rwkvCollectionCounts
+            ? {
+                cards: Number(data.rwkvCollectionCounts.cards),
+                notes: Number(data.rwkvCollectionCounts.notes),
+            }
+            : undefined;
         this.defaults = data.defaults!.config!;
         this.configs = data.allConfig.map((config) => {
             const configInner = config.config!;
@@ -145,6 +173,9 @@ export class DeckOptionsState {
         this.sortConfigs();
         this.cardStateCustomizer = writable(data.cardStateCustomizer);
         this.deckLimits = writable(data.currentDeck?.limits ?? createLimits());
+        this.rwkvRespectSubdeckMinimums = writable(
+            data.currentDeck?.limits?.rwkvRespectSubdeckMinimums ?? false,
+        );
         this.newCardsIgnoreReviewLimit = writable(data.newCardsIgnoreReviewLimit);
         this.loadBalancerEnabled = writable(data.loadBalancerEnabled);
         this.applyAllParentLimits = writable(data.applyAllParentLimits);
@@ -313,6 +344,7 @@ export class DeckOptionsState {
                 }
             }
         }
+        this.updateRwkvSchedulerUsage();
     }
 
     setCurrentName(name: string): void {
@@ -396,9 +428,9 @@ export class DeckOptionsState {
         const rwkvProfileSettings = new RwkvProfileSettings(get(this.rwkvProfileSettings));
         if (
             mode !== UpdateDeckConfigsMode.COMPUTE_ALL_PARAMS
-            && ["sm40", "sm36", "sm55"].includes(rwkvProfileSettings.model)
+            && RWKV_OLDER_SMALL_MODELS.includes(rwkvProfileSettings.model)
         ) {
-            rwkvProfileSettings.model = "sm56";
+            rwkvProfileSettings.model = RWKV_MODEL_SMALL;
         }
         return {
             targetDeckId: this.targetDeckId,
@@ -407,7 +439,12 @@ export class DeckOptionsState {
             configs,
             mode,
             cardStateCustomizer: get(this.cardStateCustomizer),
-            limits: get(this.deckLimits),
+            limits: {
+                ...get(this.deckLimits),
+                rwkvRespectSubdeckMinimums: get(this.rwkvRespectSubdeckMinimums),
+                rwkvApplyRespectSubdeckMinimumsToChildren: mode !== UpdateDeckConfigsMode.COMPUTE_ALL_PARAMS
+                    && get(this.rwkvApplyRespectSubdeckMinimumsToChildren),
+            },
             newCardsIgnoreReviewLimit: get(this.newCardsIgnoreReviewLimit),
             loadBalancerEnabled: get(this.loadBalancerEnabled),
             applyAllParentLimits: get(this.applyAllParentLimits),
@@ -435,6 +472,7 @@ export class DeckOptionsState {
         } else {
             await updateDeckConfigs(request);
         }
+        this.rwkvApplyRespectSubdeckMinimumsToChildren.set(false);
     }
 
     private onCurrentConfigChanged(config: DeckConfig_Config): void {
@@ -445,6 +483,14 @@ export class DeckOptionsState {
                 this.modifiedConfigs.add(configOuter.id);
             }
         }
+        this.updateRwkvSchedulerUsage();
+    }
+
+    private updateRwkvSchedulerUsage(): void {
+        this.rwkvSchedulerUsage.set({
+            curve: this.configs.some(({ config }) => config.config?.rwkvReviewEnabled),
+            instant: this.configs.some(({ config }) => config.config?.rwkvReviewInstantOrderEnabled),
+        });
     }
 
     private onCurrentAuxDataChanged(data: Record<string, unknown>): void {
@@ -528,6 +574,8 @@ export class DeckOptionsState {
             reviewFuzzFactorLong: get(this.reviewFuzzFactorLong),
             currentConfig: get(this.currentConfig),
             rwkvProfileSettings: get(this.rwkvProfileSettings),
+            rwkvRespectSubdeckMinimums: get(this.rwkvRespectSubdeckMinimums),
+            rwkvApplyRespectSubdeckMinimumsToChildren: get(this.rwkvApplyRespectSubdeckMinimumsToChildren),
         });
     }
 

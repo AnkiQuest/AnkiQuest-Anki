@@ -32,6 +32,7 @@ use crate::revlog::RevlogId;
 use crate::scheduler::fsrs::preset::FsrsPresetOverlayCache;
 use crate::scheduler::queue::CardQueues;
 use crate::scheduler::queue::DeferredRwkvReview;
+use crate::scheduler::queue::NewReviewMixProgress;
 use crate::scheduler::rwkv::rwkv_review_candidate_metadata;
 use crate::scheduler::rwkv::rwkv_review_score_eligibility;
 use crate::scheduler::rwkv::RwkvReviewScoreEligibility;
@@ -153,6 +154,7 @@ pub struct CollectionState {
     /// (and on the new study screen, after the app was killed in the
     /// background, that card's answer) and made Undo show another card.
     pub(crate) shown_card: Option<(CardId, crate::timestamp::TimestampSecs)>,
+    pub(crate) pending_new_review_mix: Option<NewReviewMixProgress>,
     pub(crate) rwkv_retrievability_scores: Option<RwkvRetrievabilityScores>,
     /// Model state for RWKV-Instant on clients without the desktop's Python.
     pub(crate) rwkv_offline: Option<Box<crate::scheduler::rwkv::RwkvOfflineRuntime>>,
@@ -661,7 +663,7 @@ impl Collection {
             .state
             .rwkv_retrievability_scores
             .as_ref()
-            .map_or(true, |scores| scores.days_elapsed != days_elapsed)
+            .is_none_or(|scores| scores.days_elapsed != days_elapsed)
         {
             self.state.rwkv_retrievability_scores = Some(RwkvRetrievabilityScores {
                 days_elapsed,
@@ -715,7 +717,7 @@ impl Collection {
                 .as_ref()
                 .is_some_and(|scores| scores.review_queue_scores.is_some())
         {
-            self.state.card_queues = None;
+            self.invalidate_rwkv_review_queue();
         }
         self.clear_rwkv_deck_count_scores();
         self.rwkv_retrievability_scores_mut(days_elapsed)
@@ -734,7 +736,7 @@ impl Collection {
             self.state
                 .card_queues
                 .as_ref()
-                .map_or(true, |queues| !queues.main_contains(card_id)),
+                .is_none_or(|queues| !queues.main_contains(card_id)),
             "cannot patch RWKV queue score before the answered card is removed"
         );
         let timing = self.timing_today()?;
@@ -758,7 +760,7 @@ impl Collection {
         }
         match eligibility {
             Some(RwkvReviewScoreEligibility::Eligible) => {
-                self.state.card_queues = None;
+                self.invalidate_rwkv_review_queue();
             }
             Some(eligibility @ RwkvReviewScoreEligibility::Deferred { .. }) => {
                 if let Some(queues) = self.state.card_queues.as_mut() {
@@ -828,7 +830,7 @@ impl Collection {
             scores.update_review_queue_intervening_reviews(deck_id, intervening_reviews_by_card_id);
         }
         if queue_rebuild_required {
-            self.state.card_queues = None;
+            self.invalidate_rwkv_review_queue();
         }
         Ok(())
     }

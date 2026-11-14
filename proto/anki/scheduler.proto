@@ -177,10 +177,17 @@ service SchedulerService {
   // current curve's interval and S90 (as ApplyRwkvReviewReschedule).
   rpc RwkvOfflineCurveReschedule(decks.DeckId)
       returns (collection.OpChangesWithCount);
+  // Computes the RWKV answer-time head's history features for cards from the
+  // canonical RWKV history (the same traversal as the inputs above).
+  rpc RwkvAnswerTimeHistoryFeatures(RwkvAnswerTimeHistoryFeaturesRequest)
+      returns (RwkvAnswerTimeHistoryFeaturesResponse);
   // Deletes calibration rows that a completed RWKV calibration recompute
   // superseded.
   rpc PruneRwkvReviewRetrievabilityCacheRows(
       PruneRwkvReviewRetrievabilityCacheRowsRequest) returns (generic.UInt32);
+  // Comparison-only predictions. These do not change card or review state.
+  rpc FsrsSixCurrentScores(cards.CardIds) returns (Fsrs6CurrentScoresResponse);
+  rpc FsrsSixComparisonFingerprint(generic.String) returns (generic.String);
 }
 
 // Implicitly includes any of the above methods that are not listed in the
@@ -202,6 +209,8 @@ service BackendSchedulerService {
   rpc FsrsBenchmark(FsrsBenchmarkRequest) returns (FsrsBenchmarkResponse);
   // Used for exporting revlogs for algorithm research.
   rpc ExportDataset(ExportDatasetRequest) returns (generic.Empty);
+  rpc ComputeFsrsSixComparison(ComputeFsrs6ComparisonRequest)
+      returns (ComputeFsrs6ComparisonResponse);
 }
 
 message SchedulingState {
@@ -593,6 +602,33 @@ message ComputeFsrsReviewRetrievabilityCalibrationRequest {
   optional bool enable_scheduling_penalties = 8;
 }
 
+message Fsrs6CurrentScoresResponse {
+  message Score {
+    int64 card_id = 1;
+    float retrievability = 2;
+  }
+  repeated Score scores = 1;
+  uint32 missing_parameters = 2;
+}
+
+message ComputeFsrs6ComparisonRequest {
+  string search = 1;
+  repeated float params = 2;
+  int64 ignore_revlogs_before_ms = 3;
+  uint32 num_of_relearning_steps = 4;
+  bool include_validation_folds = 5;
+}
+
+message ComputeFsrs6ComparisonResponse {
+  // Packed, sorted pairs of little-endian int64 review ID and float32 R.
+  // final_fit uses the supplied parameters; validation_fold uses parameters
+  // trained on the preceding fold. Neither result is persisted by Anki.
+  bytes final_fit = 1;
+  bytes validation_fold = 2;
+  // Hash of the history and rollover used for these predictions.
+  string history_fingerprint = 3;
+}
+
 message ComputeFsrsParamsFromItemsRequest {
   repeated FsrsItem items = 1;
 }
@@ -657,6 +693,40 @@ message SimulateFsrsReviewRequest {
   uint32 rwkv_workload_sample_limit = 36;
   uint32 rwkv_workload_target_step = 37;
   uint32 rwkv_workload_state_update_interval = 38;
+  optional RwkvComparisonOptions rwkv_comparison = 39;
+}
+
+message RwkvComparisonOptions {
+  enum Learner {
+    FSRS = 0;
+    RWKV = 1;
+  }
+  enum PerformanceScenario {
+    STEADY = 0;
+    TEMPORARY_DROP = 1;
+    PERSISTENT_DROP = 2;
+    TEMPORARY_IMPROVEMENT = 3;
+  }
+  Learner learner = 1;
+  PerformanceScenario scenario = 2;
+  uint32 repetitions = 3;
+  // Also simulate the other learner using the same prepared inputs.
+  bool compare_both_learners = 4;
+}
+
+message RwkvComparisonResponse {
+  SimulateFsrsWorkloadResponse fsrs = 1;
+  SimulateFsrsWorkloadResponse rwkv = 2;
+  uint32 total_cards = 3;
+  uint32 sampled_cards = 4;
+  uint32 estimated_fsrs_states = 5;
+  SimulateFsrsWorkloadResponse fsrs_scored_by_fsrs = 6;
+  SimulateFsrsWorkloadResponse rwkv_scored_by_fsrs = 7;
+  SimulateFsrsWorkloadResponse fsrs_scored_by_rwkv = 8;
+  SimulateFsrsWorkloadResponse rwkv_scored_by_rwkv = 9;
+  uint32 background_reviews = 10;
+  // Present when compare_both_learners was requested.
+  RwkvComparisonResponse other_learner = 11;
 }
 
 message SimulateFsrsReviewResponse {
@@ -870,6 +940,22 @@ message RwkvHistoricalReviewInputsResponse {
   RwkvHistoricalReviewMetadata metadata = 2;
   RwkvHistoricalReviewMetadata recovery_checkpoint = 3;
   repeated int64 active_ignored_review_ids = 4;
+}
+
+message RwkvAnswerTimeHistoryFeaturesRequest {
+  RwkvHistoricalReviewFingerprintRequest history = 1;
+  repeated int64 card_ids = 2;
+}
+
+message RwkvAnswerTimeHistoryFeaturesResponse {
+  message Card {
+    int64 card_id = 1;
+    // The head's 26 history features after every review in the history. The
+    // native runtime replaces the elapsed-days entries with the query's own.
+    repeated float features = 2;
+  }
+  repeated Card cards = 1;
+  uint64 review_count = 2;
 }
 
 message FuzzDeltaRequest {
@@ -1187,6 +1273,7 @@ message RwkvReviewInputRowsForSearchRequest {
   bool include_suspended_review = 2;
   bool include_disabled_decks = 3;
   bool include_new_cards = 4;
+  bool include_comparison_data = 5;
 }
 
 message RwkvReviewInputRowsForDeckReviewQueueRequest {
@@ -1216,6 +1303,16 @@ message RwkvReviewInputRowsForCardsResponse {
     float target_retention = 17;
     uint32 batch_size = 18;
     optional bool enforce_grade_order = 19;
+    optional cards.FsrsMemoryState fsrs_memory_state = 20;
+    repeated float fsrs_parameters = 21;
+    optional float fsrs_historical_retention = 22;
+    // Unix time from which current_elapsed_seconds was calculated.
+    optional int64 current_elapsed_since_secs = 23;
+    // Learning steps still to complete (without the legacy packed-day count).
+    optional uint32 remaining_steps = 24;
+    // The card is currently in a filtered deck, even though deck_id is its
+    // home.
+    bool in_filtered_deck = 25;
   }
 
   repeated Row rows = 1;

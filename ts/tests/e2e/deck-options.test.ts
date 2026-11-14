@@ -11,12 +11,252 @@ import {
     DeckConfigsForUpdate_ConfigWithExtra,
     DeckConfigsForUpdate_CurrentDeck_Limits,
     GetRetentionWorkloadResponse,
+    RwkvCollectionCounts,
     RwkvProfileSettings,
     UpdateDeckConfigsRequest,
 } from "@generated/anki/deck_config_pb";
+import { Bool } from "@generated/anki/generic_pb";
+import {
+    RwkvComparisonOptions_Learner,
+    RwkvComparisonOptions_PerformanceScenario,
+    RwkvComparisonResponse,
+    SimulateFsrsReviewRequest,
+    SimulateFsrsWorkloadResponse,
+} from "@generated/anki/scheduler_pb";
 
 import { expect, test } from "./fixtures";
 import { decodeRequestBody } from "./helpers";
+
+test("RWKV comparison explains that it needs RWKV-Curve on an instant-only runtime", async ({ page }) => {
+    let started = 0;
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!
+            .config!.config!.rwkvReviewEnabled = true;
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    await page.route("**/_anki/rwkvWorkloadAvailable", async (route) => {
+        await route.fulfill({ body: Buffer.from(new Bool({ val: false }).toBinary()) });
+    });
+    await page.route("**/_anki/startRwkvWorkload", async (route) => {
+        started += 1;
+        await route.fulfill({ body: Buffer.alloc(0) });
+    });
+    await page.goto("/deck-options/1");
+    const card = page.getByRole("heading", { name: "RWKV", exact: true }).locator("../..");
+    await card.locator("details.rwkv-advanced > summary").click();
+    await card.getByRole("button", { name: "Compare RWKV with FSRS", exact: true }).click();
+    const comparison = page.getByRole("dialog").filter({
+        has: page.getByRole("heading", { name: "FSRS / RWKV Efficiency Comparison (Experimental)", exact: true }),
+    });
+    await expect(comparison.getByText(/RWKV workload simulation needs RWKV-Curve\./)).toBeVisible();
+    await expect(comparison.getByRole("button", { name: "Simulate", exact: true })).toBeDisabled();
+    expect(started).toBe(0);
+});
+
+test("RWKV comparison sends the selected shared learner and scenario", async ({ page }) => {
+    let submitted: SimulateFsrsReviewRequest | undefined;
+    let submissions = 0;
+    let noRwkvReviews = false;
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!
+            .config!.config!.rwkvReviewEnabled = true;
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    await page.route("**/_anki/startRwkvWorkload", async (route) => {
+        submitted = decodeRequestBody(route.request(), SimulateFsrsReviewRequest);
+        submissions += 1;
+        await route.fulfill({ body: Buffer.alloc(0) });
+    });
+    await page.route("**/_anki/rwkvWorkloadResult", async (route) => {
+        const fsrs = new SimulateFsrsWorkloadResponse({
+            memorized: { 90: 1.5 },
+            cost: { 90: 20 },
+            reviewCount: { 90: 3 },
+            reviewlessEndMemorized: 1,
+        });
+        const rwkv = new SimulateFsrsWorkloadResponse({
+            memorized: { 90: 1.7 },
+            cost: { 90: noRwkvReviews ? 0 : 18 },
+            reviewCount: { 90: noRwkvReviews ? 0 : 2 },
+            reviewlessEndMemorized: 1,
+        });
+        const comparison = new RwkvComparisonResponse({
+            fsrs,
+            rwkv,
+            fsrsScoredByFsrs: fsrs,
+            rwkvScoredByFsrs: rwkv,
+            fsrsScoredByRwkv: new SimulateFsrsWorkloadResponse({
+                memorized: { 90: 1.9 },
+                cost: { 90: 20 },
+                reviewCount: { 90: 3 },
+                reviewlessEndMemorized: 1,
+            }),
+            rwkvScoredByRwkv: new SimulateFsrsWorkloadResponse({
+                memorized: { 90: 1.2 },
+                cost: { 90: noRwkvReviews ? 0 : 18 },
+                reviewCount: { 90: noRwkvReviews ? 0 : 2 },
+                reviewlessEndMemorized: 1,
+            }),
+            sampledCards: 1,
+            totalCards: 2,
+            estimatedFsrsStates: 1,
+        });
+        await route.fulfill({ body: Buffer.from(comparison.toBinary()) });
+    });
+    await page.goto("/deck-options/1");
+    const card = page.getByRole("heading", { name: "RWKV", exact: true }).locator("../..");
+    await card.locator("details.rwkv-advanced > summary").click();
+    await card.getByRole("button", { name: "Compare RWKV with FSRS", exact: true }).click();
+    const comparison = page.getByRole("dialog").filter({
+        has: page.getByRole("heading", { name: "FSRS / RWKV Efficiency Comparison (Experimental)", exact: true }),
+    });
+    await comparison.getByLabel("Simulated learner").selectOption(String(RwkvComparisonOptions_Learner.RWKV));
+    await comparison.getByLabel("Performance scenario").selectOption(
+        String(RwkvComparisonOptions_PerformanceScenario.TEMPORARY_DROP),
+    );
+    await comparison.getByRole("button", { name: "Simulate", exact: true }).click();
+    await expect.poll(() => submitted?.rwkvComparison?.learner).toBe(RwkvComparisonOptions_Learner.RWKV);
+    expect(submitted?.rwkvComparison?.scenario).toBe(RwkvComparisonOptions_PerformanceScenario.TEMPORARY_DROP);
+    expect(submitted?.rwkvComparison?.repetitions).toBe(1);
+    expect(submitted?.rwkvWorkloadSampleLimit).toBe(250);
+    expect(submitted?.rwkvWorkloadTargetStep).toBe(10);
+    await expect(comparison.getByText(/1.*of.*2.*cards simulated/)).toBeVisible();
+    await expect(comparison.getByText(/run 1\): RWKV time saving/)).toBeVisible();
+    await comparison.getByLabel("Estimate memorized with").selectOption(String(RwkvComparisonOptions_Learner.RWKV));
+    await expect(comparison.getByText("No tested points matched in simulated memory.")).toBeVisible();
+    expect(submissions).toBe(1);
+    await comparison.getByLabel("Estimate memorized with").selectOption(String(RwkvComparisonOptions_Learner.FSRS));
+    await expect(comparison.getByText(/run 1\): RWKV time saving/)).toBeVisible();
+    await comparison.getByLabel("Performance scenario").selectOption(
+        String(RwkvComparisonOptions_PerformanceScenario.STEADY),
+    );
+    await comparison.getByRole("button", { name: "Simulate", exact: true }).click();
+    await expect(comparison.getByText(/Run .*2.*RWKV-based learner.*steady/)).toBeVisible();
+    await expect(comparison.getByText(/Run .*1.*RWKV-based learner.*temporary drop/)).toBeVisible();
+    noRwkvReviews = true;
+    await comparison.getByRole("button", { name: "Simulate", exact: true }).click();
+    const noReviewsRow = comparison.getByText(/run 3\): RWKV time saving/).locator("..");
+    await expect(noReviewsRow).toContainText("100.0%");
+});
+
+test("RWKV comparison shows agreement for both answer models and multiple horizons", async ({ page }) => {
+    const requests: SimulateFsrsReviewRequest[] = [];
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!
+            .config!.config!.rwkvReviewEnabled = true;
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    await page.route("**/_anki/startRwkvWorkload", async (route) => {
+        requests.push(decodeRequestBody(route.request(), SimulateFsrsReviewRequest));
+        await route.fulfill({ body: Buffer.alloc(0) });
+    });
+    await page.route("**/_anki/rwkvWorkloadResult", async (route) => {
+        const score = (values: Record<number, number>) =>
+            new SimulateFsrsWorkloadResponse({
+                memorized: values,
+                cost: { 40: 3600, 50: 3600, 70: 3600, 80: 3600 },
+                reviewCount: { 40: 1, 50: 1, 70: 1, 80: 1 },
+                reviewlessEndMemorized: 10,
+            });
+        const fsrs = score({ 40: 20, 50: 20, 70: 20, 80: 20 });
+        const rwkvAnswers = score({ 40: 21, 50: 21, 70: 21, 80: 21 });
+        const fsrsAnswersFsrsScore = score({ 40: 22, 50: 22, 70: 22, 80: 20 });
+        const fsrsAnswersRwkvScore = score({ 40: 22, 50: 22, 70: 18, 80: 22 });
+        const comparison = new RwkvComparisonResponse({
+            fsrsScoredByFsrs: fsrs,
+            rwkvScoredByFsrs: rwkvAnswers,
+            fsrsScoredByRwkv: fsrs,
+            rwkvScoredByRwkv: rwkvAnswers,
+            otherLearner: new RwkvComparisonResponse({
+                fsrsScoredByFsrs: fsrs,
+                rwkvScoredByFsrs: fsrsAnswersFsrsScore,
+                fsrsScoredByRwkv: fsrs,
+                rwkvScoredByRwkv: fsrsAnswersRwkvScore,
+            }),
+            sampledCards: 1,
+            totalCards: 2,
+        });
+        await route.fulfill({ body: Buffer.from(comparison.toBinary()) });
+    });
+    await page.goto("/deck-options/1");
+    const card = page.getByRole("heading", { name: "RWKV", exact: true }).locator("../..");
+    await card.locator("details.rwkv-advanced > summary").click();
+    await card.getByRole("button", { name: "Compare RWKV with FSRS", exact: true }).click();
+    const comparison = page.getByRole("dialog").filter({
+        has: page.getByRole("heading", { name: "FSRS / RWKV Efficiency Comparison (Experimental)", exact: true }),
+    });
+    await comparison.getByRole("checkbox", { name: "Compare both answer models" }).check();
+    await comparison.getByLabel("Answer model for graph").selectOption(String(RwkvComparisonOptions_Learner.RWKV));
+    const days = comparison.getByRole("spinbutton").first();
+    await days.fill("30");
+    await days.blur();
+    await comparison.getByRole("button", { name: "Simulate", exact: true }).click();
+    const agreement = comparison.getByRole("region", { name: "Scheduler agreement on net efficiency" });
+    const first = agreement.getByRole("row").nth(1);
+    await expect(first.getByRole("rowheader")).toContainText("30");
+    await expect(agreement.getByRole("columnheader", { name: "40%" })).toHaveCount(0);
+    await expect(first.getByRole("cell").nth(0)).toContainText("RWKV scheduler higher");
+    await expect(first.getByRole("cell").nth(0)).toContainText("+20.0% / +20.0%");
+    await expect(first.getByRole("cell").nth(0)).toContainText("+10.0% / +10.0%");
+    await expect(first.getByRole("cell").nth(1)).toContainText("Mixed / tied");
+    await expect(first.getByRole("cell").nth(2)).toContainText("Mixed / tied");
+    expect(requests[0].daysToSimulate).toBe(30);
+    expect(requests[0].rwkvComparison?.compareBothLearners).toBe(true);
+    expect(requests[0].rwkvComparison?.learner).toBe(RwkvComparisonOptions_Learner.RWKV);
+    const rwkvLine = comparison.locator("g.lines path[data-group='1003']");
+    const rwkvAnswersLine = await rwkvLine.getAttribute("d");
+    await comparison.getByLabel("Answer model for graph").selectOption(String(RwkvComparisonOptions_Learner.FSRS));
+    await expect.poll(() => rwkvLine.getAttribute("d")).not.toBe(rwkvAnswersLine);
+    expect(requests).toHaveLength(1);
+    await comparison.getByLabel("Answer model for graph").selectOption(String(RwkvComparisonOptions_Learner.RWKV));
+
+    const minimumRetention = comparison.getByRole("spinbutton").nth(6);
+    await minimumRetention.fill("80");
+    await minimumRetention.blur();
+    await expect(agreement.getByRole("columnheader", { name: "50%" })).toHaveCount(0);
+    await expect(agreement.getByRole("columnheader", { name: "80%" })).toBeVisible();
+    await minimumRetention.fill("50");
+    await minimumRetention.blur();
+
+    await days.fill("180");
+    await days.blur();
+    await comparison.getByRole("button", { name: "Simulate", exact: true }).click();
+    await expect(agreement.getByRole("row").nth(2).getByRole("rowheader")).toContainText("180");
+    expect(requests[1].daysToSimulate).toBe(180);
+    await comparison.getByRole("button", { name: "Clear Last Simulation" }).click();
+    await expect(agreement.getByRole("row")).toHaveCount(2);
+    await expect(first).toBeVisible();
+});
+
+test("RWKV subdeck minimums can be saved and applied to descendants", async ({ page }) => {
+    let saved: UpdateDeckConfigsRequest | undefined;
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        const config = data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!.config!.config!;
+        config.rwkvReviewInstantOrderEnabled = true;
+        data.currentDeck!.limits!.rwkvRespectSubdeckMinimums = false;
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    await page.route("**/_anki/updateDeckConfigsAndClose", async (route) => {
+        saved = decodeRequestBody(route.request(), UpdateDeckConfigsRequest);
+        await route.fulfill({ body: Buffer.from(new OpChanges().toBinary()) });
+    });
+    await page.goto("/deck-options/1");
+    const setting = page.getByRole("checkbox", { name: "Also honor subdeck minimums", exact: true });
+    await expect(setting).not.toBeChecked();
+    await setting.check();
+    await page.getByRole("checkbox", { name: "Apply this setting to all subdecks on save", exact: true }).check();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect.poll(() => saved?.limits?.rwkvRespectSubdeckMinimums).toBe(true);
+    expect(saved?.limits?.rwkvApplyRespectSubdeckMinimumsToChildren).toBe(true);
+});
 
 test(
     "RWKV Advanced hides model, queue and comparison controls and preserves precision on Save",
@@ -36,6 +276,7 @@ test(
                     statePrecision: "int8",
                 },
             );
+            data.rwkvCollectionCounts = new RwkvCollectionCounts({ cards: 1_000n, notes: 500n });
             await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
         });
         await page.route("**/_anki/updateDeckConfigsAndClose", async (route) => {
@@ -49,9 +290,16 @@ test(
         });
         const card = page.getByRole("heading", { name: "RWKV", exact: true }).locator("../..");
         const advanced = card.locator("details.rwkv-advanced");
-        const openAdvanced = advanced.locator("summary");
+        const openAdvanced = advanced.locator(":scope > summary");
         const group = advanced.getByRole("region", { name: "Prediction model", exact: true });
-        const model = group.getByRole("checkbox", { name: "Use Smaller Model", exact: true });
+        const big = group.getByRole("radio", { name: "Big", exact: true });
+        const small = group.getByRole("radio", { name: "Small", exact: true });
+        const tiny = group.getByRole("radio", { name: "Tiny", exact: true });
+        const singleModel = group.getByRole("checkbox", {
+            name: "Use one model for RWKV",
+            exact: true,
+        });
+        const model = big;
         const compare = advanced.getByRole("button", { name: "Compare RWKV with FSRS", exact: true });
         await expect(model).toBeHidden();
         await expect(compare).toBeHidden();
@@ -66,7 +314,13 @@ test(
         await page.setViewportSize({ width: 1280, height: 900 });
         await openAdvanced.focus();
         await page.keyboard.press("Enter");
-        await expect(model).not.toBeChecked();
+        // The saved Big choice ("legacy") offers its own Instant model and opt-out.
+        await expect(big).toBeChecked();
+        await expect(small).not.toBeChecked();
+        await expect(tiny).not.toBeChecked();
+        await expect(singleModel).toBeVisible();
+        await expect(singleModel).not.toBeChecked();
+        await expect(group.getByRole("radio")).toHaveCount(3);
         await expect(group.getByText("Legacy - Bigger Model", { exact: true })).toHaveCount(0);
         await expect(compare).toBeVisible();
         await compare.click();
@@ -76,8 +330,32 @@ test(
         await expect(comparison).toBeVisible();
         await comparison.getByRole("button", { name: "Close", exact: true }).click();
         await expect(comparison).toBeHidden();
-        await group.getByRole("button", { name: "About prediction models", exact: true }).click();
+        await expect(group.getByRole("button", { name: "About prediction models", exact: true })).toHaveCount(0);
+        await expect(group.getByText("Use Smaller Model", { exact: true })).toHaveCount(0);
+        await expect(group).toContainText(/Estimated model state for .*1,000.* cards and .*500.* notes/);
+        await expect(group).toContainText("Both schedulers · separate models");
+        await expect(big).toHaveAccessibleDescription(
+            /51\.4 KB.*per card \+ note.*41\.1 MB.*Curve Baseline.*Instant Baseline/,
+        );
+        await expect(small).toHaveAccessibleDescription(
+            /9\.1 KB.*per card \+ note.*7\.6 MB.*Curve \+0\.31%.*Instant \+0\.11%/,
+        );
+        await expect(tiny).toHaveAccessibleDescription(
+            /6\.3 KB.*per card \+ note.*4\.7 MB.*Curve \+0\.42%.*Instant \+0\.30%/,
+        );
+        await expect(group.getByText(/answer-time estimate/)).toHaveCount(0);
+        await singleModel.check();
+        await expect(group).toContainText("Both schedulers · one shared model");
+        await expect(small).toHaveAccessibleDescription(
+            /4\.6 KB.*per card \+ note.*3\.8 MB.*Curve \+0\.31%.*Instant \+0\.25%/,
+        );
+        await expect(tiny).toHaveAccessibleDescription(
+            /3\.1 KB.*per card \+ note.*2\.4 MB.*Curve \+0\.42%.*Instant \+0\.43%/,
+        );
+        await singleModel.uncheck();
         await expect(group).toContainText("Applies to all decks in this profile on this computer");
+        await group.getByText("About these estimates", { exact: true }).click();
+        await expect(group).toContainText("Factory LogLoss comes from 722 held-out users");
         await expect(group.getByRole("link", { name: "Model Factory results" })).toHaveAttribute(
             "href",
             "https://jschoreels.github.io/anki-rwkv/factory.html",
@@ -86,33 +364,124 @@ test(
             "href",
             "https://github.com/JSchoreels/anki/blob/main/docs/rwkv-sm56-2026-10-24.MD#matched-native-backup-check",
         );
-        await model.check();
+        await tiny.check();
+        await expect(singleModel).toBeVisible();
+        await expect(group).toContainText("Turn this on to use the size's Curve model for both");
+        await expect(group).toContainText("the size's Instant model always runs alone");
+        await page.setViewportSize({ width: 736, height: 1000 });
+        await card.screenshot({ path: testInfo.outputPath("rwkv-options-advanced.png") });
+        await page.evaluate(() => document.documentElement.classList.add("night-mode"));
+        await card.screenshot({ path: testInfo.outputPath("rwkv-options-advanced-dark.png") });
+        await group.screenshot({ path: testInfo.outputPath("rwkv-model-legend-dark.png") });
         expect(saved).toBeUndefined();
         await page.reload();
         await openAdvanced.click();
-        await expect(model).not.toBeChecked();
-        await model.check();
-        await group.getByRole("button", { name: "About prediction models", exact: true }).click();
-        await card.screenshot({ path: testInfo.outputPath("rwkv-options-advanced.png") });
-        await page.getByRole("button", { name: "Save", exact: true }).click();
-        await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({
-            model: "sm56",
-            statePrecision: "int8",
-        });
-        await page.reload();
-        await openAdvanced.click();
         await expect(model).toBeChecked();
-        await model.uncheck();
-        await page.getByRole("button", { name: "Save", exact: true }).click();
-        await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({ model: "legacy", statePrecision: "int8" });
-        await page.reload();
-        await openAdvanced.click();
-        await expect(model).not.toBeChecked();
+        // Big -> Small -> Tiny -> Big, each saved and reloaded.
+        for (
+            const [radio, value] of [
+                [small, "sm72e25"],
+                [tiny, "tiny"],
+                [big, "legacy"],
+            ] as const
+        ) {
+            await radio.check();
+            const singleModelEnabled = value === "legacy";
+            await singleModel.setChecked(singleModelEnabled);
+            await page.getByRole("button", { name: "Save", exact: true }).click();
+            await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({
+                model: value,
+                statePrecision: "int8",
+                singleModel: singleModelEnabled,
+            });
+            await page.reload();
+            await openAdvanced.click();
+            await expect(radio).toBeChecked();
+            await expect(singleModel).toBeVisible();
+            if (singleModelEnabled) {
+                await expect(singleModel).toBeChecked();
+            } else {
+                await expect(singleModel).not.toBeChecked();
+            }
+        }
     },
 );
 
-for (const model of ["sm40", "sm36", "sm55"]) {
-    test(`saving older RWKV model ${model} chooses SM56 without changing hidden precision`, async ({ page }) => {
+test("RWKV estimates include schedulers used by other presets", async ({ page }) => {
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        const current = data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!;
+        current.config!.config!.rwkvReviewInstantOrderEnabled = true;
+        current.config!.config!.rwkvReviewEnabled = false;
+        data.allConfig.push(
+            new DeckConfigsForUpdate_ConfigWithExtra({
+                config: new DeckConfig({
+                    id: 123n,
+                    name: "Curve preset",
+                    config: new DeckConfig_Config({ rwkvReviewEnabled: true }),
+                }),
+                useCount: 1,
+            }),
+        );
+        data.rwkvProfileSettings = new RwkvProfileSettings({
+            model: "sm72e25",
+            statePrecision: "cards_int4_notes_int8",
+        });
+        data.rwkvCollectionCounts = new RwkvCollectionCounts({ cards: 1_000n, notes: 500n });
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    await page.goto("/deck-options/1");
+    await page.locator("details.rwkv-advanced > summary").click();
+    const group = page.getByRole("region", { name: "Prediction model", exact: true });
+    const small = group.getByRole("radio", { name: "Small", exact: true });
+    await expect(group).toContainText("Both schedulers · separate models");
+    await expect(small).toHaveAccessibleDescription(/7\.1 KB.*per card \+ note.*5\.5 MB/);
+    await expect(small).toHaveAccessibleDescription(/About .*77.*% less model replay time/);
+    await group.getByRole("checkbox", { name: "Use one model for RWKV" }).check();
+    await expect(group).toContainText("Both schedulers · one shared model");
+    await expect(small).toHaveAccessibleDescription(/3\.5 KB.*per card \+ note.*2\.7 MB/);
+    await expect(small).toHaveAccessibleDescription(/About .*76.*% less model replay time/);
+});
+
+test("RWKV keeps a saved SM92 choice as a fourth option until another size is picked", async ({ page }) => {
+    let saved: UpdateDeckConfigsRequest | undefined;
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!
+            .config!.config!.rwkvReviewInstantOrderEnabled = true;
+        data.rwkvProfileSettings = new RwkvProfileSettings(
+            saved?.rwkvProfileSettings ?? { model: "sm92", statePrecision: "f32" },
+        );
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    await page.route("**/_anki/updateDeckConfigsAndClose", async (route) => {
+        saved = decodeRequestBody(route.request(), UpdateDeckConfigsRequest);
+        await route.fulfill({ body: Buffer.from(new OpChanges().toBinary()) });
+    });
+    await page.goto("/deck-options/1");
+    await page.locator("details.rwkv-advanced > summary").click();
+    const group = page.getByRole("region", { name: "Prediction model", exact: true });
+    const kept = group.getByRole("radio", { name: "Show-time retrain of the release (SM92)", exact: true });
+    await expect(kept).toBeChecked();
+    await expect(group.getByRole("radio")).toHaveCount(4);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({ model: "sm92", statePrecision: "f32" });
+    await page.reload();
+    await page.locator("details.rwkv-advanced > summary").click();
+    await group.getByRole("radio", { name: "Tiny", exact: true }).check();
+    await expect(kept).toBeHidden();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({ model: "tiny", statePrecision: "f32" });
+    await page.reload();
+    await page.locator("details.rwkv-advanced > summary").click();
+    await expect(group.getByRole("radio", { name: "Tiny", exact: true })).toBeChecked();
+    await expect(group.getByRole("radio")).toHaveCount(3);
+});
+
+for (const model of ["sm40", "sm36", "sm55", "sm56", "sm72", "sm72e20", "sm63"]) {
+    test(`saving older RWKV model ${model} chooses Small without changing hidden precision`, async ({ page }) => {
         let saved: UpdateDeckConfigsRequest | undefined;
         await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
             const response = await route.fetch();
@@ -132,10 +501,10 @@ for (const model of ["sm40", "sm36", "sm55"]) {
         await page.reload();
         expect(saved).toBeUndefined();
         await page.getByRole("button", { name: "Save", exact: true }).click();
-        await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({ model: "sm56", statePrecision: "f32" });
+        await expect.poll(() => saved?.rwkvProfileSettings).toMatchObject({ model: "sm72e25", statePrecision: "f32" });
         await page.reload();
-        await page.locator("details.rwkv-advanced summary").click();
-        await expect(page.getByRole("checkbox", { name: "Use Smaller Model", exact: true })).toBeChecked();
+        await page.locator("details.rwkv-advanced > summary").click();
+        await expect(page.getByRole("radio", { name: "Small", exact: true })).toBeChecked();
     });
 }
 
@@ -676,6 +1045,36 @@ test("RWKV-Instant exposes and saves the shared same-day switch with FSRS off", 
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect.poll(() => saved?.fsrsShortTermWithStepsEnabled).toBe(true);
     await expect.poll(() => saved?.configs.at(-1)?.config?.rwkvReviewAllowSameDayReview).toBe(false);
+});
+
+test("RWKV precompute setting is visible in Advanced and saves", async ({ page }) => {
+    await page.route("**/_anki/getDeckConfigsForUpdate", async (route) => {
+        const response = await route.fetch();
+        const data = DeckConfigsForUpdate.fromBinary(await response.body());
+        const config = data.allConfig.find((entry) => entry.config!.id === data.currentDeck!.configId)!
+            .config!.config!;
+        config.rwkvReviewInstantOrderEnabled = true;
+        config.rwkvReviewPrecomputeNextCard = true;
+        await route.fulfill({ response, body: Buffer.from(data.toBinary()) });
+    });
+    let saved: UpdateDeckConfigsRequest | undefined;
+    await page.route("**/_anki/updateDeckConfigsAndClose", async (route) => {
+        saved = decodeRequestBody(route.request(), UpdateDeckConfigsRequest);
+        await route.fulfill({ body: Buffer.from(new OpChanges().toBinary()) });
+    });
+
+    await page.goto("/deck-options/1");
+    const advanced = page.locator("details.rwkv-advanced");
+    const precompute = advanced.getByRole("checkbox", {
+        name: "Precompute next card before this card answer",
+        exact: true,
+    });
+    await expect(precompute).toBeHidden();
+    await advanced.locator(":scope > summary").click();
+    await expect(precompute).toBeChecked();
+    await precompute.uncheck();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect.poll(() => saved?.configs.at(-1)?.config?.rwkvReviewPrecomputeNextCard).toBe(false);
 });
 
 for (const refreshOnExit of [false, true]) {

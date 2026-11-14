@@ -48,6 +48,28 @@ uses the same resolver as review scheduling, so it includes add-on overlay
 matches from `fsrsPresetOverlay` and falls back to the card's home deck config
 when no overlay rule matches.
 
+## FSRS-6 comparisons
+
+The read-only `fsrs_six_current_scores` backend method reconstructs a separate
+memory state from each card's review history and its home-deck config's saved
+FSRS-6 parameters. It reports cards with missing or invalid parameters instead
+of substituting default weights, and does not change cards or scheduler state.
+
+`compute_fsrs_six_comparison` accepts a search and an explicit 21-parameter
+FSRS-6 model. It returns packed `(review ID, retrievability)` rows for the saved
+model and, when requested, chronological validation folds trained on earlier
+reviews. Neither result is stored in Anki's prediction cache. Add-ons can use
+`fsrs_six_comparison_fingerprint` together with the search and preset settings
+to invalidate their own caches when history or rollover changes.
+
+## Training and simulation corrections
+
+FSRS-7 optimization with same-day reviews disabled retains valid forgetting
+curve parameters. FSRS-6 simulation does not reduce short-term stability after
+a Hard answer, and estimated initial stabilities remain ordered by rating.
+Presets optimized with an affected build must be optimized again to replace
+already saved parameters; opening the collection does not rewrite them.
+
 ## Add-on Overlay
 
 Add-ons can provide collection-scoped FSRS presets and ordered card matching
@@ -241,6 +263,21 @@ single-preset optimization. After preparation, jobs are balanced by training
 target count and run on Rayon worker lanes. Progress is reported with the same
 `ComputeAllParamsProgress` payload used by deck-options Optimize All, including
 per-preset review counts and iteration progress.
+
+FSRS-7 optimization and parameter evaluation store each card's review history
+once and reference its training targets by prefix. FSRS-6 optimization expands
+those targets because its trainer still requires individual items. Historical
+FSRS calibration also reuses compact histories for final-fit predictions and
+validation-fold training and predictions. The fsrs-rs compact prediction API
+accepts a selected prefix slice without expanding histories, and Anki maps its
+ordered results back to review IDs. The optional optimizer health check
+and time-series evaluation still use fsrs-rs's existing expanded-item API.
+When Dynamic DR is disabled, optimization skips preparing its simulator
+statistics. The health check records target counts before passing expanded
+items to cross-validation, avoiding an additional copy of those items.
+Review filtering, chronological target order, metrics and cached prediction
+rows remain unchanged. See [the compact-history benchmark](fsrs-compact-performance.MD)
+for the measured effects and reproduction steps.
 
 After deck-options Optimize All finishes parameter optimization, Anki reports a
 short per-preset save phase while writing the optimized deck configs. It then

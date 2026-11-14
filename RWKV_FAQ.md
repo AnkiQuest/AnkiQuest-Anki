@@ -11,7 +11,7 @@ Behavior can differ between RWKV variants, add-ons, forks, and versions. The
 fork-specific statements below describe the current repository and may change
 as the code changes.
 
-Last reviewed: 2026-10-08.
+Last reviewed: 2026-10-28.
 
 ## Sources
 
@@ -55,6 +55,7 @@ Last reviewed: 2026-10-08.
 - [6. History and state in this fork](#6-history-and-state-in-this-fork)
   - [Which review events enter the RWKV history?](#which-review-events-enter-the-rwkv-history)
   - [How is RWKV state rebuilt?](#how-is-rwkv-state-rebuilt)
+  - [Which model does the fork use, and what does leak-free mean?](#which-model-does-the-fork-use-and-what-does-leak-free-mean)
 - [7. Platform and implementation scope](#7-platform-and-implementation-scope)
   - [Does the fork run on mobile?](#does-the-fork-run-on-mobile)
   - [Is this an official Anki release?](#is-this-an-official-anki-release)
@@ -160,6 +161,51 @@ RWKV-Curve exposes the model through interval-producing behavior. It is the
 closer fit for a user who wants a conventional interval display while still
 using RWKV's learned representation. This distinction is also illustrated in
 the [RWKV-Curve/Instant discussion](https://discord.com/channels/368267295601983490/1526305928603766784/1552363440973025311).
+
+### Which model does RWKV-Instant use?
+
+Each size runs only its own two models of the RWKV family release (since
+2026-11-13, the family wiring (SM114)): a two-head model and an Instant-Only model.
+With the default size, Small, a profile whose presets use both RWKV-Instant and
+RWKV-Curve runs RWKV-Instant on the Small Instant-Only model (SM98, the show-time
+instant-only model, stage 2), trained only to predict the next answer when a card
+is shown. Tiny uses the Tiny Instant-Only model (SM101), and Big uses its own
+show-time instant-only big model (SM99). On 722 held-out users SM98's Instant
+LogLoss is 0.248% lower than the
+show-time retrain's (SM92), which RWKV-Instant used before, and 0.554% lower than
+the small model's (SM63) (both % of the big model (1 leak-free epoch)'s
+normal-input Instant LogLoss). Neither SM98 nor SM101 has a trained forgetting curve:
+
+- When no preset uses RWKV-Curve (neither as scheduler nor as RWKV-Instant's
+  fallback), the size's Instant-Only model runs alone, one model state: the Small
+  Instant-Only model (SM98) for Small, the Tiny Instant-Only model (SM101) for
+  Tiny, the show-time instant-only big model (SM99) for Big. Due dates, intervals and memory
+  states come from the FSRS fallback, Card Info shows FSRS stability and
+  retrievability without the RWKV-Curve S90 and answer-time rows, and the RWKV
+  workload simulation is unavailable (Deck Options says to turn on RWKV-Curve in a
+  preset first).
+- When presets use both, the Instant-Only model runs beside the size's two-head
+  model, which gives RWKV-Curve, the RWKV intervals, the workload simulation and
+  the answer-time estimate: for Small the show-time retrain (SM92), for Tiny the
+  Tiny two-head model (SM106), for Big the show-time big model (SM91s2). Only
+  Small's has an answer-time head; Big and Tiny show no RWKV answer-time estimate.
+  That keeps two model states, and answers replay on both. **Use one model for
+  RWKV** under Advanced makes both schedulers share the size's two-head model
+  instead (one model state; the pair's state is rebuilt once). With Small, the
+  show-time retrain (SM92) ties the former default small model (SM63) on the curve
+  on 722 held-out users (−0.019% [−0.092, +0.085]) and predicts Instant 0.305%
+  better [−0.405, −0.232] (both % of the big model (1 leak-free epoch)'s LogLoss).
+  With Tiny, the Tiny two-head model (SM106) has Curve LogLoss 0.11% and Instant
+  LogLoss 0.18% higher than the show-time retrain (SM92). The setting has no
+  effect without RWKV-Curve.
+
+Saving a model size or the one-model setting applies the new choice immediately.
+If it changes the models in use, Anki offers to rebuild RWKV state from history;
+if the models are unchanged, it keeps the existing state. Choosing **Cancel**
+leaves RWKV state unavailable until you build it, for example with **Build Cache**
+in Deck Options.
+Saving a preset that turns RWKV-Curve on also switches at once. Details:
+[integration report](docs/rwkv-sm98-2026-11-10.MD).
 
 ### How do intervals and desired retention fit in?
 
@@ -276,9 +322,13 @@ many cards are gathered. The current code does not solve for a requested daily
 cap by automatically changing desired retention or rewriting intervals.
 
 The RWKV-specific `minimum_reviews_per_day` setting is a floor used by Instant
-ordering, not a maximum. Same-day-review exemptions and the option that lets
-new cards ignore the review limit can also make the final count differ from a
-simple cap.
+ordering, not a maximum. It applies to the selected deck and its subdecks as one
+group, pulling the lowest-retrievability cards if needed. Enable **Also honor
+subdeck minimums** on a deck to enforce its direct subdecks' own minimums;
+each subdeck independently decides whether to include its children. This option
+is deck-specific and can be applied to all subdecks when saving. Same-day-review
+exemptions and the option that lets new cards ignore the review limit can also
+make the final count differ from a simple cap.
 
 ### Can RWKV-Instant repeat a card when same-day reviews are disabled?
 
@@ -446,6 +496,58 @@ line with the collection history after a substantial change.
 
 The exact time and memory cost depend on the collection, the model, and the
 runtime. The repository does not define one fixed rebuild time for all users.
+
+### Which model does the fork use, and what does leak-free mean?
+
+Deck Options → RWKV → Advanced offers three sizes:
+
+- **Small** (the default): the show-time retrain (SM92) for RWKV-Curve (since
+  2026-11-13; the small model, leak-free, cool-down from epoch 25 (SM63) before),
+  331,511 parameters, 8.3× fewer than the big model, beside the Small Instant-Only
+  model (SM98) for RWKV-Instant. Both have the same size: about 3.5 KB of state per
+  card and note each at the default storage precision. SM92's show-time Curve
+  LogLoss on 722 held-out users is 0.300356 (SM63: 0.300414).
+- **Tiny**: the Tiny two-head model (SM106) for RWKV-Curve beside the Tiny
+  Instant-Only model (SM101) for RWKV-Instant, both with one card layer instead of
+  two: about 2.6 KB of state per card and note each at the default storage
+  precision (26% less than Small; 31% less at int8). Its Curve LogLoss is 0.11%
+  higher than Small's (0.300676) and its Instant LogLoss 0.19% higher (722
+  held-out users, % of the big model (1 leak-free epoch)'s LogLoss). The Tiny
+  two-head model (SM106) has no answer-time head, so Tiny shows no RWKV
+  answer-time estimate.
+- **Big**: the show-time big model (SM91s2) for RWKV-Curve, beside the
+  show-time instant-only big model (SM99) for RWKV-Instant (since 2026-11-12), as
+  the former Legacy choice. It is the big model (1 leak-free epoch) trained one more epoch
+  on the time since the last review measured when the card is shown, the time
+  Anki gives the model. On those inputs its Instant LogLoss is 0.35% lower and
+  its Curve LogLoss 0.06% lower (a tie) than the big model (1 leak-free epoch)
+  (722 held-out users).
+
+The show-time retrain of the release (SM92) stays a preserved choice for profiles
+that already hold it (Deck Options lists it only for them): it is the small
+model (SM63) retrained so that the time since a card's last review is measured the way Anki
+measures it, up to the moment the card is shown, not up to the moment it is
+answered. It only pays off once Anki schedules by querying the model at show time
+(retrievability below the desired retention). Until then the normal-input model
+is better: on normal inputs SM63 scores 0.30003 Curve / 0.27654 Instant against
+0.30024 / 0.27676 for SM92 (722 users). SM92 stays bundled.
+
+In the public training data, a card that was deleted before the export is
+missing from the cards table. A naive feature builder then marks its note,
+deck and preset as missing, which tells a model that the card will be deleted
+later. Live Anki never reviews a deleted card, so that is information from the
+future. SM72 and SM92 were trained and scored without it: the three missing-identity
+inputs are always zero, and the fork forces them to zero whenever SM72
+(all its cool-downs, from epoch 15, 20 and 25) or SM92 is selected. The fork's history replay already skips deleted cards' reviews, so
+every replayed review has its real note, deck and preset.
+
+On held-out users, with leak-free inputs for every model, SM72's LogLoss is
+within about 0.4% of the big model (1 leak-free epoch) and within about 0.2%
+of the original big model used at the time, for both Curve and Instant. On the inputs Anki
+actually gives (intervals measured when the card is shown), SM92's Instant
+LogLoss is about 0.3% lower than SM72's and its Curve LogLoss is unchanged. See
+[the model documentation](docs/rwkv.MD#show-time-retrain-of-the-release-sm92)
+for the full tables.
 
 ## 7. Platform and implementation scope
 
