@@ -447,9 +447,9 @@ mod tests {
         (reviews, query)
     }
 
-    /// Each size's pair answers RWKV-Instant's recall as its Instant model alone
-    /// and RWKV-Curve as its two-head model alone, and its saved state loads
-    /// back to the same answers.
+    /// Each size's pair answers RWKV-Instant's recall as its Instant model
+    /// alone and RWKV-Curve as its two-head model alone, and its saved
+    /// state loads back to the same answers.
     #[test]
     fn a_pair_is_its_two_models_side_by_side() {
         let load = |file: &str| {

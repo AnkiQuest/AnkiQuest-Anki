@@ -527,6 +527,9 @@ fn prepare_and_wait(col: &mut Col, model_path: &str) -> anki::error::Result<()> 
             model_path: model_path.into(),
             state_precision: state_precision(),
             model_kind: std::env::var("KUMA3_RWKV_MODEL_KIND").unwrap_or_default(),
+            // a size's Instant model (the pair, or alone without RWKV-Curve)
+            instant_model_path: std::env::var("KUMA3_RWKV_INSTANT_MODEL").unwrap_or_default(),
+            single_model: std::env::var("KUMA3_RWKV_SINGLE_MODEL").is_ok(),
         },
     )?;
     wait_ready(col)
@@ -650,6 +653,10 @@ fn lag_check(
         let queued = SchedulerService::get_queued_cards(&mut col, request.clone())?;
         let fetch_ms = start.elapsed().as_millis();
         let Some(card) = queued.cards.first() else {
+            println!(
+                "LAG card {index}: queue empty (new {} learn {} review {})",
+                queued.new_count, queued.learning_count, queued.review_count
+            );
             break;
         };
         let card_id = card.card.as_ref().unwrap().id;
@@ -664,9 +671,12 @@ fn lag_check(
             (now + index) * 1000,
         )?;
         println!(
-            "LAG card {index}: fetch {fetch_ms} ms, answer {} ms (queue {})",
+            "LAG card {index}: fetch {fetch_ms} ms, answer {} ms (queue {}) counts new {} learn {} review {}",
             start.elapsed().as_millis(),
-            card.queue
+            card.queue,
+            queued.new_count,
+            queued.learning_count,
+            queued.review_count
         );
     }
     let start = Instant::now();
