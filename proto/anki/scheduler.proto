@@ -1083,9 +1083,19 @@ message RwkvPrepareOfflineRequest {
   // How card/note states are kept: "f32", "int8" or "int4"; empty: int8 (the
   // fork's desktop default).
   string state_precision = 2;
-  // "sm72" enables the input rules used by the leak-free SM72 checkpoint.
+  // "sm72" enables the input rules used by the leak-free checkpoints (SM72
+  // and the fork's build 115 family: every Big, Small and Tiny model).
   // Empty retains the original automatic big/small model behavior.
   string model_kind = 3;
+  // kuma3: the model size's Instant model, beside `model_path` (its two-head
+  // model). Empty: `model_path` alone, as before. With it, the backend runs
+  // what the desktop runs for the presets' schedulers: both models for
+  // RWKV-Instant and RWKV-Curve, the Instant model alone for RWKV-Instant
+  // without RWKV-Curve, the two-head model alone otherwise.
+  string instant_model_path = 4;
+  // "Use one model for RWKV": the two-head model alone even when presets use
+  // both schedulers.
+  bool single_model = 5;
 }
 
 message RwkvPrepareOfflineResponse {

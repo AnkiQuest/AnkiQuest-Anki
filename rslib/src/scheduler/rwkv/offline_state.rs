@@ -55,19 +55,11 @@ const STATE_VERSION: u32 = 4; // 4: desktop-compatible reimport reset boundaries
 /// bytes). The model doesn't change while the app runs, so its 11 MB are read
 /// and hashed once, not at every save and start.
 pub(super) fn header(model: &SelectedOfflineModel) -> io::Result<String> {
-    static HASHED: Mutex<Option<(PathBuf, String)>> = Mutex::new(None);
-    let mut cached = HASHED.lock().unwrap();
-    let hashed = match cached.as_ref() {
-        Some((path, hashed)) if *path == model.model.path => hashed.clone(),
-        _ => {
-            let bytes = fs::read(&model.model.path)?;
-            let mut hash = fnv::FnvHasher::default();
-            hash.write(&bytes);
-            let hashed = format!("{} {:016x}", bytes.len(), hash.finish());
-            *cached = Some((model.model.path.clone(), hashed.clone()));
-            hashed
-        }
-    };
+    let mut hashed = hash_model(&model.model.path)?;
+    // a pair: both files (one model's header stays as it was)
+    if let Some(instant) = &model.instant_path {
+        hashed = format!("{hashed} + {}", hash_model(instant)?);
+    }
     // int4 keeps note states in int8 since kuma3 17: a file from before
     // holds int4 note states and is rebuilt. Since the fork's build 107 that
     // is its Int4CardsInt8Notes; the header stays, so no rebuild.
@@ -83,6 +75,22 @@ pub(super) fn header(model: &SelectedOfflineModel) -> io::Result<String> {
     ))
 }
 
+/// A model file's size and FNV-1a hash, read once per file (they don't change
+/// while the app runs).
+fn hash_model(path: &Path) -> io::Result<String> {
+    static HASHED: Mutex<Vec<(PathBuf, String)>> = Mutex::new(Vec::new());
+    let mut cached = HASHED.lock().unwrap();
+    if let Some((_, hashed)) = cached.iter().find(|(known, _)| known == path) {
+        return Ok(hashed.clone());
+    }
+    let bytes = fs::read(path)?;
+    let mut hash = fnv::FnvHasher::default();
+    hash.write(&bytes);
+    let hashed = format!("{} {:016x}", bytes.len(), hash.finish());
+    cached.push((path.to_path_buf(), hashed.clone()));
+    Ok(hashed)
+}
+
 #[cfg(test)]
 #[test]
 fn sm72_input_rule_changes_the_saved_state_header() -> io::Result<()> {
@@ -93,6 +101,7 @@ fn sm72_input_rule_changes_the_saved_state_header() -> io::Result<()> {
             precision: StatePrecision::Int8,
         },
         leak_free_inputs: false,
+        instant_path: None,
     };
     let ordinary = header(&model)?;
     model.leak_free_inputs = true;

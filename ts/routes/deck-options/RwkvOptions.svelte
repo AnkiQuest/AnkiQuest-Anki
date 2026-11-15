@@ -399,11 +399,9 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
             <details class="rwkv-advanced">
                 <summary>{tr.deckConfigAdvancedTitle()}</summary>
-                <!-- Phones pick the model in the app's settings (kuma3: Settings > kuma3 >
-                     RWKV model); these desktop profile settings would not be saved there. -->
-                {#if isDesktop()}
-                    <RwkvModelOptions {state} disabled={rwkvActionInProgress} />
-                {/if}
+                <!-- kuma3 fills these from its own settings and stores them there on save
+                     (Settings > kuma3 > RWKV model, Use one model for RWKV). -->
+                <RwkvModelOptions {state} disabled={rwkvActionInProgress} />
 
                 {#if $config.rwkvReviewInstantOrderEnabled}
                     <h2 class="rwkv-subheading">RWKV-Instant</h2>

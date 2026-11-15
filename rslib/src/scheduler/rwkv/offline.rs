@@ -120,6 +120,9 @@ pub(super) struct OfflineModel {
 pub(super) struct SelectedOfflineModel {
     pub(super) model: OfflineModel,
     pub(super) leak_free_inputs: bool,
+    /// With RWKV-Instant and RWKV-Curve both in use: the size's Instant model,
+    /// run beside `model` (its two-head model).
+    pub(super) instant_path: Option<PathBuf>,
 }
 
 impl From<OfflineModel> for SelectedOfflineModel {
@@ -127,6 +130,7 @@ impl From<OfflineModel> for SelectedOfflineModel {
         Self {
             model,
             leak_free_inputs: false,
+            instant_path: None,
         }
     }
 }
@@ -284,13 +288,23 @@ struct ScoredCard {
 impl RwkvOfflineRuntime {
     fn load(model: impl Into<SelectedOfflineModel>) -> Result<Self> {
         let model = model.into();
-        let inference = Engine::load_with_precision(
-            model.model.path.clone(),
-            MODEL_TARGET_RETENTION,
-            MODEL_MAX_INTERVAL_DAYS,
-            model.model.precision,
-            model.leak_free_inputs,
-        )?;
+        let inference = match &model.instant_path {
+            Some(instant) => Engine::load_pair(
+                model.model.path.clone(),
+                instant.clone(),
+                MODEL_TARGET_RETENTION,
+                MODEL_MAX_INTERVAL_DAYS,
+                model.model.precision,
+                model.leak_free_inputs,
+            )?,
+            None => Engine::load_with_precision(
+                model.model.path.clone(),
+                MODEL_TARGET_RETENTION,
+                MODEL_MAX_INTERVAL_DAYS,
+                model.model.precision,
+                model.leak_free_inputs,
+            )?,
+        };
         let initial_cache_state = inference.cache_state();
         Ok(Self {
             model,
@@ -729,10 +743,30 @@ impl Collection {
             input.model_kind.is_empty() || input.model_kind == "sm72",
             "unsupported RWKV offline model kind"
         );
+        // the desktop's layout for the presets' schedulers (any preset, as its
+        // Deck Options): both models, the Instant model alone, or the two-head
+        // model alone
+        let (mut path, mut instant_path) = (PathBuf::from(input.model_path), None);
+        if !input.instant_model_path.is_empty() {
+            let configs = self.storage.all_deck_config()?;
+            let curve = configs.iter().any(|c| c.inner.rwkv_review_enabled);
+            let instant = configs
+                .iter()
+                .any(|c| c.inner.rwkv_review_instant_order_enabled);
+            match (curve, instant) {
+                (true, true) if !input.single_model => {
+                    instant_path = Some(PathBuf::from(input.instant_model_path))
+                }
+                (false, true) => path = PathBuf::from(input.instant_model_path),
+                _ => {}
+            }
+            tracing::info!(curve, instant, single = input.single_model, model = ?path, instant_model = ?instant_path, "RWKV offline models");
+        }
         let model = SelectedOfflineModel {
             leak_free_inputs: input.model_kind == "sm72",
+            instant_path,
             model: OfflineModel {
-                path: PathBuf::from(input.model_path),
+                path,
                 // empty: int8 (the fork's desktop default until build 107, which
                 // moved to int4 cards + int8 notes). The app's "int4" is int4
                 // cards with int8 notes: a note's state takes every answer to all
