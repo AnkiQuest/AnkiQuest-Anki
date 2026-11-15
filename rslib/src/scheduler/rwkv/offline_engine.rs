@@ -319,6 +319,39 @@ impl Engine {
             Self::Pair { instant, .. } => instant.predict_retrievability_many_from_warm_up(inputs),
         }
     }
+
+    /// Workload simulations schedule with the curve: a pair runs them on its
+    /// two-head model, as the desktop's paired runtime. The state is left
+    /// unchanged.
+    pub(super) fn simulate_workload_from_warm_up(
+        &self,
+        inputs: Vec<rwkv::RwkvWorkloadSimulationInput>,
+        config: rwkv::RwkvWorkloadSimulationConfig,
+        progress: &mut dyn FnMut(u32, u32) -> io::Result<()>,
+    ) -> io::Result<rwkv::RwkvWorkloadSimulationOutput> {
+        match self {
+            Self::Big(engine) => engine.simulate_workload_from_warm_up(inputs, config, progress),
+            Self::Small(engine) => engine.simulate_workload_from_warm_up(inputs, config, progress),
+            Self::Pair { curve, .. } => {
+                curve.simulate_workload_from_warm_up(inputs, config, progress)
+            }
+        }
+    }
+
+    pub(super) fn compare_workloads_from_warm_up(
+        &self,
+        inputs: Vec<rwkv::RwkvComparisonCard>,
+        config: rwkv::RwkvComparisonConfig,
+        progress: &mut dyn FnMut(u32, u32) -> io::Result<()>,
+    ) -> io::Result<rwkv::RwkvComparisonOutput> {
+        match self {
+            Self::Big(engine) => engine.compare_workloads_from_warm_up(inputs, config, progress),
+            Self::Small(engine) => engine.compare_workloads_from_warm_up(inputs, config, progress),
+            Self::Pair { curve, .. } => {
+                curve.compare_workloads_from_warm_up(inputs, config, progress)
+            }
+        }
+    }
 }
 
 impl Snapshot {

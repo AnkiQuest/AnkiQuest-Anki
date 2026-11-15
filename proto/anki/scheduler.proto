@@ -177,6 +177,18 @@ service SchedulerService {
   // current curve's interval and S90 (as ApplyRwkvReviewReschedule).
   rpc RwkvOfflineCurveReschedule(decks.DeckId)
       returns (collection.OpChangesWithCount);
+  // Deck Options' RWKV workload simulation and "Compare RWKV with FSRS" for
+  // clients without the desktop's Python: started on its own thread (the
+  // standard order applies until it is done), then polled.
+  rpc RwkvOfflineWorkloadStart(SimulateFsrsReviewRequest)
+      returns (generic.Empty);
+  rpc RwkvOfflineWorkloadResult(generic.Empty)
+      returns (RwkvOfflineWorkloadResultResponse);
+  rpc RwkvOfflineWorkloadCancel(generic.Empty) returns (generic.Empty);
+  rpc RwkvOfflineWorkloadProgress(generic.Empty)
+      returns (collection.ComputeRetentionProgress);
+  // False when RWKV-Instant runs its Instant model alone (no RWKV-Curve).
+  rpc RwkvOfflineWorkloadAvailable(generic.Empty) returns (generic.Bool);
   // Computes the RWKV answer-time head's history features for cards from the
   // canonical RWKV history (the same traversal as the inputs above).
   rpc RwkvAnswerTimeHistoryFeatures(RwkvAnswerTimeHistoryFeaturesRequest)
@@ -1151,6 +1163,16 @@ message RwkvOfflineCalibrationResponse {
   bool started = 5;
   uint64 replay_done = 6;
   uint64 replay_total = 7;
+}
+
+message RwkvOfflineWorkloadResultResponse {
+  // False while the simulation runs.
+  bool done = 1;
+  // Why there is no result (it failed, was cancelled or never started).
+  string error = 2;
+  // A SimulateFsrsWorkloadResponse, or with rwkv_comparison a
+  // RwkvComparisonResponse.
+  bytes result = 3;
 }
 
 message RwkvOfflineForecastRequest {

@@ -65,6 +65,8 @@ use crate::storage::RWKV_HISTORY_RESET_AFTER_SQL;
 #[cfg(test)]
 #[path = "offline_review_kind_tests.rs"]
 mod review_kind_tests;
+#[path = "offline_workload.rs"]
+mod workload;
 
 /// The desktop always loads the model with these (they only affect interval
 /// outputs, which Instant does not use).
@@ -123,6 +125,9 @@ pub(super) struct SelectedOfflineModel {
     /// With RWKV-Instant and RWKV-Curve both in use: the size's Instant model,
     /// run beside `model` (its two-head model).
     pub(super) instant_path: Option<PathBuf>,
+    /// `model` is the size's Instant model alone (RWKV-Instant without
+    /// RWKV-Curve): no curve, so no workload simulation.
+    pub(super) instant_only: bool,
 }
 
 impl From<OfflineModel> for SelectedOfflineModel {
@@ -131,6 +136,7 @@ impl From<OfflineModel> for SelectedOfflineModel {
             model,
             leak_free_inputs: false,
             instant_path: None,
+            instant_only: false,
         }
     }
 }
@@ -747,6 +753,7 @@ impl Collection {
         // Deck Options): both models, the Instant model alone, or the two-head
         // model alone
         let (mut path, mut instant_path) = (PathBuf::from(input.model_path), None);
+        let mut instant_only = false;
         if !input.instant_model_path.is_empty() {
             let configs = self.storage.all_deck_config()?;
             let curve = configs.iter().any(|c| c.inner.rwkv_review_enabled);
@@ -757,7 +764,10 @@ impl Collection {
                 (true, true) if !input.single_model => {
                     instant_path = Some(PathBuf::from(input.instant_model_path))
                 }
-                (false, true) => path = PathBuf::from(input.instant_model_path),
+                (false, true) => {
+                    path = PathBuf::from(input.instant_model_path);
+                    instant_only = true;
+                }
                 _ => {}
             }
             tracing::info!(curve, instant, single = input.single_model, model = ?path, instant_model = ?instant_path, "RWKV offline models");
@@ -765,6 +775,7 @@ impl Collection {
         let model = SelectedOfflineModel {
             leak_free_inputs: input.model_kind == "sm72",
             instant_path,
+            instant_only,
             model: OfflineModel {
                 path,
                 // empty: int8 (the fork's desktop default until build 107, which

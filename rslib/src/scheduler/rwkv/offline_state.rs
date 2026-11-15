@@ -102,6 +102,7 @@ fn sm72_input_rule_changes_the_saved_state_header() -> io::Result<()> {
         },
         leak_free_inputs: false,
         instant_path: None,
+        instant_only: false,
     };
     let ordinary = header(&model)?;
     model.leak_free_inputs = true;

@@ -1233,6 +1233,34 @@ impl crate::services::SchedulerService for Collection {
         Collection::rwkv_offline_curve_reschedule(self, input.did.into()).map(Into::into)
     }
 
+    fn rwkv_offline_workload_start(
+        &mut self,
+        input: anki_proto::scheduler::SimulateFsrsReviewRequest,
+    ) -> Result<()> {
+        Collection::rwkv_offline_workload_start(self, input)
+    }
+
+    fn rwkv_offline_workload_result(
+        &mut self,
+    ) -> Result<anki_proto::scheduler::RwkvOfflineWorkloadResultResponse> {
+        Collection::rwkv_offline_workload_result(self)
+    }
+
+    fn rwkv_offline_workload_cancel(&mut self) -> Result<()> {
+        Collection::rwkv_offline_workload_cancel(self);
+        Ok(())
+    }
+
+    fn rwkv_offline_workload_progress(
+        &mut self,
+    ) -> Result<anki_proto::collection::ComputeRetentionProgress> {
+        Ok(Collection::rwkv_offline_workload_progress(self))
+    }
+
+    fn rwkv_offline_workload_available(&mut self) -> Result<generic::Bool> {
+        Ok(Collection::rwkv_offline_workload_available(self).into())
+    }
+
     fn rwkv_answer_time_history_features(
         &mut self,
         input: anki_proto::scheduler::RwkvAnswerTimeHistoryFeaturesRequest,
