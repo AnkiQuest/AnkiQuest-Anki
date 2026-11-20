@@ -76,6 +76,18 @@ pub enum SearchNode {
         text: String,
         mode: FieldSearchMode,
     },
+    NumericField {
+        field: String,
+        operator: String,
+        value: f64,
+    },
+    NumericFieldRange {
+        field: String,
+        min: f64,
+        max: f64,
+        min_inclusive: bool,
+        max_inclusive: bool,
+    },
     AddedInDays(u32),
     EditedInDays(u32),
     CardTemplate(TemplateKind),
@@ -95,6 +107,7 @@ pub enum SearchNode {
         days: u32,
         ease: RatingKind,
     },
+    FirstGrade(u8),
     Tag {
         tag: String,
         mode: FieldSearchMode,
@@ -132,6 +145,8 @@ pub enum PropertyKind {
     Stability(f32),
     Difficulty(f32),
     Retrievability(f32),
+    RwkvRetrievability(f32),
+    RwkvCurveRetrievability(f32),
     CustomDataNumber { key: String, value: f32 },
     CustomDataString { key: String, value: String },
 }
@@ -142,6 +157,8 @@ pub enum StateKind {
     Review,
     Learning,
     Due,
+    RwkvDue,
+    RwkvCurveDue,
     Buried,
     UserBuried,
     SchedBuried,
@@ -355,10 +372,41 @@ fn search_node_for_text(s: &str) -> ParseResult<'_, SearchNode> {
     .parse(s)
     .map_err(|_: nom::Err<ParseError>| parse_failure(s, FailKind::MissingKey))?;
     if tail.is_empty() {
-        Ok(SearchNode::UnqualifiedText(unescape(head)?))
+        if let Some((field, operator, value)) = numeric_field_comparison(head) {
+            Ok(SearchNode::NumericField {
+                field: unescape(field)?,
+                operator: operator.into(),
+                value,
+            })
+        } else {
+            Ok(SearchNode::UnqualifiedText(unescape(head)?))
+        }
     } else {
         search_node_for_text_with_argument(head, &tail[1..])
     }
+}
+
+/// Detect a numeric comparison at the first unescaped comparator.
+pub(super) fn numeric_field_comparison(s: &str) -> Option<(&str, &str, f64)> {
+    let mut escaped = false;
+    for (idx, ch) in s.char_indices() {
+        if !escaped && matches!(ch, '<' | '>' | '=') {
+            if idx == 0 {
+                return None;
+            }
+            let operator_len = if ch != '=' && s[idx + 1..].starts_with('=') {
+                2
+            } else {
+                1
+            };
+            let value = s[idx + operator_len..].parse::<f64>().ok()?;
+            return value
+                .is_finite()
+                .then_some((&s[..idx], &s[idx..idx + operator_len], value));
+        }
+        escaped = ch == '\\' && !escaped;
+    }
+    None
 }
 
 /// Convert a colon-separated key/val pair into the relevant search type.
@@ -378,6 +426,7 @@ fn search_node_for_text_with_argument<'a>(
         "edited" => parse_edited(val)?,
         "introduced" => parse_introduced(val)?,
         "rated" => parse_rated(val)?,
+        "firstgrade" => parse_first_grade(val)?,
         "is" => parse_state(val)?,
         "did" => SearchNode::DeckIdsWithoutChildren(check_id_list(val, key)?.into()),
         "mid" => parse_mid(val)?,
@@ -391,8 +440,45 @@ fn search_node_for_text_with_argument<'a>(
         "has-cd" => SearchNode::CustomData(unescape(val)?),
         "preset" => SearchNode::Preset(val.into()),
         // anything else is a field search
-        _ => parse_single_field(key, val)?,
+        _ => parse_numeric_field_range(key, val)?.unwrap_or(parse_single_field(key, val)?),
     })
+}
+
+fn parse_numeric_field_range<'a>(
+    key: &'a str,
+    val: &'a str,
+) -> ParseResult<'a, Option<SearchNode>> {
+    let Some(left_bracket) = val.as_bytes().first() else {
+        return Ok(None);
+    };
+    let Some(right_bracket) = val.as_bytes().last() else {
+        return Ok(None);
+    };
+    if !matches!(left_bracket, b'[' | b']') || !matches!(right_bracket, b'[' | b']') {
+        return Ok(None);
+    }
+
+    let inner = &val[1..val.len() - 1];
+    let Some((min, max)) = inner.split_once(',') else {
+        return Ok(None);
+    };
+    let Ok(min) = min.trim().parse::<f64>() else {
+        return Ok(None);
+    };
+    let Ok(max) = max.trim().parse::<f64>() else {
+        return Ok(None);
+    };
+    if !min.is_finite() || !max.is_finite() {
+        return Ok(None);
+    }
+
+    Ok(Some(SearchNode::NumericFieldRange {
+        field: unescape(key)?,
+        min,
+        max,
+        min_inclusive: *left_bracket == b'[',
+        max_inclusive: *right_bracket == b']',
+    }))
 }
 
 fn parse_tag(s: &str) -> ParseResult<'_, SearchNode> {
@@ -453,6 +539,8 @@ fn parse_prop(prop_clause: &str) -> ParseResult<'_, SearchNode> {
         tag("pos"),
         tag("rated"),
         tag("resched"),
+        tag("rwkv-curve:r"),
+        tag("rwkv:r"),
         tag("s"),
         tag("d"),
         tag("r"),
@@ -502,6 +590,8 @@ fn parse_prop(prop_clause: &str) -> ParseResult<'_, SearchNode> {
         "s" => PropertyKind::Stability(parse_f32(num, prop_clause)?),
         "d" => PropertyKind::Difficulty(parse_f32(num, prop_clause)?),
         "r" => PropertyKind::Retrievability(parse_f32(num, prop_clause)?),
+        "rwkv:r" => PropertyKind::RwkvRetrievability(parse_f32(num, prop_clause)?),
+        "rwkv-curve:r" => PropertyKind::RwkvCurveRetrievability(parse_f32(num, prop_clause)?),
         prop if prop.starts_with("cdn:") => PropertyKind::CustomDataNumber {
             key: prop.strip_prefix("cdn:").unwrap().into(),
             value: parse_f32(num, prop_clause)?,
@@ -634,6 +724,14 @@ fn parse_rated(s: &str) -> ParseResult<'_, SearchNode> {
     Ok(SearchNode::Rated { days, ease: button })
 }
 
+/// eg firstgrade:1
+fn parse_first_grade(s: &str) -> ParseResult<'_, SearchNode> {
+    let RatingKind::AnswerButton(button) = parse_answer_button(Some(s), s)? else {
+        unreachable!("firstgrade always provides a button")
+    };
+    Ok(SearchNode::FirstGrade(button))
+}
+
 /// eg is:due
 fn parse_state(s: &str) -> ParseResult<'_, SearchNode> {
     use StateKind::*;
@@ -642,6 +740,8 @@ fn parse_state(s: &str) -> ParseResult<'_, SearchNode> {
         "review" => Review,
         "learn" => Learning,
         "due" => Due,
+        "rwkv:due" => RwkvDue,
+        "rwkv-curve:due" => RwkvCurveDue,
         "buried" => Buried,
         "buried-manually" => UserBuried,
         "buried-sibling" => SchedBuried,
@@ -745,7 +845,7 @@ fn unescape(txt: &str) -> ParseResult<'_, String> {
         ))
     } else {
         Ok(if is_parser_escape(txt) {
-            static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\\[\\":()-]"#).unwrap());
+            static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\\[\\":()<>=-]"#).unwrap());
             RE.replace_all(txt, |caps: &Captures| match &caps[0] {
                 r"\\" => r"\\",
                 "\\\"" => "\"",
@@ -753,6 +853,9 @@ fn unescape(txt: &str) -> ParseResult<'_, String> {
                 r"\(" => "(",
                 r"\)" => ")",
                 r"\-" => "-",
+                r"\<" => "<",
+                r"\>" => ">",
+                r"\=" => "=",
                 _ => unreachable!(),
             })
             .into()
@@ -771,7 +874,7 @@ fn invalid_escape_sequence(txt: &str) -> Option<String> {
             (?:^|[^\\])         # not a backslash
             (?:\\\\)*           # even number of backslashes
             (\\                 # single backslash
-            (?:[^\\":*_()-]|$)) # anything but an escapable char
+            (?:[^\\":*_()<>=-]|$)) # anything but an escapable char
             "#,
         )
         .unwrap()
@@ -781,7 +884,7 @@ fn invalid_escape_sequence(txt: &str) -> Option<String> {
     Some(caps[1].to_string())
 }
 
-/// Check string for escape sequences handled by the parser: ":()-
+/// Check string for escape sequences handled by the parser: ":()<>=-
 fn is_parser_escape(txt: &str) -> bool {
     // odd number of \s followed by a char with special meaning to the parser
     static RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -790,7 +893,7 @@ fn is_parser_escape(txt: &str) -> bool {
             (?:^|[^\\])     # not a backslash
             (?:\\\\)*       # even number of backslashes
             \\              # single backslash
-            [":()-]         # parser escape
+            [":()<>=-]      # parser escape
             "#,
         )
         .unwrap()
@@ -894,6 +997,88 @@ mod test {
                 mode: FieldSearchMode::NoCombining,
             })]
         );
+        assert_eq!(
+            parse("Frequency>500 Frequency<1500")?,
+            vec![
+                Search(NumericField {
+                    field: "Frequency".into(),
+                    operator: ">".into(),
+                    value: 500.0,
+                }),
+                And,
+                Search(NumericField {
+                    field: "Frequency".into(),
+                    operator: "<".into(),
+                    value: 1500.0,
+                })
+            ]
+        );
+        assert_eq!(
+            parse("Frequency:[500,600[")?,
+            vec![Search(NumericFieldRange {
+                field: "Frequency".into(),
+                min: 500.0,
+                max: 600.0,
+                min_inclusive: true,
+                max_inclusive: false,
+            })]
+        );
+        assert_eq!(
+            parse("Frequency:]500,600]")?,
+            vec![Search(NumericFieldRange {
+                field: "Frequency".into(),
+                min: 500.0,
+                max: 600.0,
+                min_inclusive: false,
+                max_inclusive: true,
+            })]
+        );
+        for operator in ["<", "<=", "=", ">=", ">"] {
+            assert_eq!(
+                parse(&format!("Frequency{operator}500"))?,
+                vec![Search(NumericField {
+                    field: "Frequency".into(),
+                    operator: operator.into(),
+                    value: 500.0,
+                })]
+            );
+        }
+        for (input, text) in [
+            (r"x\<5", "x<5"),
+            (r#""x\<5""#, "x<5"),
+            (r"x\=5", "x=5"),
+            ("<=5", "<=5"),
+            ("=5", "=5"),
+            ("<b>", "<b>"),
+            ("a=b", "a=b"),
+            ("a<b<5", "a<b<5"),
+        ] {
+            assert_eq!(
+                parse(input)?,
+                vec![Search(UnqualifiedText(text.into()))],
+                "{input}"
+            );
+        }
+        for (input, field) in [("x<5", "x"), (r"x\<a<5", "x<a"), (r"x\\<5", r"x\\")] {
+            assert_eq!(
+                parse(input)?,
+                vec![Search(NumericField {
+                    field: field.into(),
+                    operator: "<".into(),
+                    value: 5.0,
+                })],
+                "{input}"
+            );
+        }
+        assert_eq!(
+            parse(r"front:\<b\>")?,
+            vec![Search(SingleField {
+                field: "front".into(),
+                text: "<b>".into(),
+                mode: FieldSearchMode::Normal,
+            })]
+        );
+        assert_eq!(parse(r"re:\<x")?, vec![Search(Regex(r"\<x".into()))]);
 
         // escaping is independent of quotation
         assert_eq!(
@@ -993,6 +1178,14 @@ mod test {
             vec![Search(NoteIds("1237123712,2,3".into()))]
         );
         assert_eq!(parse("is:due")?, vec![Search(State(StateKind::Due))]);
+        assert_eq!(
+            parse("is:rwkv:due")?,
+            vec![Search(State(StateKind::RwkvDue))]
+        );
+        assert_eq!(
+            parse("is:rwkv-curve:due")?,
+            vec![Search(State(StateKind::RwkvCurveDue))]
+        );
         assert_eq!(parse("flag:3")?, vec![Search(Flag(3))]);
 
         assert_eq!(
@@ -1009,6 +1202,28 @@ mod test {
                 kind: PropertyKind::Ease(3.3)
             })]
         );
+        assert_eq!(
+            parse("prop:r<0.9")?,
+            vec![Search(Property {
+                operator: "<".into(),
+                kind: PropertyKind::Retrievability(0.9)
+            })]
+        );
+        assert_eq!(
+            parse("prop:rwkv:r>=0.8")?,
+            vec![Search(Property {
+                operator: ">=".into(),
+                kind: PropertyKind::RwkvRetrievability(0.8)
+            })]
+        );
+        assert_eq!(
+            parse("prop:rwkv-curve:r=0.7")?,
+            vec![Search(Property {
+                operator: "=".into(),
+                kind: PropertyKind::RwkvCurveRetrievability(0.7)
+            })]
+        );
+        assert_eq!(parse("firstgrade:1")?, vec![Search(FirstGrade(1))]);
         assert_eq!(
             parse("prop:cdn:abc<=1")?,
             vec![Search(Property {
@@ -1215,6 +1430,14 @@ mod test {
         ));
         assert!(matches!(
             failkind("rated:0:foo"),
+            SearchErrorKind::InvalidAnswerButton { .. }
+        ));
+        assert!(matches!(
+            failkind("firstgrade:0"),
+            SearchErrorKind::InvalidAnswerButton { .. }
+        ));
+        assert!(matches!(
+            failkind("firstgrade:5"),
             SearchErrorKind::InvalidAnswerButton { .. }
         ));
 

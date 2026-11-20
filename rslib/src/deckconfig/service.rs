@@ -14,6 +14,8 @@ use crate::deckconfig::UpdateDeckConfigsRequest;
 use crate::error::Result;
 use crate::scheduler::fsrs::params::ignore_revlogs_before_date_to_ms;
 use crate::scheduler::fsrs::simulator::is_included_card;
+use crate::scheduler::fsrs::simulator::normalized_fsrs_parameters;
+use crate::scheduler::states::fuzz::StoredReviewFuzzConfig;
 
 impl crate::services::DeckConfigService for Collection {
     fn add_or_update_deck_config_legacy(
@@ -116,7 +118,7 @@ impl crate::services::DeckConfigService for Collection {
             .get_revlog_entries_for_searched_cards_in_card_order()?;
 
         let mut config = guard.col.get_optimal_retention_parameters(revlogs)?;
-        let fsrs_card_params = std::sync::Arc::new(fsrs::check_and_fill_parameters(&input.w)?);
+        let fsrs_card_params = std::sync::Arc::new(normalized_fsrs_parameters(&input.w)?);
         let cards = guard
             .col
             .storage
@@ -137,7 +139,7 @@ impl crate::services::DeckConfigService for Collection {
 
         config.deck_size = guard.cards;
 
-        let costs = (70u32..=99u32)
+        let costs = (10u32..=99u32)
             .into_par_iter()
             .map(|dr| {
                 Ok((
@@ -179,10 +181,23 @@ impl From<anki_proto::deck_config::UpdateDeckConfigsRequest> for UpdateDeckConfi
             card_state_customizer: c.card_state_customizer,
             limits: c.limits.unwrap_or_default(),
             new_cards_ignore_review_limit: c.new_cards_ignore_review_limit,
+            load_balancer_enabled: c.load_balancer_enabled,
+            fsrs_short_term_with_steps_enabled: c.fsrs_short_term_with_steps_enabled,
+            fsrs_learning_queues_disabled: c.fsrs_learning_queues_disabled,
             apply_all_parent_limits: c.apply_all_parent_limits,
             fsrs: c.fsrs,
             fsrs_reschedule: c.fsrs_reschedule,
             fsrs_health_check: c.fsrs_health_check,
+            review_fuzz_config: {
+                let defaults = StoredReviewFuzzConfig::default();
+                StoredReviewFuzzConfig {
+                    enabled: c.review_fuzz_enabled.unwrap_or(defaults.enabled),
+                    base: c.review_fuzz_base.unwrap_or(defaults.base),
+                    factor_short: c.review_fuzz_factor_short.unwrap_or(defaults.factor_short),
+                    factor_mid: c.review_fuzz_factor_mid.unwrap_or(defaults.factor_mid),
+                    factor_long: c.review_fuzz_factor_long.unwrap_or(defaults.factor_long),
+                }
+            },
         }
     }
 }
@@ -202,5 +217,45 @@ impl From<anki_proto::deck_config::DeckConfig> for DeckConfig {
 impl From<anki_proto::deck_config::DeckConfigId> for DeckConfigId {
     fn from(dcid: anki_proto::deck_config::DeckConfigId) -> Self {
         DeckConfigId(dcid.dcid)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_deck_configs_request_defaults_missing_review_fuzz() {
+        let request = anki_proto::deck_config::UpdateDeckConfigsRequest::default();
+
+        let converted = UpdateDeckConfigsRequest::from(request);
+
+        assert_eq!(
+            converted.review_fuzz_config,
+            StoredReviewFuzzConfig::default()
+        );
+    }
+
+    #[test]
+    fn update_deck_configs_request_preserves_review_fuzz() {
+        let expected = StoredReviewFuzzConfig {
+            enabled: false,
+            base: 2.0,
+            factor_short: 0.3,
+            factor_mid: 0.2,
+            factor_long: 0.1,
+        };
+        let request = anki_proto::deck_config::UpdateDeckConfigsRequest {
+            review_fuzz_enabled: Some(expected.enabled),
+            review_fuzz_base: Some(expected.base),
+            review_fuzz_factor_short: Some(expected.factor_short),
+            review_fuzz_factor_mid: Some(expected.factor_mid),
+            review_fuzz_factor_long: Some(expected.factor_long),
+            ..Default::default()
+        };
+
+        let converted = UpdateDeckConfigsRequest::from(request);
+
+        assert_eq!(converted.review_fuzz_config, expected);
     }
 }

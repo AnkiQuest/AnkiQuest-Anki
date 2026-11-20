@@ -37,7 +37,7 @@ pub struct MediaEntry {
     pub fname: String,
     /// If None, file has been deleted
     pub sha1: Option<Sha1Hash>,
-    // Modification time; 0 if deleted
+    // Modification time in milliseconds; 0 if deleted. Older scans stored seconds.
     pub mtime: i64,
     /// True if changed since last sync
     pub sync_required: bool,
@@ -311,7 +311,7 @@ pub(crate) fn open_or_create<P: AsRef<Path>>(path: P) -> error::Result<Connectio
         db.trace_v2(
             rusqlite::trace::TraceEventCodes::SQLITE_TRACE_STMT,
             Some(trace),
-        );
+        )?;
     }
 
     db.pragma_update(None, "page_size", 4096)?;
