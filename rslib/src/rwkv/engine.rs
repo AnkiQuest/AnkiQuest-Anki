@@ -485,7 +485,7 @@ impl WarmUpStateSpill {
             // Only one serialized module is held at a time. Do not build a
             // serialized snapshot or drain the maps before publishing the file.
             for (id, state) in states.iter() {
-                let bytes = serialize_module_state(&state);
+                let bytes = serialize_module_state(state);
                 max_state_bytes = max_state_bytes.max(bytes.len());
                 io::Write::write_all(&mut out, &id.to_le_bytes())?;
                 hasher.update(&id.to_le_bytes());
