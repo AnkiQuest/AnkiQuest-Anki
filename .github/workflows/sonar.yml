@@ -1,5 +1,10 @@
 name: SonarCloud
 
+# ANKIQUEST: the fork has no SONAR_TOKEN secret; with HAVE_SONAR_TOKEN (a
+# repository variable) unset the scan is skipped instead of failing master.
+# Set the secret and the variable to enable it. Keep the edits marked
+# ANKIQUEST close to upstream's shape when merging upstream changes.
+
 on:
   workflow_run:
     workflows: ["CI"]
@@ -30,6 +35,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
       && (github.event.workflow_run.event == 'push'
           || github.event.workflow_run.event == 'pull_request')
+      && vars.HAVE_SONAR_TOKEN == 'true'
     env:
       # A fork PR's head repository differs from ours. Its tests, coverage, and
       # coverage regression check still run in CI, but the privileged Sonar job
