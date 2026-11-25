@@ -19,6 +19,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import FsrsOptions from "./FsrsOptions.svelte";
     import GlobalLabel from "./GlobalLabel.svelte";
     import type { DeckOptionsState } from "./lib";
+    import SchedulerOptions from "./SchedulerOptions.svelte";
 
     export let state: DeckOptionsState;
     export let api: Record<string, never>;
@@ -42,6 +43,21 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             help: tr.deckConfigFsrsTooltip(),
             url: HelpPage.DeckOptions.fsrs,
             global: true,
+        },
+        // the desktop fork's scheduler choice (RWKV-Instant, RWKV-Curve, FSRS)
+        review: {
+            title: tr.deckConfigSchedulerReview(),
+            help: [
+                "### RWKV",
+                tr.deckConfigRwkvDescription(),
+                "### FSRS",
+                tr.deckConfigFsrsDescription(),
+            ].join("\n\n"),
+            url: HelpPage.DeckOptions.fsrs,
+        },
+        dueDates: {
+            title: tr.deckConfigSchedulerDueDates(),
+            help: tr.deckConfigSchedulerDueDatesDescription(),
         },
         desiredRetention: {
             title: tr.deckConfigDesiredRetention(),
@@ -112,6 +128,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             </SwitchRow>
         </Item>
 
+        {#if !$fsrs}
+            <p class="scheduler-disabled">{tr.deckConfigSchedulerDisabled()}</p>
+        {/if}
+
+        <!-- Writes the preset's RWKV fields, which sync with the desktop fork. -->
+        <SchedulerOptions
+            {state}
+            onSelect={() => fsrs.set(true)}
+            openHelp={(key) => openHelpModal(Object.keys(settings).indexOf(key))}
+        />
+
         {#if $fsrs}
             <FsrsOptions
                 bind:this={fsrsOptionsComponent}
@@ -124,3 +151,11 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         {/if}
     </DynamicallySlottable>
 </TitledContainer>
+
+<style>
+    .scheduler-disabled {
+        color: var(--fg-subtle);
+        font-size: 0.8rem;
+        margin: 0.375rem 0;
+    }
+</style>

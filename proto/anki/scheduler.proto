@@ -117,6 +117,10 @@ service SchedulerService {
   // replays the review history, and from then on installs the transient score
   // maps inside the backend. Cheap to call again when nothing changed.
   rpc RwkvPrepareOffline(RwkvPrepareOfflineRequest) returns (RwkvPrepareOfflineResponse);
+  // Undoes RwkvPrepareOffline without a restart: forgets the model, drops it
+  // and the scores it installed, so queues and deck counts use each preset's
+  // fallback scheduler until the next prepare. Idempotent.
+  rpc RwkvUnloadOffline(generic.Empty) returns (generic.Empty);
   // Rescores every Instant-enabled deck and installs the deck count scores.
   rpc RwkvOfflineInstantPassStep(RwkvOfflineInstantPassStepRequest) returns (RwkvOfflineInstantPassProgress);
   // Projected recall of review cards at later times, "if you stop reviewing

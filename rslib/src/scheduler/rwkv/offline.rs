@@ -65,6 +65,9 @@ use crate::storage::RWKV_HISTORY_RESET_AFTER_SQL;
 #[cfg(test)]
 #[path = "offline_review_kind_tests.rs"]
 mod review_kind_tests;
+#[cfg(test)]
+#[path = "offline_unload_tests.rs"]
+mod unload_tests;
 #[path = "offline_workload.rs"]
 mod workload;
 
@@ -819,6 +822,40 @@ impl Collection {
         *REGISTERED_MODEL.lock().unwrap() = Some(runtime.model.clone());
         self.state.rwkv_offline = Some(runtime);
         Ok(RwkvPrepareOfflineResponse { reviews_replayed })
+    }
+
+    /// Turns the offline RWKV layer off without a restart: forgets the model
+    /// `RwkvPrepareOffline` registered, drops the runtime and every score it
+    /// installed, so the next queue build and deck count use the preset's
+    /// fallback scheduler. A build or workload simulation under way for this
+    /// collection is detached: it runs to its end on its thread (a workload
+    /// simulation is cancelled first) and is never installed. The state file
+    /// is kept, so a later prepare replays only the reviews after it. Calling
+    /// it again, or with nothing loaded, does nothing.
+    pub(crate) fn rwkv_unload_offline(&mut self) {
+        *REGISTERED_MODEL.lock().unwrap() = None;
+        self.rwkv_offline_workload_cancel();
+        {
+            let mut building = BUILDING.lock().unwrap();
+            if building
+                .as_ref()
+                .is_some_and(|(path, _)| *path == self.col_path)
+            {
+                // dropping the handle detaches the thread; its runtime is
+                // dropped when it finishes
+                *building = None;
+            }
+        }
+        if self.state.rwkv_offline.take().is_some() {
+            release_freed_memory();
+        }
+        REPLAY_DONE.store(0, Ordering::Relaxed);
+        REPLAY_TOTAL.store(0, Ordering::Relaxed);
+
+        // what the runtime installed, and the per-card caches beside it
+        self.invalidate_rwkv_offline_targets();
+        self.state.rwkv_synthetic_filtered_answers.clear();
+        self.state.rwkv_last_review_times.clear();
     }
 
     /// Scores every Instant-enabled deck now and installs the deck count
