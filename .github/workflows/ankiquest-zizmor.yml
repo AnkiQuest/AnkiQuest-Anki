@@ -1,0 +1,29 @@
+# zizmor's security audit of every workflow here, upstream's included, with
+# the rules in .github/zizmor.yml. It runs in AnkiQuest-Dev's default shell
+# (the anki shell has no zizmor), through the shared
+# nix-check.yml, and reports as `zizmor / check`.
+name: AnkiQuest zizmor
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  zizmor:
+    uses: AnkiQuest/AnkiQuest-Dev/.github/workflows/nix-check.yml@master
+    with:
+      flake: github:AnkiQuest/AnkiQuest-Dev
+      flake-check: false
+      format: ""
+      zizmor: true
+      timeout-minutes: 15

@@ -6,7 +6,10 @@ name: SonarCloud
 # ANKIQUEST close to upstream's shape when merging upstream changes.
 
 on:
-  workflow_run:
+  # The scan needs SONAR_TOKEN, which pull request runs don't get. The pull
+  # request's checkout is read as data only, with the trusted configuration
+  # from the default branch (see the comments below, docs/sonarcloud.md).
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["CI"]
     types: [completed]
 
@@ -74,8 +77,10 @@ jobs:
           path: .sonar-trusted
           persist-credentials: false
 
+      # Writes the version read from the trusted checkout, after the check
+      # below, to GITHUB_ENV.
       - name: Install trusted SonarCloud configuration
-        run: |
+        run: | # zizmor: ignore[github-env]
           rm -f sonar-project.properties
           cp .sonar-trusted/sonar-project.properties sonar-project.properties
           # New code is measured since the previous version, so the analysed

@@ -1,7 +1,10 @@
 name: Clean up closed PR caches
 
 on:
-  pull_request_target:
+  # Fork pull requests need pull_request_target for actions: write. The job
+  # checks out and runs no pull request code; it deletes that pull request's
+  # caches only.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types: [closed]
 
 permissions: {}

@@ -1,0 +1,22 @@
+# zizmor's rules for this repository's workflows and actions.
+rules:
+  # Third-party actions are pinned to a full commit SHA, which Dependabot
+  # bumps. AnkiQuest's own workflows and actions are taken at master, so
+  # every repository runs the same shared CI.
+  unpinned-uses:
+    config:
+      policies:
+        "AnkiQuest/*": any
+        "*": hash-pin
+
+  # `./` paths (the setup-anki action) resolve to this repository at the
+  # commit under test, which is what CI here checks.
+  self-repository:
+    disable: true
+
+  # ci.yml runs on pushes to release/** and so reads as a release workflow,
+  # but it publishes nothing: its artifacts are logs and coverage for the
+  # Sonar scan.
+  cache-poisoning:
+    ignore:
+      - ci.yml
