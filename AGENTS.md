@@ -206,7 +206,9 @@ AnkiQuest-Anki is a fork of [ankitects/anki](https://github.com/ankitects/anki):
 
 ## Upstream guidance
 
-From [ankitects/anki](https://github.com/ankitects/anki)'s CLAUDE.md, kept here so the fork still follows the originating project's own rules where AnkiQuest's do not override them; this job refreshes the wording when upstream changes it.
+[ankitects/anki](https://github.com/ankitects/anki)'s own instructions, kept verbatim. They apply to upstream's code where the rules above don't override them. AnkiQuest-Sync copies them from the upstream commit `master` last merged; don't edit them here.
+
+<!-- ankitects/anki: CLAUDE.md -->
 
 # Claude Code Configuration
 
