@@ -18,7 +18,7 @@ and summarised, with who works on what, in
   licence and says to use them for personal and research use only, and to
   ask the dataset's owners before shipping them in an application.
 
-hill asked both sources for permission on 2026-11-20
+AnkiQuest asked both sources for permission
 ([JSchoreels/anki#29](https://github.com/JSchoreels/anki/issues/29),
 [srs-benchmark#364](https://github.com/open-spaced-repetition/srs-benchmark/issues/364));
 neither answered, and both point to #353. `.gitignore` keeps any weights
@@ -116,8 +116,8 @@ Download flow, in addition:
   resume on interruption; check size and SHA-256 before an atomic rename.
   A mismatch deletes the file and reports it; never load an unverified
   file.
-- Share the downloader with the runtime companion-art packs (hill's
-  decision of 2026-11-25): both fetch a pinned release asset by hash.
+- Share the downloader with the runtime companion-art packs: both fetch
+  a pinned release asset by hash.
 - An F-Droid build flag that hides the download (`INTERNET` is already
   declared for the AnkiQuest server).
 - A model update is a lock-file change in an app release. Key the model

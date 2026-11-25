@@ -1,4 +1,4 @@
-# RWKV scheduling for Anki: who does what (2026-11-25)
+# RWKV scheduling for Anki: who does what
 
 The state of RWKV scheduling for Anki, traced from
 [JSchoreels/anki#29](https://github.com/JSchoreels/anki/issues/29) and
@@ -9,9 +9,8 @@ them, is in [rwkv-weights.md](rwkv-weights.md).
 
 ## The chain
 
-Both starting issues were opened by hill (float3) on 2026-11-20, asking whether
-AnkiQuest may use the weights. Neither got an answer from the owners: hill
-closed both the same day with a link to
+Both starting issues ask whether AnkiQuest may use the weights. Neither got
+an answer from the owners; both are closed with a link to
 [srs-benchmark#353](https://github.com/open-spaced-repetition/srs-benchmark/issues/353),
 which already asks the same question and is still open.
 
@@ -60,10 +59,10 @@ flowchart TD
 
 Licence questions:
 
-- [JSchoreels/anki#29](https://github.com/JSchoreels/anki/issues/29): hill, 2026-11-20, closed by hill, links #353.
-- [srs-benchmark#364](https://github.com/open-spaced-repetition/srs-benchmark/issues/364): hill, 2026-11-20, closed by hill, links #353.
+- [JSchoreels/anki#29](https://github.com/JSchoreels/anki/issues/29): AnkiQuest's permission request, closed, links #353.
+- [srs-benchmark#364](https://github.com/open-spaced-repetition/srs-benchmark/issues/364): AnkiQuest's permission request, closed, links #353.
 - [srs-benchmark#353](https://github.com/open-spaced-repetition/srs-benchmark/issues/353): open, no decision.
-- [anki-revlogs-10k LICENSE](https://huggingface.co/datasets/open-spaced-repetition/anki-revlogs-10k/blob/main/LICENSE): not readable from this session (huggingface.co is blocked); quoted as "memory research only" in #353 and as "memory research, and by university students and individuals for their own research; other uses need permission" in anki-rwkv's `WEIGHTS-NOTICE.md`.
+- [anki-revlogs-10k LICENSE](https://huggingface.co/datasets/open-spaced-repetition/anki-revlogs-10k/blob/main/LICENSE): not read for this page; quoted as "memory research only" in #353 and as "memory research, and by university students and individuals for their own research; other uses need permission" in anki-rwkv's `WEIGHTS-NOTICE.md`.
 
 Research and training:
 
