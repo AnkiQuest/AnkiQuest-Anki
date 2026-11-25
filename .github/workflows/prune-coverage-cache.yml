@@ -1,7 +1,9 @@
 name: Prune coverage baseline caches
 
 on:
-  workflow_run:
+  # Runs after CI on the default branches only, deletes old baseline caches
+  # through the API and checks out nothing.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["CI"]
     # master: AnkiQuest-Anki's default branch
     branches: [main, master]

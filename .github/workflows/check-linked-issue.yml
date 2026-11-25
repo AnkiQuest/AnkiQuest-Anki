@@ -1,7 +1,9 @@
 name: Check Linked Issue
 
 on:
-  pull_request_target:
+  # Labels and comments on fork pull requests; checks out and runs no pull
+  # request code, and runs in ankitects/anki only.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types: [opened, edited, labeled, reopened]
 
 jobs:

@@ -13,6 +13,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 env:
   N2_OUTPUT_PROGRESS: "1"
   N2_OUTPUT_SUCCESS: "1"
@@ -43,8 +46,9 @@ jobs:
   minilints:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
           filter: blob:none
 
@@ -91,7 +95,9 @@ jobs:
   format:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 #v2.0.1
@@ -112,7 +118,9 @@ jobs:
           CARGO_BUILD_WARNINGS: allow
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Run format checks
         run: just fmt
@@ -121,8 +129,14 @@ jobs:
   check-linux:
     runs-on: ubuntu-24.04
     name: check (linux)
+    permissions:
+      contents: read
+      actions: read # upload-sarif reads the run
+      security-events: write # upload-sarif uploads the complexipy results
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Restore cargo cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
@@ -151,7 +165,9 @@ jobs:
         uses: ./.github/actions/setup-anki
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
@@ -192,14 +208,16 @@ jobs:
       - name: Run complexipy diff
         id: complexipy
         continue-on-error: true
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           # complexipy compares against a local branch named main: the default branch
-          git fetch origin "${{ github.event.repository.default_branch }}:main" 2>/dev/null || true
+          git fetch origin "$DEFAULT_BRANCH:main" 2>/dev/null || true
           just complexipy-diff
 
       - name: Upload SARIF results for complexipy
         if: steps.complexipy.outcome == 'failure'
-        uses: github/codeql-action/upload-sarif@fbfa9f37476c0024508d051f3c34fcca3366b0e2 #v4
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 #v4.39.5
         with:
             sarif_file: out/complexipy/complexipy-results.sarif
             category: complexipy
@@ -283,7 +301,9 @@ jobs:
     runs-on: ubuntu-24.04-arm
     name: check (linux-arm)
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Restore cargo cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
@@ -312,7 +332,9 @@ jobs:
         uses: ./.github/actions/setup-anki
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
@@ -356,8 +378,9 @@ jobs:
     runs-on: macos-15-intel
     name: check (macos-intel)
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
+          persist-credentials: false
           submodules: true
 
       - name: Restore cargo cache
@@ -387,7 +410,9 @@ jobs:
         uses: ./.github/actions/setup-anki
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
@@ -430,8 +455,9 @@ jobs:
     runs-on: macos-latest
     name: check (macos)
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
+          persist-credentials: false
           submodules: true
 
       - name: Restore cargo cache
@@ -461,7 +487,9 @@ jobs:
         uses: ./.github/actions/setup-anki
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
@@ -510,8 +538,9 @@ jobs:
       TEMP: D:\tmp
       TMP: D:\tmp
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
+          persist-credentials: false
           submodules: true
 
       - name: Prepare D:\ directories
@@ -545,7 +574,9 @@ jobs:
         uses: ./.github/actions/setup-anki
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
@@ -589,8 +620,9 @@ jobs:
     # Unlike the x64 Windows runner, windows-11-arm has no D: drive, so we use
     # the default C:-based CARGO_HOME and TEMP.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
+          persist-credentials: false
           submodules: true
 
       - name: Restore cargo cache
@@ -620,7 +652,9 @@ jobs:
         uses: ./.github/actions/setup-anki
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
+        with:
+          just-version: "1.59.0"
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0

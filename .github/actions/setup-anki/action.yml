@@ -51,7 +51,7 @@ runs:
     - name: Install rsync (Windows)
       if: runner.os == 'Windows'
       id: setup-msys2
-      uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e #v2
+      uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e #v2.33.0
       with:
         update: false
         install: rsync
@@ -59,12 +59,15 @@ runs:
     - name: Add MSYS2 usr/bin to PATH (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      run: |
-        "${{ steps.setup-msys2.outputs.msys2-location }}\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # The path setup-msys2 reports, not input.
+      env:
+        MSYS2_LOCATION: ${{ steps.setup-msys2.outputs.msys2-location }}
+      run: | # zizmor: ignore[github-env]
+        "$env:MSYS2_LOCATION\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     # Reads toolchain version from rust-toolchain.toml automatically.
     - name: Install Rust toolchain
-      uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 #v1
+      uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 #v2.0.1
       env:
         CARGO_BUILD_WARNINGS: allow
       with:
@@ -83,10 +86,13 @@ runs:
 
     # Set UV_CACHE_DIR so both setup-uv's binary and the build system's
     # downloaded uv share the same dependency cache for faster builds.
+    # The values written to GITHUB_ENV here and below are paths setup-uv
+    # reports, not input.
     - name: Configure uv cache
       shell: bash
-      run: |
-        CACHE_DIR="${{ steps.setup-uv.outputs.cache-dir }}"
+      env:
+        CACHE_DIR: ${{ steps.setup-uv.outputs.cache-dir }}
+      run: | # zizmor: ignore[github-env]
         if [ -n "$CACHE_DIR" ]; then
           echo "UV_CACHE_DIR=$CACHE_DIR" >> "$GITHUB_ENV"
         fi
@@ -95,12 +101,14 @@ runs:
     - name: Set UV_BINARY
       if: runner.os != 'Windows'
       shell: bash
-      run: echo "UV_BINARY=${{ steps.setup-uv.outputs.uv-path }}" >> "$GITHUB_ENV"
+      env:
+        UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
+      run: echo "UV_BINARY=$UV_PATH" >> "$GITHUB_ENV" # zizmor: ignore[github-env]
 
     # Ensure cargo-installed tools like n2 are discoverable.
     - name: Add CARGO_HOME/bin to PATH
       shell: bash
-      run: echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> "$GITHUB_PATH"
+      run: echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> "$GITHUB_PATH" # zizmor: ignore[github-env]
 
     - name: Install n2
       shell: bash
