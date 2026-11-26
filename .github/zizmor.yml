@@ -20,3 +20,11 @@ rules:
   cache-poisoning:
     ignore:
       - ci.yml
+
+  # upstream's prepare-release.yml checks out with RELEASE_TOKEN and pushes
+  # with it at the end of the job; this fork does not run it (releases are
+  # made in AnkiQuest-Android-Backend), so the rule would only churn
+  # upstream's file.
+  artipacked:
+    ignore:
+      - prepare-release.yml
