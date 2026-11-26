@@ -6,6 +6,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import {
         DeckConfig_Config_NewCardGatherPriority as GatherOrder,
         DeckConfig_Config_NewCardSortOrder as SortOrder,
+        DeckConfig_Config_ReviewMix as ReviewMix,
     } from "@generated/anki/deck_config_pb";
     import * as tr from "@generated/ftl";
     import { HelpPage } from "@tslib/help-page";
@@ -26,7 +27,12 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         reviewMixChoices,
         reviewOrderChoices,
     } from "./choices";
+    import {
+        readDisplayOrderSettings,
+        withDisplayOrderSettings,
+    } from "./display-order-settings";
     import type { DeckOptionsState } from "./lib";
+    import SpinBoxRow from "./SpinBoxRow.svelte";
 
     export let state: DeckOptionsState;
     export let api: Record<string, never>;
@@ -34,6 +40,40 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     const config = state.currentConfig;
     const defaults = state.defaults;
     const fsrs = state.fsrs;
+    const auxData = state.currentAuxData;
+
+    let intradayLearningMix = ReviewMix.MIX_WITH_REVIEWS;
+    $: intradayLearningMix = readDisplayOrderSettings($auxData).intradayLearningMix;
+    $: {
+        const updated = withDisplayOrderSettings($auxData, {
+            intradayLearningMix,
+        });
+        if (updated) {
+            auxData.set(updated);
+        }
+    }
+
+    // kuma3: kept in the preset's extra JSON, like the intraday mix above
+    const KUMA3_KEY = "kuma3.deckoptions";
+    function kuma3Options(aux: Record<string, unknown>): Record<string, unknown> {
+        const value = aux[KUMA3_KEY];
+        return typeof value === "object" && value !== null && !Array.isArray(value)
+            ? (value as Record<string, unknown>)
+            : {};
+    }
+    const storedReviewsPerNewCard = (aux: Record<string, unknown>) =>
+        Number(kuma3Options(aux).reviews_per_new_card) || 0;
+    let reviewsPerNewCard = 0;
+    $: reviewsPerNewCard = storedReviewsPerNewCard($auxData);
+    $: if (storedReviewsPerNewCard($auxData) !== reviewsPerNewCard) {
+        auxData.set({
+            ...$auxData,
+            [KUMA3_KEY]: {
+                ...kuma3Options($auxData),
+                reviews_per_new_card: reviewsPerNewCard,
+            },
+        });
+    }
 
     const currentDeck = "\n\n" + tr.deckConfigDisplayOrderWillUseCurrentDeck();
 
@@ -88,9 +128,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             title: tr.deckConfigNewReviewPriority(),
             help: tr.deckConfigNewReviewPriorityTooltip() + currentDeck,
         },
+        reviewsPerNewCard: {
+            title: tr.deckConfigReviewsPerNewCard(),
+            help: tr.deckConfigReviewsPerNewCardTooltip() + currentDeck,
+        },
         interdayStepPriority: {
             title: tr.deckConfigInterdayStepPriority(),
             help: tr.deckConfigInterdayStepPriorityTooltip() + currentDeck,
+        },
+        intradayStepPriority: {
+            title: tr.deckConfigIntradayStepPriority(),
+            help: tr.deckConfigIntradayStepPriorityTooltip() + currentDeck,
         },
         reviewSortOrder: {
             title: tr.deckConfigReviewSortOrder(),
@@ -172,6 +220,21 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             </EnumSelectorRow>
         </Item>
 
+        {#if $config.newMix === ReviewMix.MIX_WITH_REVIEWS}
+            <Item>
+                <SpinBoxRow bind:value={reviewsPerNewCard} defaultValue={0}>
+                    <SettingTitle
+                        on:click={() =>
+                            openHelpModal(
+                                Object.keys(settings).indexOf("reviewsPerNewCard"),
+                            )}
+                    >
+                        {settings.reviewsPerNewCard.title}
+                    </SettingTitle>
+                </SpinBoxRow>
+            </Item>
+        {/if}
+
         <Item>
             <EnumSelectorRow
                 bind:value={$config.interdayLearningMix}
@@ -185,6 +248,23 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                         )}
                 >
                     {settings.interdayStepPriority.title}
+                </SettingTitle>
+            </EnumSelectorRow>
+        </Item>
+
+        <Item>
+            <EnumSelectorRow
+                bind:value={intradayLearningMix}
+                defaultValue={ReviewMix.MIX_WITH_REVIEWS}
+                choices={reviewMixChoices()}
+            >
+                <SettingTitle
+                    on:click={() =>
+                        openHelpModal(
+                            Object.keys(settings).indexOf("intradayStepPriority"),
+                        )}
+                >
+                    {settings.intradayStepPriority.title}
                 </SettingTitle>
             </EnumSelectorRow>
         </Item>

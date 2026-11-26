@@ -3036,6 +3036,139 @@ mod tests {
         }
 
         #[test]
+        fn parallel_batches_preserve_states_callbacks_and_undo() -> Result<()> {
+            use fsrs::FSRSReview;
+
+            for params in [
+                fsrs::FSRS6_DEFAULT_PARAMETERS.as_slice(),
+                DEFAULT_PARAMETERS.as_slice(),
+            ] {
+                let mut col = Collection::new();
+                let fsrs = FSRS::new(params)?;
+                let mut items = Vec::new();
+                let mut originals = HashMap::new();
+                for i in 0..2005 {
+                    let mut card = Card {
+                        due: i,
+                        ..Default::default()
+                    };
+                    col.storage.add_card(&mut card)?;
+                    originals.insert(card.id, card.clone());
+                    let item = FSRSItem {
+                        reviews: (0..1 + i % 11)
+                            .map(|review| FSRSReview {
+                                rating: 1 + (review % 4) as u32,
+                                delta_t: if review == 0 { 0.0 } else { review as f32 },
+                            })
+                            .collect(),
+                    };
+                    let starting_state = (i % 2 == 0).then_some(MemoryState {
+                        stability: 5.0,
+                        difficulty: 4.0,
+                        stability_fast: 5.0,
+                    });
+                    items.push((
+                        card.id,
+                        FsrsItemForMemoryState {
+                            item,
+                            starting_state,
+                            filtered_revlogs: Vec::new(),
+                        },
+                    ));
+                }
+                // The serial baseline uses the same sorted 1000-card batches.
+                let mut ordered_items = items.clone();
+                let mut order =
+                    permutation::sort_unstable_by_key(&items, |(_, item)| item.item.reviews.len());
+                order.apply_slice_in_place(&mut ordered_items);
+                let mut expected = HashMap::new();
+                for batch in ordered_items.chunks(1000) {
+                    let states = fsrs.memory_state_batch(
+                        batch.iter().map(|(_, item)| item.item.clone()).collect(),
+                        batch.iter().map(|(_, item)| item.starting_state).collect(),
+                    )?;
+                    for ((cid, _), state) in batch.iter().zip(states) {
+                        // Compare the exact persisted state, including the
+                        // existing card-data precision limits.
+                        let mut card = originals[cid].clone();
+                        card.memory_state = Some(fsrs_memory_state_for_fsrs(&fsrs, state));
+                        col.storage.update_card(&card)?;
+                        expected.insert(
+                            *cid,
+                            col.storage.get_card(*cid)?.unwrap().memory_state.unwrap(),
+                        );
+                        col.storage.update_card(&originals[cid])?;
+                    }
+                }
+                let expected_order: Vec<_> = ordered_items.iter().map(|(cid, _)| *cid).collect();
+                let mut callback_order = Vec::new();
+                let mut progress = 0;
+                col.transact(Op::UpdateDeckConfig, |col| {
+                    col.update_memory_state_for_cards_with_items(
+                        items,
+                        &fsrs,
+                        |card| card.desired_retention = Some(0.91),
+                        |card, _, _| {
+                            callback_order.push(card.id);
+                            Ok(())
+                        },
+                        Usn(0),
+                        || {
+                            progress += 1;
+                            Ok(())
+                        },
+                    )
+                })?;
+                assert_eq!(callback_order, expected_order);
+                assert_eq!(progress, expected.len());
+                for (cid, state) in &expected {
+                    let card = col.storage.get_card(*cid)?.unwrap();
+                    assert_eq!(card.memory_state, Some(*state));
+                    assert_eq!(card.due, originals[cid].due);
+                }
+                col.undo()?;
+                for cid in expected.keys() {
+                    let card = col.storage.get_card(*cid)?.unwrap();
+                    assert_eq!(card.memory_state, None);
+                    assert_eq!(card.desired_retention, None);
+                }
+                col.redo()?;
+                for (cid, state) in &expected {
+                    assert_eq!(
+                        col.storage.get_card(*cid)?.unwrap().memory_state,
+                        Some(*state)
+                    );
+                }
+                // An interrupted update must roll back earlier batches too.
+                let mut updates = 0;
+                let result = col.transact(Op::UpdateDeckConfig, |col| {
+                    col.update_memory_state_for_cards_with_items(
+                        ordered_items,
+                        &fsrs,
+                        |card| card.desired_retention = Some(0.5),
+                        |_, _, _| Ok(()),
+                        Usn(0),
+                        || {
+                            updates += 1;
+                            if updates == 1001 {
+                                Err(AnkiError::Interrupted)
+                            } else {
+                                Ok(())
+                            }
+                        },
+                    )
+                });
+                assert!(matches!(result, Err(AnkiError::Interrupted)));
+                for (cid, state) in &expected {
+                    let card = col.storage.get_card(*cid)?.unwrap();
+                    assert_eq!(card.memory_state, Some(*state));
+                    assert_eq!(card.desired_retention, Some(0.91));
+                }
+            }
+            Ok(())
+        }
+
+        #[test]
         fn no_req_clears_fsrs_data() -> Result<()> {
             let mut col = Collection::new();
             let card_id = create_review_card_with_revlog(&mut col, 1, 1, None, None)?;

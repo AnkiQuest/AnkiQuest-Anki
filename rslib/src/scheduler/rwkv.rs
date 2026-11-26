@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use std::collections::hash_map::Entry;
@@ -788,7 +792,11 @@ impl Collection {
         let previous: Option<crate::config::RwkvHistoryResetMirror> =
             self.storage.get_config_value(&key)?;
         if (boundary > 0 || previous.is_some())
+<<<<<<< HEAD
             && previous.is_none_or(|mirror| mirror.after != Some(boundary))
+=======
+            && previous.map_or(true, |mirror| mirror.after != Some(boundary))
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         {
             let mirror = crate::config::RwkvHistoryResetMirror::new(Some(boundary), previous);
             self.set_config(key.as_str(), &mirror)?;

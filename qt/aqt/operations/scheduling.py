@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import enum
+import time
+from collections.abc import Callable, Sequence
+from types import SimpleNamespace
+from typing import TypeVar
 
 import aqt
 import aqt.forms
@@ -16,15 +20,36 @@ from anki.collection import (
     OpChangesWithCount,
     OpChangesWithId,
 )
-from anki.decks import DeckId
+from anki.decks import DeckId, FilteredDeckConfig
 from anki.notes import NoteId
 from anki.scheduler import CustomStudyRequest, FilteredDeckForUpdate, UnburyDeck
 from anki.scheduler.base import ScheduleCardsAsNew
-from anki.scheduler.v3 import CardAnswer
+from anki.scheduler.v3 import CardAnswer, GradeNowCardOptions
 from anki.scheduler.v3 import Scheduler as V3Scheduler
 from aqt.operations import CollectionOp
 from aqt.qt import *
 from aqt.utils import disable_help_button, getText, tooltip, tr
+
+_T = TypeVar("_T")
+
+
+def _run_preserving_rwkv_state(
+    col: Collection,
+    mutation: Callable[[], _T],
+    *,
+    card_ids: Sequence[int] = (),
+    note_ids: Sequence[int] = (),
+    require_no_preset_overlay: bool = False,
+) -> _T:
+    from aqt import rwkv_scheduler
+
+    return rwkv_scheduler.run_collection_mutation_preserving_rwkv_state(
+        col,
+        mutation,
+        card_ids=card_ids,
+        note_ids=note_ids,
+        require_no_preset_overlay=require_no_preset_overlay,
+    )
 
 
 def set_due_date_dialog(
@@ -56,7 +81,12 @@ def set_due_date_dialog(
         return None
     else:
         return CollectionOp(
-            parent, lambda col: col.sched.set_due_date(card_ids, days, config_key)
+            parent,
+            lambda col: _run_preserving_rwkv_state(
+                col,
+                lambda: col.sched.set_due_date(card_ids, days, config_key),
+                card_ids=card_ids,
+            ),
         ).success(
             lambda _: tooltip(
                 tr.scheduling_set_due_date_done(cards=len(card_ids)),
@@ -70,7 +100,12 @@ def grade_now(
     parent: QWidget,
     card_ids: Sequence[CardId],
     ease: int,
+    card_options: Sequence[GradeNowCardOptions] | None = None,
 ) -> CollectionOp[OpChanges]:
+    assert aqt.mw
+    mw = aqt.mw
+    card_ids = tuple(card_ids)
+    card_options = tuple(card_options or ())
     if ease == 1:
         rating = CardAnswer.AGAIN
     elif ease == 2:
@@ -79,13 +114,32 @@ def grade_now(
         rating = CardAnswer.GOOD
     else:
         rating = CardAnswer.EASY
-    return CollectionOp(
-        parent,
-        lambda col: col._backend.grade_now(
+
+    def grade_now_v3(col: Collection) -> OpChanges:
+        from aqt import rwkv_scheduler
+
+        reviewer = getattr(mw, "reviewer", None)
+        reconciliation = (
+            rwkv_scheduler.prepare_grade_now_reconciliation(reviewer, card_ids)
+            if reviewer is not None
+            else None
+        )
+        changes = col._backend.grade_now(
             card_ids=card_ids,
             rating=rating,
+<<<<<<< HEAD
             card_options=[],
         ),
+=======
+            card_options=card_options,
+        )
+        rwkv_scheduler.record_grade_now_answers(reconciliation)
+        return changes
+
+    return CollectionOp(
+        parent,
+        grade_now_v3,
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     ).success(
         lambda _: tooltip(
             tr.scheduling_graded_cards_done(cards=len(card_ids)), parent=parent
@@ -119,11 +173,15 @@ def forget_cards(
 
     return CollectionOp(
         parent,
-        lambda col: col.sched.schedule_cards_as_new(
-            card_ids,
-            restore_position=restore_position,
-            reset_counts=reset_counts,
-            context=context,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.schedule_cards_as_new(
+                card_ids,
+                restore_position=restore_position,
+                reset_counts=reset_counts,
+                context=context,
+            ),
+            card_ids=card_ids,
         ),
     ).success(
         lambda _: tooltip(
@@ -195,12 +253,17 @@ def reposition_new_cards(
 ) -> CollectionOp[OpChangesWithCount]:
     return CollectionOp(
         parent,
-        lambda col: col.sched.reposition_new_cards(
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.reposition_new_cards(
+                card_ids=card_ids,
+                starting_from=starting_from,
+                step_size=step_size,
+                randomize=randomize,
+                shift_existing=shift_existing,
+            ),
             card_ids=card_ids,
-            starting_from=starting_from,
-            step_size=step_size,
-            randomize=randomize,
-            shift_existing=shift_existing,
+            require_no_preset_overlay=shift_existing,
         ),
     ).success(
         lambda out: tooltip(
@@ -214,7 +277,14 @@ def suspend_cards(
     parent: QWidget,
     card_ids: Sequence[CardId],
 ) -> CollectionOp[OpChangesWithCount]:
-    return CollectionOp(parent, lambda col: col.sched.suspend_cards(card_ids))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.suspend_cards(card_ids),
+            card_ids=card_ids,
+        ),
+    )
 
 
 def suspend_note(
@@ -222,13 +292,27 @@ def suspend_note(
     parent: QWidget,
     note_ids: Sequence[NoteId],
 ) -> CollectionOp[OpChangesWithCount]:
-    return CollectionOp(parent, lambda col: col.sched.suspend_notes(note_ids))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.suspend_notes(note_ids),
+            note_ids=note_ids,
+        ),
+    )
 
 
 def unsuspend_cards(
     *, parent: QWidget, card_ids: Sequence[CardId]
 ) -> CollectionOp[OpChanges]:
-    return CollectionOp(parent, lambda col: col.sched.unsuspend_cards(card_ids))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.unsuspend_cards(card_ids),
+            card_ids=card_ids,
+        ),
+    )
 
 
 def bury_cards(
@@ -236,7 +320,14 @@ def bury_cards(
     parent: QWidget,
     card_ids: Sequence[CardId],
 ) -> CollectionOp[OpChangesWithCount]:
-    return CollectionOp(parent, lambda col: col.sched.bury_cards(card_ids))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.bury_cards(card_ids),
+            card_ids=card_ids,
+        ),
+    )
 
 
 def bury_notes(
@@ -244,31 +335,201 @@ def bury_notes(
     parent: QWidget,
     note_ids: Sequence[NoteId],
 ) -> CollectionOp[OpChangesWithCount]:
-    return CollectionOp(parent, lambda col: col.sched.bury_notes(note_ids))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.bury_notes(note_ids),
+            note_ids=note_ids,
+        ),
+    )
 
 
 def unbury_cards(
     *, parent: QWidget, card_ids: Sequence[CardId]
 ) -> CollectionOp[OpChanges]:
-    return CollectionOp(parent, lambda col: col.sched.unbury_cards(card_ids))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.unbury_cards(card_ids),
+            card_ids=card_ids,
+        ),
+    )
+
+
+class FilteredDeckRwkvPolicy(enum.Enum):
+    WARM_UP = "warm_up"
+    REQUIRE_STATE = "require_state"
+    SKIP = "skip"
+
+
+class RwkvFilteredDeckStateCold(Exception):
+    def __init__(
+        self,
+        message: str = "RWKV state is not ready; build it before building this filtered deck.",
+    ) -> None:
+        super().__init__(message)
 
 
 def rebuild_filtered_deck(
-    *, parent: QWidget, deck_id: DeckId
+    *,
+    parent: QWidget,
+    deck_id: DeckId,
+    rwkv_policy: FilteredDeckRwkvPolicy = FilteredDeckRwkvPolicy.WARM_UP,
 ) -> CollectionOp[OpChangesWithCount]:
-    return CollectionOp(parent, lambda col: col.sched.rebuild_filtered_deck(deck_id))
+    return CollectionOp(
+        parent, lambda col: _rebuild_filtered_deck(col, deck_id, rwkv_policy)
+    )
 
 
 def empty_filtered_deck(*, parent: QWidget, deck_id: DeckId) -> CollectionOp[OpChanges]:
-    return CollectionOp(parent, lambda col: col.sched.empty_filtered_deck(deck_id))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.empty_filtered_deck(deck_id),
+            require_no_preset_overlay=True,
+        ),
+    )
 
 
 def add_or_update_filtered_deck(
     *,
     parent: QWidget,
     deck: FilteredDeckForUpdate,
+    rwkv_policy: FilteredDeckRwkvPolicy = FilteredDeckRwkvPolicy.WARM_UP,
 ) -> CollectionOp[OpChangesWithId]:
-    return CollectionOp(parent, lambda col: col.sched.add_or_update_filtered_deck(deck))
+    return CollectionOp(
+        parent, lambda col: _add_or_update_filtered_deck(col, deck, rwkv_policy)
+    )
+
+
+def _rebuild_filtered_deck(
+    col: Collection,
+    deck_id: DeckId,
+    rwkv_policy: FilteredDeckRwkvPolicy = FilteredDeckRwkvPolicy.WARM_UP,
+) -> OpChangesWithCount:
+    deck = col.sched.get_or_create_filtered_deck(deck_id=deck_id)
+    if rwkv_policy is FilteredDeckRwkvPolicy.SKIP:
+        _log_filtered_deck_rwkv_skip(deck, operation="rebuild")
+    else:
+        _prepare_filtered_deck_retrievability_scores(
+            col, deck, operation="rebuild", rwkv_policy=rwkv_policy
+        )
+    return _run_preserving_rwkv_state(
+        col,
+        lambda: col.sched.rebuild_filtered_deck(deck_id),
+        require_no_preset_overlay=True,
+    )
+
+
+def _add_or_update_filtered_deck(
+    col: Collection,
+    deck: FilteredDeckForUpdate,
+    rwkv_policy: FilteredDeckRwkvPolicy = FilteredDeckRwkvPolicy.WARM_UP,
+) -> OpChangesWithId:
+    if rwkv_policy is FilteredDeckRwkvPolicy.SKIP:
+        _log_filtered_deck_rwkv_skip(deck, operation="add_or_update")
+    else:
+        _prepare_filtered_deck_retrievability_scores(
+            col, deck, operation="add_or_update", rwkv_policy=rwkv_policy
+        )
+    return _run_preserving_rwkv_state(
+        col,
+        lambda: col.sched.add_or_update_filtered_deck(deck),
+        require_no_preset_overlay=True,
+    )
+
+
+def _filtered_deck_log_context(deck: FilteredDeckForUpdate, *, operation: str) -> str:
+    order_names = {
+        value: name for name, value in FilteredDeckConfig.SearchTerm.Order.items()
+    }
+    filters = [
+        {
+            "filter": index,
+            "search": term.search,
+            "limit": term.limit,
+            "order": order_names.get(term.order, term.order),
+        }
+        for index, term in enumerate(deck.config.search_terms[:2], start=1)
+    ]
+    return (
+        f"operation={operation} deck_id={deck.id} deck_name={deck.name!r} "
+        f"reschedule={deck.config.reschedule} filters={filters!r}"
+    )
+
+
+def _log_filtered_deck_rwkv_skip(
+    deck: FilteredDeckForUpdate, *, operation: str
+) -> None:
+    from aqt import rwkv_scheduler
+
+    rwkv_scheduler.logger.info(
+        "RWKV preparation skipped by user choice; FSRS retrievability order is used: %s",
+        _filtered_deck_log_context(deck, operation=operation),
+    )
+
+
+def _prepare_filtered_deck_retrievability_scores(
+    col: Collection,
+    deck: FilteredDeckForUpdate,
+    *,
+    operation: str,
+    rwkv_policy: FilteredDeckRwkvPolicy = FilteredDeckRwkvPolicy.WARM_UP,
+) -> None:
+    from aqt import rwkv_scheduler
+
+    logger = rwkv_scheduler.logger
+    log_context = _filtered_deck_log_context(deck, operation=operation)
+    logger.debug(
+        "RWKV filtered-deck preparation started: %s",
+        log_context,
+    )
+    start = time.monotonic()
+    mw = aqt.mw
+    if mw is not None and mw.col is col:
+        reviewer = getattr(mw, "reviewer", None) or SimpleNamespace(mw=mw)
+    else:
+        reviewer = SimpleNamespace(mw=SimpleNamespace(col=col))
+    try:
+        status = rwkv_scheduler.prepare_filtered_deck_retrievability_scores(
+            reviewer,
+            deck.config,
+            allow_full_replay=rwkv_policy is FilteredDeckRwkvPolicy.WARM_UP,
+        )
+    except Exception:
+        logger.exception(
+            "RWKV filtered-deck preparation raised: %s elapsed_ms=%.1f",
+            log_context,
+            (time.monotonic() - start) * 1000,
+        )
+        raise
+    if status is rwkv_scheduler.RwkvStatsPreparationStatus.COLD:
+        logger.info(
+            "RWKV filtered-deck preparation needs state: %s status=cold elapsed_ms=%.1f",
+            log_context,
+            (time.monotonic() - start) * 1000,
+        )
+        raise RwkvFilteredDeckStateCold()
+    if status in {
+        rwkv_scheduler.RwkvStatsPreparationStatus.PENDING,
+        rwkv_scheduler.RwkvStatsPreparationStatus.FAILED,
+    }:
+        logger.warning(
+            "RWKV filtered-deck preparation failed: %s status=%s elapsed_ms=%.1f",
+            log_context,
+            status.value,
+            (time.monotonic() - start) * 1000,
+        )
+        raise RuntimeError(tr.qt_misc_rwkv_filtered_deck_preparation_failed())
+    logger.debug(
+        "RWKV filtered-deck preparation finished: %s status=%s elapsed_ms=%.1f",
+        log_context,
+        status.value if status is not None else "not_required",
+        (time.monotonic() - start) * 1000,
+    )
 
 
 def unbury_deck(
@@ -278,7 +539,12 @@ def unbury_deck(
     mode: UnburyDeck.Mode.V = UnburyDeck.ALL,
 ) -> CollectionOp[OpChanges]:
     return CollectionOp(
-        parent, lambda col: col.sched.unbury_deck(deck_id=deck_id, mode=mode)
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.unbury_deck(deck_id=deck_id, mode=mode),
+            require_no_preset_overlay=True,
+        ),
     )
 
 
@@ -286,10 +552,14 @@ def answer_card(
     *,
     parent: QWidget,
     answer: CardAnswer,
+    after_answer: Callable[[], None] | None = None,
 ) -> CollectionOp[OpChanges]:
     def answer_v3(col: Collection) -> OpChanges:
         assert isinstance(col.sched, V3Scheduler)
-        return col.sched.answer_card(answer)
+        changes = col.sched.answer_card(answer)
+        if after_answer is not None:
+            after_answer()
+        return changes
 
     return CollectionOp(parent, answer_v3)
 
@@ -299,4 +569,11 @@ def custom_study(
     parent: QWidget,
     request: CustomStudyRequest,
 ) -> CollectionOp[OpChanges]:
-    return CollectionOp(parent, lambda col: col.sched.custom_study(request))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.sched.custom_study(request),
+            require_no_preset_overlay=True,
+        ),
+    )

@@ -16,7 +16,12 @@ service StatsService {
   rpc Graphs(GraphsRequest) returns (GraphsResponse);
   rpc GetGraphPreferences(generic.Empty) returns (GraphPreferences);
   rpc SetGraphPreferences(GraphPreferences) returns (generic.Empty);
+<<<<<<< HEAD
   rpc CardMemoryMetrics(CardMemoryMetricsRequest) returns (CardMemoryMetricsResponse);
+=======
+  rpc CardMemoryMetrics(CardMemoryMetricsRequest)
+      returns (CardMemoryMetricsResponse);
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
   rpc CardDetails(CardDetailsRequest) returns (CardDetailsResponse);
 }
 
@@ -131,10 +136,16 @@ message CardStatsResponse {
   optional string original_deck = 22;
   optional float desired_retention = 23;
   repeated float fsrs_params = 24;
+<<<<<<< HEAD
   bool fsrs_enabled = 25;
   repeated CardInfoRow extra_rows = 26;
   // Desktop diagnostics may be temporarily busy or waiting for state recovery.
   bool rwkv_retry_pending = 27;
+=======
+  repeated CardInfoRow extra_rows = 25;
+  // Desktop diagnostics may be temporarily busy or waiting for state recovery.
+  bool rwkv_retry_pending = 26;
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 }
 
 message GraphsRequest {

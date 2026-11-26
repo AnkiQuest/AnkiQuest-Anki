@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! The offline runtime's RWKV: the fork's 2.76M-parameter model
@@ -55,8 +59,48 @@ fn small_precision(precision: StatePrecision) -> rwkv_small::StatePrecision {
     }
 }
 
+<<<<<<< HEAD
 /// The four answers' intervals in days and their S90s.
 type CurvePair = ([Option<f32>; 4], [Option<f32>; 4]);
+=======
+fn small_inputs(inputs: Vec<ReviewInput>) -> Vec<rwkv_small::ReviewInput> {
+    inputs
+        .into_iter()
+        .map(|input| {
+            let ReviewInput {
+                card_id,
+                note_id,
+                deck_id,
+                preset_id,
+                is_query,
+                ease,
+                duration_millis,
+                card_type,
+                day_offset,
+                current_elapsed_days,
+                current_elapsed_seconds,
+                target_retentions,
+                enforce_grade_order,
+            } = input;
+            rwkv_small::ReviewInput {
+                card_id,
+                note_id,
+                deck_id,
+                preset_id,
+                is_query,
+                ease,
+                duration_millis,
+                card_type,
+                day_offset,
+                current_elapsed_days,
+                current_elapsed_seconds,
+                target_retentions,
+                enforce_grade_order,
+            }
+        })
+        .collect()
+}
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 
 impl Engine {
     pub(super) fn load_with_precision(
@@ -186,7 +230,13 @@ impl Engine {
     ) -> io::Result<Vec<(usize, f32)>> {
         match self {
             Self::Big(engine) => engine.warm_up_reviews(reviews, record_predictions),
+<<<<<<< HEAD
             Self::Small(engine) => engine.warm_up_reviews(reviews, record_predictions),
+=======
+            Self::Small(engine) => {
+                engine.warm_up_reviews(small_inputs(reviews), record_predictions)
+            }
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             // both models see every answer, in parallel; the recorded
             // predictions are RWKV-Instant's recall
             Self::Pair { curve, instant } => {
@@ -205,7 +255,14 @@ impl Engine {
     /// unrounded intervals in days at the input's target retentions, and
     /// their S90s (the desktop's `predict_many`: a query pass plus one per
     /// simulated answer).
+<<<<<<< HEAD
     pub(super) fn curve_from_warm_up(&mut self, input: ReviewInput) -> io::Result<CurvePair> {
+=======
+    pub(super) fn curve_from_warm_up(
+        &mut self,
+        input: ReviewInput,
+    ) -> io::Result<([Option<f32>; 4], [Option<f32>; 4])> {
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         Ok(match self {
             Self::Big(engine) => {
                 let state = engine.warm_up_state(&input);
@@ -214,6 +271,10 @@ impl Engine {
                 out.first().map(|o| (o.intervals, o.s90s))
             }
             Self::Small(engine) => {
+<<<<<<< HEAD
+=======
+                let input = small_inputs(vec![input]).remove(0);
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
                 let state = engine.warm_up_state(&input);
                 let out = engine
                     .predict_many(vec![rwkv_small::ReviewPredictionRequest { input, state }])?;
@@ -249,7 +310,11 @@ impl Engine {
                     .collect()
             }
             Self::Small(engine) => {
+<<<<<<< HEAD
                 let requests = inputs
+=======
+                let requests = small_inputs(inputs)
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
                     .into_iter()
                     .map(|input| {
                         let state = engine.warm_up_state(&input);
@@ -272,7 +337,13 @@ impl Engine {
     ) -> io::Result<Vec<f32>> {
         match self {
             Self::Big(engine) => engine.predict_retrievability_many_from_warm_up(inputs),
+<<<<<<< HEAD
             Self::Small(engine) => engine.predict_retrievability_many_from_warm_up(inputs),
+=======
+            Self::Small(engine) => {
+                engine.predict_retrievability_many_from_warm_up(small_inputs(inputs))
+            }
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             Self::Pair { instant, .. } => instant.predict_retrievability_many_from_warm_up(inputs),
         }
     }
@@ -358,10 +429,13 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn sm72_offline_engine_enables_the_leak_free_rule() {
         let weights = model_file("sm72/weights.f32.bin");
         let predict = |precision, leak_free| {
@@ -445,10 +519,13 @@ mod tests {
     /// alone and RWKV-Curve as its two-head model alone, and its saved
     /// state loads back to the same answers.
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn a_pair_is_its_two_models_side_by_side() {
         let load = |file: &str| {
             Engine::load_with_precision(model_file(file), 0.9, 36_500, StatePrecision::Int8, true)

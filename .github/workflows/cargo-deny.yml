@@ -3,9 +3,15 @@ name: cargo-deny
 on:
   workflow_dispatch:
   push:
+<<<<<<< HEAD
     branches: [main, master, 'release/**']
   pull_request:
     branches: [main, master]
+=======
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main]
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     types: [opened, synchronize, reopened]
     paths:
       - "Cargo.lock"
@@ -26,17 +32,29 @@ jobs:
     permissions:
       contents: read
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+=======
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         with:
           persist-credentials: false
 
       - name: Install Rust toolchain
+<<<<<<< HEAD
         uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 #v2.0.1
+=======
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 #v1
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         with:
           cache: false
 
       - name: Install cargo-deny
+<<<<<<< HEAD
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
+=======
+        uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 #v2.85.7
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         with:
           tool: |
             cargo-deny@0.20.2

@@ -87,10 +87,14 @@ pub struct DeckConfSchema11 {
     fsrs_params_6: Vec<f32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     fsrs_params_7: Vec<f32>,
+<<<<<<< HEAD
     #[serde(
         default = "default_fsrs_minimum_interval_secs",
         skip_serializing_if = "is_default_fsrs_minimum_interval_secs"
     )]
+=======
+    #[serde(default, skip_serializing_if = "is_default_fsrs_minimum_interval_secs")]
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fsrs_minimum_interval_secs: u32,
     #[serde(default, skip_serializing_if = "is_false")]
     fsrs_dynamic_desired_retention_enabled: bool,
@@ -211,6 +215,7 @@ fn is_false(value: &bool) -> bool {
     !value
 }
 
+<<<<<<< HEAD
 const DEFAULT_FSRS_MINIMUM_INTERVAL_SECS: u32 = 1;
 
 fn default_fsrs_minimum_interval_secs() -> u32 {
@@ -219,6 +224,10 @@ fn default_fsrs_minimum_interval_secs() -> u32 {
 
 fn is_default_fsrs_minimum_interval_secs(value: &u32) -> bool {
     *value == DEFAULT_FSRS_MINIMUM_INTERVAL_SECS
+=======
+fn is_default_fsrs_minimum_interval_secs(value: &u32) -> bool {
+    *value == 1
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 }
 
 fn default_rwkv_review_batch_size() -> u32 {

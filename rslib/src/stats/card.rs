@@ -109,7 +109,10 @@ impl Collection {
                 None
             },
             desired_retention: card.desired_retention,
+<<<<<<< HEAD
             fsrs_enabled,
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             extra_rows: vec![],
             rwkv_retry_pending: false,
         })

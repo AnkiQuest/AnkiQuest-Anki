@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use std::borrow::Cow;
@@ -485,7 +489,11 @@ impl WarmUpStateSpill {
             // Only one serialized module is held at a time. Do not build a
             // serialized snapshot or drain the maps before publishing the file.
             for (id, state) in states.iter() {
+<<<<<<< HEAD
                 let bytes = serialize_module_state(state);
+=======
+                let bytes = serialize_module_state(&state);
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
                 max_state_bytes = max_state_bytes.max(bytes.len());
                 io::Write::write_all(&mut out, &id.to_le_bytes())?;
                 hasher.update(&id.to_le_bytes());
@@ -4027,10 +4035,15 @@ impl<'a> Cursor<'a> {
         // decoding element by element on the state-restore path.
         Ok(self
             .bytes(byte_len)?
+<<<<<<< HEAD
             .as_chunks::<{ std::mem::size_of::<f32>() }>()
             .0
             .iter()
             .map(|bytes| f32::from_le_bytes(*bytes))
+=======
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             .collect())
     }
 
@@ -4368,7 +4381,11 @@ impl SrsModel {
             .apply_batch(&scratch.head, rows, &mut scratch.logits);
         for (retrievability, logits) in retrievabilities
             .iter_mut()
+<<<<<<< HEAD
             .zip(scratch.logits.as_chunks::<4>().0)
+=======
+            .zip(scratch.logits.chunks_exact(4))
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         {
             let mut probabilities = [0.0; 4];
             softmax_into(logits, &mut probabilities);
@@ -5729,10 +5746,15 @@ fn read_half_module_state(
         input.read_exact(buffer)?;
         Ok(Some(
             buffer
+<<<<<<< HEAD
                 .as_chunks::<2>()
                 .0
                 .iter()
                 .map(|bytes| half::f16::from_le_bytes(*bytes).to_f32())
+=======
+                .chunks_exact(2)
+                .map(|bytes| half::f16::from_le_bytes([bytes[0], bytes[1]]).to_f32())
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
                 .collect(),
         ))
     }
@@ -6507,9 +6529,13 @@ fn write_f32_slice(out: &mut Vec<u8>, values: &[f32]) {
     let start = out.len();
     out.resize(start + std::mem::size_of_val(values), 0);
     for (bytes, value) in out[start..]
+<<<<<<< HEAD
         .as_chunks_mut::<{ std::mem::size_of::<f32>() }>()
         .0
         .iter_mut()
+=======
+        .chunks_exact_mut(std::mem::size_of::<f32>())
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         .zip(values)
     {
         bytes.copy_from_slice(&value.to_le_bytes());
@@ -6520,7 +6546,11 @@ fn write_state_cache_f32_slice(out: &mut impl io::Write, values: &[f32]) -> io::
     write_state_cache_u32(out, values.len())?;
     let mut buffer = [0_u8; 8192];
     for values in values.chunks(buffer.len() / 4) {
+<<<<<<< HEAD
         for (destination, value) in buffer.as_chunks_mut::<4>().0.iter_mut().zip(values) {
+=======
+        for (destination, value) in buffer.chunks_exact_mut(4).zip(values) {
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             destination.copy_from_slice(&value.to_le_bytes());
         }
         out.write_all(&buffer[..values.len() * 4])?;
@@ -9494,7 +9524,11 @@ fn time_shift_mix_row(
     for channel in 0..D_MODEL {
         shift_delta[channel] = x_shift[channel] - x[channel];
     }
+<<<<<<< HEAD
     for (mixed, weights) in mixed.iter_mut().zip(lerp_weights.as_chunks::<D_MODEL>().0) {
+=======
+    for (mixed, weights) in mixed.iter_mut().zip(lerp_weights.chunks_exact(D_MODEL)) {
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         let mixed = &mut mixed[row * D_MODEL..(row + 1) * D_MODEL];
         for channel in 0..D_MODEL {
             mixed[channel] = x[channel] + weights[channel] * shift_delta[channel];
@@ -12047,7 +12081,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn spill_stash_restores_empty_resident_state() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12067,7 +12104,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn spill_restore_keeps_stash_for_retry_when_file_is_missing_truncated_or_corrupt() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12136,7 +12176,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn discard_stashed_warm_up_state_allows_another_stash() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12171,7 +12214,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn discard_stashed_warm_up_state_ignores_spill_delete_errors() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12189,7 +12235,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn spill_write_failure_keeps_resident_state_and_allows_in_memory_stash() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12368,7 +12417,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn full_state_checkpoint_bounds_sqlite_memory() {
         // SQLite's memory high-water counter is process-wide. Isolate this
         // measurement from other tests, including when the suite runs in parallel.
@@ -13064,7 +13116,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn batched_retrievability_matches_scalar_query_path() {
         let model_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(MODEL_PATH);
         assert!(model_path.exists(), "RWKV parity model is missing");

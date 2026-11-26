@@ -4,13 +4,33 @@
 from __future__ import annotations
 
 import html
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import TypeVar
 
-from anki.collection import OpChanges, OpChangesWithCount, OpChangesWithId
+from anki.collection import Collection, OpChanges, OpChangesWithCount, OpChangesWithId
 from anki.decks import DeckCollapseScope, DeckDict, DeckId, UpdateDeckConfigs
 from aqt.operations import CollectionOp
 from aqt.qt import QWidget
 from aqt.utils import getOnlyText, tooltip, tr
+
+_T = TypeVar("_T")
+
+
+def _run_preserving_rwkv_state(
+    col: Collection,
+    mutation: Callable[[], _T],
+    *,
+    card_ids: Sequence[int] = (),
+    require_no_preset_overlay: bool = False,
+) -> _T:
+    from aqt import rwkv_scheduler
+
+    return rwkv_scheduler.run_collection_mutation_preserving_rwkv_state(
+        col,
+        mutation,
+        card_ids=card_ids,
+        require_no_preset_overlay=require_no_preset_overlay,
+    )
 
 
 def remove_decks(
@@ -19,7 +39,27 @@ def remove_decks(
     deck_ids: Sequence[DeckId],
     deck_name: str,
 ) -> CollectionOp[OpChangesWithCount]:
-    return CollectionOp(parent, lambda col: col.decks.remove(deck_ids)).success(
+    def remove_preserving_rwkv_state(col: Collection) -> OpChangesWithCount:
+        affected_deck_ids = sorted(
+            {
+                child_id
+                for deck_id in deck_ids
+                for child_id in col.decks.deck_and_child_ids(deck_id)
+            }
+        )
+        # The did search includes cards borrowed by other filtered decks too.
+        card_ids = (
+            col.find_cards(f"did:{','.join(str(did) for did in affected_deck_ids)}")
+            if affected_deck_ids
+            else []
+        )
+        return _run_preserving_rwkv_state(
+            col,
+            lambda: col.decks.remove(deck_ids),
+            card_ids=card_ids,
+        )
+
+    return CollectionOp(parent, remove_preserving_rwkv_state).success(
         lambda out: tooltip(
             tr.browsing_cards_deleted_with_deckname(
                 count=out.count,
@@ -34,7 +74,12 @@ def reparent_decks(
     *, parent: QWidget, deck_ids: Sequence[DeckId], new_parent: DeckId
 ) -> CollectionOp[OpChangesWithCount]:
     return CollectionOp(
-        parent, lambda col: col.decks.reparent(deck_ids=deck_ids, new_parent=new_parent)
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.decks.reparent(deck_ids=deck_ids, new_parent=new_parent),
+            require_no_preset_overlay=True,
+        ),
     ).success(
         lambda out: tooltip(
             tr.browsing_reparented_decks(count=out.count), parent=parent
@@ -50,7 +95,11 @@ def rename_deck(
 ) -> CollectionOp[OpChanges]:
     return CollectionOp(
         parent,
-        lambda col: col.decks.rename(deck_id, new_name),
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.decks.rename(deck_id, new_name),
+            require_no_preset_overlay=True,
+        ),
     )
 
 
@@ -71,7 +120,13 @@ def add_deck_dialog(
 
 
 def add_deck(*, parent: QWidget, name: str) -> CollectionOp[OpChangesWithId]:
-    return CollectionOp(parent, lambda col: col.decks.add_normal_deck_with_name(name))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.decks.add_normal_deck_with_name(name),
+        ),
+    )
 
 
 def set_deck_collapsed(
@@ -83,14 +138,25 @@ def set_deck_collapsed(
 ) -> CollectionOp[OpChanges]:
     return CollectionOp(
         parent,
-        lambda col: col.decks.set_collapsed(
-            deck_id=deck_id, collapsed=collapsed, scope=scope
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.decks.set_collapsed(
+                deck_id=deck_id,
+                collapsed=collapsed,
+                scope=scope,
+            ),
         ),
     )
 
 
 def set_current_deck(*, parent: QWidget, deck_id: DeckId) -> CollectionOp[OpChanges]:
-    return CollectionOp(parent, lambda col: col.decks.set_current(deck_id))
+    return CollectionOp(
+        parent,
+        lambda col: _run_preserving_rwkv_state(
+            col,
+            lambda: col.decks.set_current(deck_id),
+        ),
+    )
 
 
 def update_deck_configs(

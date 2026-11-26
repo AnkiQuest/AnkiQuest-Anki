@@ -1,5 +1,5 @@
 name: Setup Anki Build Environment
-description: Install system dependencies, Rust toolchain, uv, and n2
+description: Install system dependencies, Rust toolchain, uv, just, and n2
 
 runs:
   using: composite
@@ -79,7 +79,11 @@ runs:
       id: setup-uv
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 #v10.3.3
       with:
+<<<<<<< HEAD
         version-file: ".tool-versions"
+=======
+        version: "0.13.6"
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         enable-cache: true
         cache-python: true
         prune-cache: ${{ runner.os != 'Windows' }} # Windows file-locking breaks cache pruning
@@ -109,6 +113,9 @@ runs:
     - name: Add CARGO_HOME/bin to PATH
       shell: bash
       run: echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> "$GITHUB_PATH" # zizmor: ignore[github-env]
+
+    - name: Install just
+      uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4
 
     - name: Install n2
       shell: bash

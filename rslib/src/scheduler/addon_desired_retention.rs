@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Mobile evaluation of the Dynamic Desired Retention add-on's synced rules.
@@ -493,7 +497,11 @@ impl AddonRetentionRules {
                 }
             };
             let allowed = |id: &CardId| {
+<<<<<<< HEAD
                 scope.as_ref().is_none_or(|scope| scope.contains(id)) && !exclusion.contains(id)
+=======
+                scope.as_ref().map_or(true, |scope| scope.contains(id)) && !exclusion.contains(id)
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             };
             // Without a scope/exclusion search, the population depends only
             // on note fields and card/note membership, not on review answers.

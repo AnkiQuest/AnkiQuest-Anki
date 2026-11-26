@@ -222,6 +222,7 @@ impl From<anki_proto::deck_config::DeckConfigId> for DeckConfigId {
 
 #[cfg(test)]
 mod tests {
+<<<<<<< HEAD
     use std::assert_matches;
 
     use anki_proto::generic::Json;
@@ -602,6 +603,9 @@ mod tests {
 
         assert_matches!(result, Err(AnkiError::InvalidInput { .. }));
     }
+=======
+    use super::*;
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 
     #[test]
     fn update_deck_configs_request_defaults_missing_review_fuzz() {

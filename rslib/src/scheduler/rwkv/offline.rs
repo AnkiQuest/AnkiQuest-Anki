@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! RWKV-Instant without the desktop's Python.
@@ -65,9 +69,12 @@ use crate::storage::RWKV_HISTORY_RESET_AFTER_SQL;
 #[cfg(test)]
 #[path = "offline_review_kind_tests.rs"]
 mod review_kind_tests;
+<<<<<<< HEAD
 #[cfg(test)]
 #[path = "offline_unload_tests.rs"]
 mod unload_tests;
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 #[path = "offline_workload.rs"]
 mod workload;
 
@@ -748,6 +755,7 @@ impl Collection {
         input: RwkvPrepareOfflineRequest,
     ) -> Result<RwkvPrepareOfflineResponse> {
         require!(!input.model_path.is_empty(), "missing RWKV model path");
+<<<<<<< HEAD
 
         // The model files come from the user, not from the app's assets: say
         // which one is missing now, instead of failing later on the build
@@ -758,6 +766,8 @@ impl Collection {
                 "RWKV model file not found: {model_path}"
             );
         }
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         require!(
             input.model_kind.is_empty() || input.model_kind == "sm72",
             "unsupported RWKV offline model kind"
@@ -824,6 +834,7 @@ impl Collection {
         Ok(RwkvPrepareOfflineResponse { reviews_replayed })
     }
 
+<<<<<<< HEAD
     /// Turns the offline RWKV layer off without a restart: forgets the model
     /// `RwkvPrepareOffline` registered, drops the runtime and every score it
     /// installed, so the next queue build and deck count use the preset's
@@ -858,6 +869,8 @@ impl Collection {
         self.state.rwkv_last_review_times.clear();
     }
 
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     /// Scores every Instant-enabled deck now and installs the deck count
     /// scores, in one call.
     ///
@@ -1413,7 +1426,11 @@ impl Collection {
         const FILTERED: u32 = 3;
         Ok(match (previous_kind, previous_ease) {
             (1, 1) | (2, 1 | 2) => Some(RELEARNING),
+<<<<<<< HEAD
             (0..=2, _) => Some(FILTERED),
+=======
+            (0 | 1 | 2, _) => Some(FILTERED),
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             // Only a synthetic repeat chains; a real filtered-deck answer
             // returns to Review when the card is answered normally.
             (3, _)
@@ -2373,10 +2390,13 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn same_day_review_kind_ignores_reviews_before_reset() -> Result<()> {
         let (mut col, _dir) = open_fs_test_collection("rwkv-same-day-reset");
         let card_id = CardAdder::new().add(&mut col)[0].id;
@@ -2447,10 +2467,13 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn first_answer_after_unlogged_reset_updates_the_resident_model() -> Result<()> {
         let (mut col, _dir) = open_fs_test_collection("rwkv-new-reset-model");
         let first = CardAdder::new().add(&mut col)[0].id;

@@ -2704,9 +2704,13 @@ pub(crate) mod tests {
                 .collect_vec();
             expected.sort_by_key(|row| row.0);
             let actual = bytes
+<<<<<<< HEAD
                 .as_chunks::<12>()
                 .0
                 .iter()
+=======
+                .chunks_exact(12)
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
                 .map(|chunk| {
                     (
                         i64::from_le_bytes(chunk[..8].try_into().unwrap()),
