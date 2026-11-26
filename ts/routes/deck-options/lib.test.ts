@@ -212,6 +212,23 @@ test("deck list", () => {
     expect(out.removedConfigIds).toStrictEqual([1618570764780n]);
 });
 
+test("any preset using RWKV, the current one as edited", () => {
+    const state = startingState();
+    expect(state.anyPresetUsesRwkv(get(state.currentConfig))).toBe(false);
+
+    // The current preset, edited but not saved.
+    state.currentConfig.update((config) => {
+        config.rwkvReviewEnabled = true;
+        return config;
+    });
+    expect(state.anyPresetUsesRwkv(get(state.currentConfig))).toBe(true);
+
+    // Another preset: the edited one is no longer current.
+    state.setCurrentIndex(1);
+    expect(get(state.currentConfig).rwkvReviewEnabled).toBe(false);
+    expect(state.anyPresetUsesRwkv(get(state.currentConfig))).toBe(true);
+});
+
 test("duplicate name", () => {
     const state = startingState();
 

@@ -390,6 +390,8 @@ deck-config-rwkv-single-model = Use one model for RWKV
 deck-config-rwkv-single-model-explanation = When your presets use both RWKV-Instant and RWKV-Curve (including as Instant's fallback), each normally uses its own model of the chosen size. Turn this on to use the size's Curve model for both: it uses less memory, but Instant predictions are slightly less accurate.
 deck-config-rwkv-single-model-instant-only = If you use Instant without Curve, the size's Instant model always runs alone. FSRS supplies due dates and memory states, and RWKV workload simulation is unavailable.
 deck-config-rwkv-workload-needs-curve = RWKV workload simulation needs RWKV-Curve. Turn on RWKV-Curve in a preset (as its scheduler or as RWKV-Instant's fallback) and save to simulate RWKV workload.
+deck-config-rwkv-optimize-all = Some presets use RWKV-Curve or RWKV-Instant. Optimize All Presets fits only their FSRS fallback parameters; the RWKV model isn't trained by it.
+deck-config-rwkv-optimize-current = This preset uses RWKV-Curve or RWKV-Instant. Optimizing fits only its FSRS fallback parameters; the RWKV model isn't trained by it.
 deck-config-rwkv-model-size-migration = Older small models saved by earlier versions switch to Small when you save.
 # Preserve the links and URL variables.
 deck-config-rwkv-model-results = Results: <a href="{ $factory }">Model Factory results</a> · <a href="{ $backup }">Matched backup comparison</a>

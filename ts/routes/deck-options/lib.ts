@@ -19,6 +19,8 @@ import { get, readable, writable } from "svelte/store";
 
 import type { DynamicSvelteComponent } from "#lib/sveltelib/dynamicComponent.js";
 
+import { usesRwkv } from "./scheduler-choice";
+
 export type DeckOptionsId = bigint;
 
 export interface ConfigWithCount {
@@ -286,6 +288,15 @@ export class DeckOptionsState {
             fsrsHealthCheck: get(this.fsrsHealthCheck),
             ...this.schedulerFlags,
         };
+    }
+
+    /** Whether the current preset, as edited, or any other preset schedules with RWKV. */
+    anyPresetUsesRwkv(current: DeckConfig_Config): boolean {
+        return usesRwkv(current)
+            || this.configs.some((entry, idx) =>
+                idx !== this.selectedIdx && entry.config.config !== undefined
+                && usesRwkv(entry.config.config)
+            );
     }
 
     presetAssignmentsChanged(): boolean {
