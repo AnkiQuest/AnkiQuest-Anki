@@ -70,6 +70,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     function offlineRwkvCounts(progress: RwkvOfflineInstantPassProgress): string {
         const reviews = Number(progress.reviewsAbsorbed).toLocaleString();
+        // status_only reports the last deck-list scoring: 0 right after a load
+        if (!progress.scored) {
+            return `${reviews} reviews absorbed`;
+        }
         return `${reviews} reviews absorbed, ${progress.scored.toLocaleString()} cards scored`;
     }
 
