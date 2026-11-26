@@ -16,6 +16,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import { isDesktop } from "@tslib/platform";
     import type Carousel from "bootstrap/js/dist/carousel";
     import type Modal from "bootstrap/js/dist/modal";
+    import { onDestroy } from "svelte";
 
     import DynamicallySlottable from "$lib/components/DynamicallySlottable.svelte";
     import CheckBox from "$lib/components/CheckBox.svelte";
@@ -53,6 +54,9 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     // Phones: the backend's offline layer (rslib/src/scheduler/rwkv/offline.rs)
     let rebuildingOfflineRwkvState = false;
     let offlineRwkvStatus = "";
+    let statusTimer: ReturnType<typeof setTimeout> | undefined;
+    let statusTries = 0;
+    onDestroy(() => clearTimeout(statusTimer));
 
     async function offlineRwkvStep(
         restart: boolean,
@@ -69,12 +73,32 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         return `${reviews} reviews absorbed, ${progress.scored.toLocaleString()} cards scored`;
     }
 
+    /** Why RWKV is not active: failed to build, still loading, or neither. */
+    function offlineRwkvInactive(progress: RwkvOfflineInstantPassProgress): string {
+        if (progress.buildError) {
+            return `RWKV failed to load: ${progress.buildError}. Save the options to retry.`;
+        }
+        if (Number(progress.replayTotal) > 0) {
+            return (
+                "RWKV is loading on this device " +
+                `(${Number(progress.replayDone).toLocaleString()} / ` +
+                `${Number(progress.replayTotal).toLocaleString()} reviews).`
+            );
+        }
+        return "RWKV is not active on this device.";
+    }
+
     async function refreshOfflineRwkvStatus(): Promise<void> {
         try {
             const progress = await offlineRwkvStep(false);
             offlineRwkvStatus = progress.available
                 ? `RWKV is active: ${offlineRwkvCounts(progress)}.`
-                : "RWKV is not active on this device.";
+                : offlineRwkvInactive(progress);
+            // loading (no runtime, no error): ask again until it is in
+            clearTimeout(statusTimer);
+            if (!progress.available && !progress.buildError && statusTries++ < 150) {
+                statusTimer = setTimeout(() => void refreshOfflineRwkvStatus(), 2000);
+            }
         } catch (error) {
             offlineRwkvStatus = `RWKV status unavailable: ${error}`;
         }
@@ -91,7 +115,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                     `RWKV state rebuilt: ${replayed} reviews in ${seconds} s; ` +
                     `${progress.scored.toLocaleString()} cards scored.`;
             } else {
-                offlineRwkvStatus = "RWKV is not active on this device.";
+                offlineRwkvStatus = offlineRwkvInactive(progress);
             }
         } catch (error) {
             offlineRwkvStatus = `Rebuild failed: ${error}`;

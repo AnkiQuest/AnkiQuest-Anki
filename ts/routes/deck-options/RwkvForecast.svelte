@@ -21,6 +21,7 @@ for a typed DR the minimum is estimated (see minimumAt).
         RwkvOfflineForecastResponse,
     } from "@generated/anki/scheduler_pb";
     import { postProto } from "@generated/post";
+    import { onDestroy } from "svelte";
 
     /** The preset's name, escaped for a search. */
     export let presetSearch: string;
@@ -36,6 +37,11 @@ for a typed DR the minimum is estimated (see minimumAt).
     type Card = { recall: number; target: number; minimum: boolean; waiting: boolean };
     let cards: Card[] | null = null;
     let status = "computing…";
+    // while RWKV loads (no runtime yet, no error): ask again every POLL_MS
+    const POLL_MS = 2000;
+    const MAX_TRIES = 150;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function load(search: string): Promise<void> {
         try {
@@ -52,7 +58,16 @@ for a typed DR the minimum is estimated (see minimumAt).
             }
             if (!reply.available) {
                 cards = null;
-                status = "RWKV is not active on this device";
+                if (reply.buildError) {
+                    status = `RWKV failed to load: ${reply.buildError}. Save the options to retry.`;
+                } else {
+                    // the forecast call starts the build; ask again until it is in
+                    status = "RWKV is loading on this device…";
+                    if (tries++ < MAX_TRIES) {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => void load(search), POLL_MS);
+                    }
+                }
                 return;
             }
             cards = reply.cards.map((c) => ({
@@ -68,7 +83,14 @@ for a typed DR the minimum is estimated (see minimumAt).
         }
     }
 
-    $: void load(presetSearch);
+    // a function, so the reactive statement depends on presetSearch only (not timer/tries)
+    function restart(search: string): void {
+        tries = 0;
+        clearTimeout(timer);
+        void load(search);
+    }
+    $: restart(presetSearch);
+    onDestroy(() => clearTimeout(timer));
 
     /**
      * The cards "minimum reviews per day" adds at `target`. At the current DR, the backend's.
