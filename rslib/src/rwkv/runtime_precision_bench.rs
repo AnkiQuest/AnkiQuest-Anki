@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Offline, fresh-process runtime measurements driven by the Python profiler.
@@ -50,7 +54,11 @@ fn state_hash(inference: &RwkvInference) -> String {
     }
     let mut digest = DigestWriter(blake3::Hasher::new());
     for states in [
+<<<<<<< HEAD
         &inference.warm_up_states.card as &dyn StateMap,
+=======
+        &inference.warm_up_states.card,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         &inference.warm_up_states.note,
         &inference.warm_up_states.deck,
         &inference.warm_up_states.preset,
@@ -122,7 +130,10 @@ fn hybrid_runtime() -> RwkvInference {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn rwkv_hybrid_precision_preserves_replay_across_chunks() {
     let reviews = super::precision_tests::reviews(51);
     let mut sequential = hybrid_runtime();

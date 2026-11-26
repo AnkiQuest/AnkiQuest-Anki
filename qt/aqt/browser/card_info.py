@@ -4,14 +4,19 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from google.protobuf.json_format import MessageToDict
 
 import aqt
 from anki.cards import Card, CardId
+from anki.collection import OpChanges
 from anki.errors import NotFoundError
 from anki.lang import without_unicode_isolation
+from aqt import gui_hooks
 from aqt.qt import *
 from aqt.utils import (
     disable_help_button,
@@ -23,6 +28,14 @@ from aqt.utils import (
     tr,
 )
 from aqt.webview import AnkiWebView, AnkiWebViewKind
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CardInfoRow:
+    label: str
+    value: str
 
 
 class CardInfoDialog(QDialog):
@@ -123,6 +136,8 @@ class CardInfoDialog(QDialog):
         tooltip(tr.about_copied_to_clipboard())
 
     def update_card(self, card_id: CardId | None) -> None:
+        start = time.monotonic()
+        requested_card_id = card_id
         try:
             self.mw.col.get_card(card_id)
         except NotFoundError:
@@ -130,6 +145,12 @@ class CardInfoDialog(QDialog):
 
         assert self.web is not None
         self.web.eval(f"anki.updateCard('{card_id}');")
+        logger.debug(
+            "card info update requested: requested_card_id=%s card_id=%s elapsed_ms=%.1f",
+            requested_card_id,
+            card_id,
+            (time.monotonic() - start) * 1000,
+        )
 
     def reject(self) -> None:
         if self._on_close:
@@ -164,6 +185,8 @@ class CardInfoManager:
                 self.geometry_key,
                 self.window_title,
             )
+            gui_hooks.operation_did_execute.append(self._on_operation_did_execute)
+            gui_hooks.rwkv_state_did_prepare.append(self._on_rwkv_state_did_prepare)
 
     def set_card(self, card: Card | None) -> None:
         self._card = card
@@ -175,7 +198,23 @@ class CardInfoManager:
             self._dialog.reject()
 
     def _on_close(self) -> None:
+        gui_hooks.operation_did_execute.remove(self._on_operation_did_execute)
+        gui_hooks.rwkv_state_did_prepare.remove(self._on_rwkv_state_did_prepare)
         self._dialog = None
+
+    def _on_operation_did_execute(
+        self, changes: OpChanges, _handler: object | None
+    ) -> None:
+        if changes.deck or changes.deck_config or changes.config:
+            self._refresh()
+
+    def _on_rwkv_state_did_prepare(self, mw: aqt.AnkiQt) -> None:
+        if mw is self.mw:
+            self._refresh()
+
+    def _refresh(self) -> None:
+        if self._dialog and self._card:
+            self._dialog.update_card(self._card.id)
 
 
 class BrowserCardInfo(CardInfoManager):

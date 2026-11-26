@@ -69,6 +69,15 @@ pub(crate) struct CardData {
     pub(crate) last_review_time: Option<TimestampSecs>,
 
     #[serde(
+<<<<<<< HEAD
+=======
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "default_on_invalid"
+    )]
+    pub(crate) review_step_secs: Option<u32>,
+
+    #[serde(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         rename = "rwkv_reset_after",
         skip_serializing_if = "Option::is_none",
         deserialize_with = "default_on_invalid"
@@ -93,6 +102,10 @@ impl CardData {
             fsrs_desired_retention: card.desired_retention,
             decay: card.decay,
             last_review_time: card.last_review_time,
+<<<<<<< HEAD
+=======
+            review_step_secs: card.review_step_secs,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_history_reset_after: card.rwkv_history_reset_after,
             custom_data: card.custom_data.clone(),
         }
@@ -222,6 +235,10 @@ mod test {
             fsrs_desired_retention: Some(0.987654),
             decay: Some(0.123456),
             last_review_time: None,
+<<<<<<< HEAD
+=======
+            review_step_secs: None,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_history_reset_after: None,
             custom_data: "".to_string(),
         };

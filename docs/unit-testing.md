@@ -28,7 +28,7 @@ When adding a test:
 5. Give the test a name that explains the behavior being checked.
 6. Avoid dependencies on real time, network access, user data, or test order.
 7. For a bug fix, confirm that the test fails before the fix when practical.
-8. Run the relevant `just test-*` recipe and then `just check`.
+8. Run focused tests while editing and `just check-local` before committing.
 
 ## Purpose
 
@@ -446,19 +446,25 @@ directly.
 
 ## Running and validating tests
 
-Use the repository's `just` recipes:
+1. **While editing.** Run the tests that exercise the behavior you changed.
+   Use `just test-py-target` with specific Python test paths or case IDs,
+   or use the relevant stack recipe below.
+2. **Before committing.** Run `just check-local` for the build, formatting,
+   lint, and tests. It skips the installer tests and limits Cargo and Rust
+   test execution to two jobs each.
+3. **Before pushing or updating the installed app.** Run `just check` on the
+   commit you will push or install. It includes the installer tests. For a
+   draft release, also require all six CI platform checks to pass on that commit.
 
 ```sh
 just test-rust  # Rust
 just test-py    # Python library and Python/Qt
 just test-ts    # TypeScript/JavaScript/Svelte unit tests
 just test       # every stack (Rust, Python, TS)
-just check      # required final formatting, build, lint, and test validation
 ```
 
-During development, run the relevant stack frequently. Before considering a code
-change complete, run `just check`. See [Testing and Coverage](https://anki.mintlify.app/developers/testing-coverage)
-for coverage commands and [End-to-End Testing](https://anki.mintlify.app/developers/e2e-testing) when the
+Use [Testing and Coverage](https://anki.mintlify.app/developers/testing-coverage) for
+coverage commands and [End-to-End Testing](https://anki.mintlify.app/developers/e2e-testing) when the
 selected boundary requires Playwright.
 
 ## Review checklist
@@ -475,7 +481,7 @@ A test is ready when the answer to each relevant question is yes:
   refactoring?
 - For a bug fix, did the regression test fail before and pass after the fix when
   practical?
-- Do the relevant `just` test recipe and `just check` pass?
+- Do the relevant `just` test recipe and `just check-local` pass?
 
 ## Instructions for coding assistants
 

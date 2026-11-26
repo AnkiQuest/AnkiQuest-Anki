@@ -16,7 +16,7 @@ use crate::deckconfig::DeckConfig;
 use crate::deckconfig::DeckConfigId;
 use crate::prelude::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LimitKind {
     Review,
     New,
@@ -50,11 +50,24 @@ pub fn limit_if_today(limit: DayLimit, today: u32) -> Option<u32> {
     (limit.today == today).then_some(limit.limit)
 }
 
+/// A daily review limit at or above this value is effectively unlimited: it
+/// is the setting's maximum (`ensure_u32_valid` clamps to it) and the
+/// conventional "no limit". The deck's limit for today counts (today's
+/// override, else the deck override, else the preset), before subtracting
+/// cards studied today.
+pub(crate) const UNLIMITED_REVIEW_LIMIT: u32 = 9999;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct RemainingLimits {
     pub(crate) review: u32,
     pub(crate) new: u32,
     pub(crate) cap_new_to_review: bool,
+    /// The configured review limit is at least [UNLIMITED_REVIEW_LIMIT] for
+    /// this deck and, after [RemainingLimits::cap_to], for every parent whose
+    /// limits apply. Decks without config count as unlimited.
+    pub(crate) review_unlimited: bool,
+    /// Which daily allowance supplied the remaining new-card slots.
+    new_limit_kind: LimitKind,
 }
 
 impl RemainingLimits {
@@ -95,8 +108,9 @@ impl RemainingLimits {
         normal: &NormalDeck,
         config: &DeckConfig,
     ) -> RemainingLimits {
-        let mut review_limit =
-            current_review_limit(normal, today).unwrap_or(config.inner.reviews_per_day) as i32;
+        let configured_review_limit =
+            current_review_limit(normal, today).unwrap_or(config.inner.reviews_per_day);
+        let mut review_limit = configured_review_limit as i32;
         let mut new_limit =
             current_new_limit(normal, today).unwrap_or(config.inner.new_per_day) as i32;
         let (new_today_count, review_today_count) = deck.new_rev_counts(today);
@@ -105,14 +119,19 @@ impl RemainingLimits {
         new_limit -= new_today_count;
         if !new_cards_ignore_review_limit {
             review_limit -= new_today_count;
-            new_limit = new_limit.min(review_limit);
         }
 
-        Self {
+        let mut limits = Self {
             review: review_limit.max(0) as u32,
             new: new_limit.max(0) as u32,
             cap_new_to_review: !new_cards_ignore_review_limit,
+            review_unlimited: configured_review_limit >= UNLIMITED_REVIEW_LIMIT,
+            new_limit_kind: LimitKind::New,
+        };
+        if limits.cap_new_to_review {
+            limits.cap_new(limits.review, LimitKind::Review);
         }
+        limits
     }
 
     pub(crate) fn get(&self, kind: LimitKind) -> u32 {
@@ -124,7 +143,15 @@ impl RemainingLimits {
 
     pub(crate) fn cap_to(&mut self, limits: RemainingLimits) {
         self.review = self.review.min(limits.review);
-        self.new = self.new.min(limits.new);
+        self.review_unlimited &= limits.review_unlimited;
+        self.cap_new(limits.new, limits.new_limit_kind);
+    }
+
+    fn cap_new(&mut self, available: u32, kind: LimitKind) {
+        if available < self.new {
+            self.new = available;
+            self.new_limit_kind = kind;
+        }
     }
 
     /// True if some limit was decremented to 0.
@@ -134,7 +161,7 @@ impl RemainingLimits {
             LimitKind::Review => {
                 self.review = self.review.saturating_sub(count);
                 if self.cap_new_to_review {
-                    self.new = self.new.min(self.review);
+                    self.cap_new(self.review, LimitKind::Review);
                 }
             }
             LimitKind::New => self.new = self.new.saturating_sub(count),
@@ -159,9 +186,11 @@ impl DecrementResult {
 impl Default for RemainingLimits {
     fn default() -> Self {
         RemainingLimits {
-            review: 9999,
+            review: UNLIMITED_REVIEW_LIMIT,
             new: 9999,
             cap_new_to_review: false,
+            review_unlimited: true,
+            new_limit_kind: LimitKind::New,
         }
     }
 }
@@ -373,8 +402,25 @@ impl LimitTreeMap {
         self.get_root_limits().get(kind)
     }
 
+<<<<<<< HEAD
+=======
+    pub(crate) fn remaining_limit(&self, deck_id: DeckId, kind: LimitKind) -> Result<u32> {
+        Ok(self.get_deck_limits(deck_id)?.get(kind))
+    }
+
+    /// See [RemainingLimits::review_unlimited].
+    pub(crate) fn review_limit_unlimited(&self, deck_id: DeckId) -> Result<bool> {
+        Ok(self.get_deck_limits(deck_id)?.review_unlimited)
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) fn limit_reached(&self, deck_id: DeckId, kind: LimitKind) -> Result<bool> {
         Ok(self.get_deck_limits(deck_id)?.get(kind) == 0)
+    }
+
+    pub(crate) fn exhausted_new_limit(&self, deck_id: DeckId) -> Result<Option<LimitKind>> {
+        let limits = self.get_deck_limits(deck_id)?;
+        Ok((limits.new == 0).then_some(limits.new_limit_kind))
     }
 
     pub(crate) fn decrement_deck_and_parent_limits(
@@ -478,8 +524,17 @@ impl LimitTreeMap {
         })
     }
 
+<<<<<<< HEAD
     pub(crate) fn reserve_new_card(&mut self, deck_id: DeckId) -> Result<()> {
         let new_counts_towards_review_limit = self.get_root_limits().cap_new_to_review;
+=======
+    pub(crate) fn new_cards_count_toward_review_limit(&self) -> bool {
+        self.get_root_limits().cap_new_to_review
+    }
+
+    pub(crate) fn reserve_new_card(&mut self, deck_id: DeckId) -> Result<()> {
+        let new_counts_towards_review_limit = self.new_cards_count_toward_review_limit();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         self.decrement_deck_and_parent_limits(deck_id, LimitKind::New)?;
         if new_counts_towards_review_limit {
             self.decrement_deck_and_parent_limits(deck_id, LimitKind::Review)?;

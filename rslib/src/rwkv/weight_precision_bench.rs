@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Offline accuracy/storage POC. Packed weights decode to f32 before inference;
@@ -283,7 +287,10 @@ fn rwkv_weight_precision_rejects_truncated_scales_codes_and_padding() {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn rwkv_weight_precision_native_model_loads_packed_round_trip() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(MODEL_PATH);
     let weights = WeightMap::load(&path).unwrap();

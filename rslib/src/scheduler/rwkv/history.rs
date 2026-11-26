@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use anki_proto::scheduler::rwkv_answer_time_history_features_response::Card as AnswerTimeCard;
@@ -12,12 +16,15 @@ use anki_proto::scheduler::RwkvHistoricalReviewMetadata;
 
 use super::*;
 
+<<<<<<< HEAD
 /// The revlog rows (alias `r`) the model reads as reviews: rated, of a known
 /// kind, and not a manual reschedule.
 pub(crate) const RWKV_COUNTED_REVIEW: &str =
     "r.ease between 1 and 4 and r.type in (0, 1, 2, 3, 4, 5) \
      and not (r.type = 3 and r.factor = 0)";
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl Collection {
     pub(crate) fn rwkv_historical_review_inputs(
         &mut self,
@@ -34,11 +41,39 @@ impl Collection {
                 preserved_learning_start_cutoffs: input.preserved_learning_start_cutoffs,
                 first_review_uses_creation: input.first_review_uses_creation,
                 recovery_checkpoint_max_age_millis: input.recovery_checkpoint_max_age_millis,
+<<<<<<< HEAD
                 card_id: None,
             },
             |review, hash, is_checkpoint| {
                 let row = review.row;
                 output.reviews.push(historical_review(&review));
+=======
+            },
+            |review, hash, is_checkpoint| {
+                let row = review.row;
+                output.reviews.push(Review {
+                    review_id: row.review_id,
+                    card_id: row.card_id,
+                    note_id: row.note_id,
+                    deck_id: row.deck_id,
+                    preset_id: review.stable_preset_id,
+                    ease: row.ease,
+                    duration_millis: row.duration_millis,
+                    review_kind: row.review_kind,
+                    interval_days: row.interval_days,
+                    ease_factor: row.ease_factor,
+                    // The desktop's legacy card_type field holds RwkvReviewState:
+                    // zero marks learning start; other states are revlog kind + 1.
+                    card_type: if row.is_learning_start {
+                        0
+                    } else {
+                        row.review_kind + 1
+                    },
+                    day_offset: review.day_offset,
+                    elapsed_days: review.elapsed_days,
+                    elapsed_seconds: review.elapsed_seconds,
+                });
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 metadata
                     .previous_review_id_by_card
                     .insert(row.card_id, row.review_id);
@@ -103,6 +138,7 @@ impl Collection {
     }
 }
 
+<<<<<<< HEAD
 pub(super) fn historical_review(review: &RwkvHistoricalFingerprintReview) -> Review {
     let row = review.row;
     Review {
@@ -187,10 +223,15 @@ mod tests {
     use anki_proto::scheduler::GetQueuedCardsRequest;
     use serde_json::json;
 
+=======
+#[cfg(test)]
+mod tests {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     use super::*;
     use crate::notes::NoteId;
     use crate::revlog::RevlogEntry;
     use crate::revlog::RevlogReviewKind;
+<<<<<<< HEAD
     use crate::services::SchedulerService;
     use crate::tests::open_fs_test_collection;
     use crate::tests::CardAdder;
@@ -325,6 +366,8 @@ mod tests {
         );
         Ok(())
     }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
     #[test]
     fn historical_inputs_prepare_new_cards_with_old_review_logs() -> Result<()> {
@@ -404,8 +447,13 @@ mod tests {
         col.add_card(&mut card)?;
         let start = 1_700_000_000_000;
         let add_review = |col: &mut Collection, offset, kind, button, factor| {
+<<<<<<< HEAD
             col.transact_no_undo(|col| {
                 let _ = col.add_revlog_entry_undoable(RevlogEntry {
+=======
+            col.storage.add_revlog_entry(
+                &RevlogEntry {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     id: RevlogId(start + offset),
                     cid: card.id,
                     usn: Usn(0),
@@ -415,9 +463,15 @@ mod tests {
                     taken_millis: 1_000,
                     review_kind: kind,
                     ..Default::default()
+<<<<<<< HEAD
                 })?;
                 Ok(())
             })
+=======
+                },
+                false,
+            )
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         };
         add_review(&mut col, 0, RevlogReviewKind::Learning, 3, 2_500)?;
         add_review(&mut col, 1, RevlogReviewKind::Review, 3, 2_500)?;
@@ -487,8 +541,13 @@ mod tests {
         let day = 86_400_000;
         let start = 1_700_000_000_000;
         let add_review = |col: &mut Collection, card: CardId, offset, interval, kind| {
+<<<<<<< HEAD
             col.transact_no_undo(|col| {
                 let _ = col.add_revlog_entry_undoable(RevlogEntry {
+=======
+            col.storage.add_revlog_entry(
+                &RevlogEntry {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     id: RevlogId(start + offset * day),
                     cid: card,
                     usn: Usn(0),
@@ -498,9 +557,15 @@ mod tests {
                     taken_millis: 1_000,
                     review_kind: kind,
                     ..Default::default()
+<<<<<<< HEAD
                 })?;
                 Ok(())
             })
+=======
+                },
+                false,
+            )
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         };
         add_review(&mut col, first.id, 0, 1, RevlogReviewKind::Learning)?;
         add_review(&mut col, second.id, 1, 2, RevlogReviewKind::Learning)?;

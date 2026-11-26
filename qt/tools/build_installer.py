@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import compileall
+import importlib.util
 import os
 import platform
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Sequence
 
 sys.path.extend(["pylib", "out/pylib"])
@@ -18,6 +20,23 @@ sys.path.extend(["pylib", "out/pylib"])
 installer_dir = Path("qt/installer")
 app_dir = installer_dir / "app"
 out_dir = Path("out/installer").resolve()
+portable_out_dir = Path("out/portable").resolve()
+
+PORTABLE_FORMAL_NAME = "Anki Portable"
+PORTABLE_BUNDLE = "net.ankiweb.portable"
+PORTABLE_MARKER = "anki-portable"
+PORTABLE_DATA_DIR = "Anki Portable Data"
+
+
+def portable_update_module() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "portable_update", Path("qt/aqt/portable_update.py")
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 # Anki disk-lang codes whose Chromium .pak filename differs from the disk lang.
 _CHROMIUM_PAK_LANG_REMAP = {"tl": "fil"}
@@ -74,10 +93,11 @@ def prune_webengine_locales(out_dir: Path) -> None:
             pak.unlink()
 
 
-def remove_visualstudio_debug_info(out_dir: Path) -> None:
-    src_dir = get_briefcase_sources_path(out_dir)
-    (src_dir / "Anki.pdb").unlink(missing_ok=True)
-    (src_dir / "Anki.exe.metagen").unlink(missing_ok=True)
+def remove_visualstudio_debug_info(out_dir: Path, portable: bool = False) -> None:
+    src_dir = get_briefcase_sources_path(out_dir, portable=portable)
+    formal_name = PORTABLE_FORMAL_NAME if portable else "Anki"
+    (src_dir / f"{formal_name}.pdb").unlink(missing_ok=True)
+    (src_dir / f"{formal_name}.exe.metagen").unlink(missing_ok=True)
 
 
 def get_briefcase_template_path() -> Path:
@@ -98,7 +118,7 @@ def get_briefcase_output_format() -> list[str]:
     return []
 
 
-def get_briefcase_sources_path(out_dir: Path) -> Path:
+def get_briefcase_sources_path(out_dir: Path, portable: bool = False) -> Path:
     """
     Get the directory where Briefcase's `app`/`app_packages` directories are written.
     Make sure to update this if output formats or templates ever change.
@@ -115,13 +135,14 @@ def get_briefcase_sources_path(out_dir: Path) -> Path:
             / "Release"
         )
     elif sys.platform == "darwin":
+        formal_name = PORTABLE_FORMAL_NAME if portable else "Anki"
         path = (
             out_dir
             / "build"
             / "anki"
             / "macos"
             / "app"
-            / "Anki.app"
+            / f"{formal_name}.app"
             / "Contents"
             / "Resources"
         )
@@ -161,6 +182,17 @@ def get_briefcase_config_args(
         "-C",
         f'version="{version}"',
     ]
+    if getattr(args, "portable", False):
+        config_args.extend(
+            [
+                "-C",
+                f'formal_name="{PORTABLE_FORMAL_NAME}"',
+                "-C",
+                f'bundle="{PORTABLE_BUNDLE}"',
+                "-C",
+                "document_type={}",
+            ]
+        )
     requires = []
     if aqt_wheel:
         requires.append(f"{aqt_wheel}[qt,audio]")
@@ -238,10 +270,10 @@ def get_briefcase_environ() -> dict[str, str]:
     return env
 
 
-def compile_sources(out_dir: Path, version: str) -> bool:
+def compile_sources(out_dir: Path, version: str, portable: bool = False) -> bool:
     """Compile Python sources to .pyc"""
 
-    sources_root = get_briefcase_sources_path(out_dir)
+    sources_root = get_briefcase_sources_path(out_dir, portable=portable)
     for src_dir in (sources_root / "app", sources_root / "app_packages"):
         # legacy=True is needed to write .pyc to the same location as .py
         # so no __pycache__, which is not loaded with no sources
@@ -306,13 +338,29 @@ def bundle_fcitx(out_dir: Path) -> None:
             )
 
 
+def repair_macos_anki_audio_layout(out_dir: Path, portable: bool = False) -> None:
+    if sys.platform != "darwin":
+        return
+    audio_dir = (
+        get_briefcase_sources_path(out_dir, portable=portable)
+        / "app_packages"
+        / "anki_audio"
+    )
+    lib_dir = audio_dir / "lib"
+    libs_dir = audio_dir / "libs"
+    # anki-audio 0.2.0 macOS wheels used lib/, but mpv is linked against libs/.
+    if lib_dir.exists() and not libs_dir.exists():
+        lib_dir.rename(libs_dir)
+
+
 def build(args: argparse.Namespace) -> None:
     version = args.version
-    shutil.copytree(app_dir, out_dir, dirs_exist_ok=True)
-    constraints_path = export_constraints(out_dir)
+    output_dir = get_output_dir(args)
+    shutil.copytree(app_dir, output_dir, dirs_exist_ok=True)
+    constraints_path = export_constraints(output_dir)
     config_args = get_briefcase_config_args(args, constraints_path)
-    shutil.copy("LICENSE", out_dir / "LICENSE")
-    (out_dir / "CHANGELOG").write_text(
+    shutil.copy("LICENSE", output_dir / "LICENSE")
+    (output_dir / "CHANGELOG").write_text(
         "Please see https://apps.ankiweb.net/", encoding="utf-8"
     )
     subprocess.check_call(
@@ -329,14 +377,21 @@ def build(args: argparse.Namespace) -> None:
             "--update-support",
             "--log",
         ],
-        cwd=out_dir,
+        cwd=output_dir,
         env=get_briefcase_environ(),
     )
-    prune_webengine_locales(out_dir)
-    remove_visualstudio_debug_info(out_dir)
-    compile_sources(out_dir, version)
+    prune_webengine_locales(output_dir)
+    remove_visualstudio_debug_info(output_dir, portable=args.portable)
+    repair_macos_anki_audio_layout(output_dir, portable=args.portable)
+    if args.portable:
+        resources = get_briefcase_sources_path(output_dir, portable=True)
+        (resources / PORTABLE_MARKER).touch()
+        shutil.copy2(
+            "qt/aqt/portable_update.py", resources / "portable-update-helper.py"
+        )
+    compile_sources(output_dir, version, portable=args.portable)
     if not args.skip_fcitx:
-        bundle_fcitx(out_dir)  # pragma: no cover
+        bundle_fcitx(output_dir)  # pragma: no cover
 
 
 def get_platform_suffix() -> str:
@@ -359,10 +414,120 @@ def get_signing_args() -> list[str]:
     return ["--identity", identity] if identity else ["--adhoc-sign"]
 
 
+def get_output_dir(args: argparse.Namespace) -> Path:
+    return portable_out_dir if getattr(args, "portable", False) else out_dir
+
+
+def get_artifact_version(app_version: str) -> str:
+    return os.environ.get("ANKI_ARTIFACT_VERSION") or app_version
+
+
+def get_portable_archive_path(output_dir: Path, version: str) -> Path:
+    platform_suffix = get_platform_suffix()
+    if sys.platform == "linux":
+        extension = ".zst"
+    elif sys.platform in ("darwin", "win32"):
+        extension = ".zip"
+    else:  # pragma: no cover
+        raise RuntimeError(f"Unsupported portable platform: {sys.platform}")
+    return output_dir / "dist" / f"anki-{version}-portable{platform_suffix}{extension}"
+
+
+def package_portable_archive(output_dir: Path, version: str) -> Path:
+    dist_dir = output_dir / "dist"
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    generated_artifacts = list(dist_dir.iterdir())
+    staging_dir = output_dir / "portable-package"
+    distribution_dir = staging_dir / PORTABLE_FORMAL_NAME
+    archive_path = get_portable_archive_path(output_dir, version)
+
+    shutil.rmtree(staging_dir, ignore_errors=True)
+    distribution_dir.mkdir(parents=True)
+    sources = get_briefcase_sources_path(output_dir, portable=True)
+    if not (sources / "portable-update-helper.py").is_file():
+        raise RuntimeError(
+            "Portable update helper missing; rebuild the portable app first."
+        )
+    if sys.platform == "darwin":
+        app_bundle = sources.parents[1]
+        shutil.copytree(
+            app_bundle,
+            distribution_dir / app_bundle.name,
+            copy_function=shutil.copy2,
+            symlinks=True,
+        )
+    else:
+        shutil.copytree(
+            sources,
+            distribution_dir,
+            copy_function=shutil.copy2,
+            dirs_exist_ok=True,
+            symlinks=True,
+        )
+    (distribution_dir / PORTABLE_DATA_DIR).mkdir()
+    shutil.copy2(installer_dir / "portable-readme.txt", distribution_dir / "README.txt")
+    shutil.copy2("LICENSE", distribution_dir / "LICENSE.txt")
+    portable_update_module().write_manifest(
+        distribution_dir, sys.platform, platform.machine()
+    )
+
+    for artifact in generated_artifacts:
+        if artifact.is_dir():
+            shutil.rmtree(artifact)
+        else:
+            artifact.unlink()
+
+    try:
+        if sys.platform == "darwin":
+            subprocess.check_call(
+                [
+                    "ditto",
+                    "-c",
+                    "-k",
+                    "--sequesterRsrc",
+                    "--keepParent",
+                    str(distribution_dir),
+                    str(archive_path),
+                ]
+            )
+        elif sys.platform == "win32":
+            shutil.make_archive(
+                str(archive_path.with_suffix("")),
+                "zip",
+                root_dir=staging_dir,
+                base_dir=distribution_dir.name,
+            )
+        elif sys.platform == "linux":
+            subprocess.check_call(
+                [
+                    "tar",
+                    "-I",
+                    "zstd -c --long -T0 -18",
+                    "-cf",
+                    str(archive_path),
+                    "-C",
+                    str(staging_dir),
+                    distribution_dir.name,
+                ]
+            )
+        else:  # pragma: no cover
+            raise RuntimeError(f"Unsupported portable platform: {sys.platform}")
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+    return archive_path
+
+
 def package(args: argparse.Namespace) -> None:
     version = args.version
+    artifact_version = get_artifact_version(version)
+    output_dir = get_output_dir(args)
+    shutil.rmtree(output_dir / "dist", ignore_errors=True)
+    if args.portable and sys.platform != "darwin":
+        package_portable_archive(output_dir, artifact_version)
+        return
+
     config_args = get_briefcase_config_args(args)
-    shutil.rmtree(out_dir / "dist", ignore_errors=True)
     subprocess.check_call(
         [
             sys.executable,
@@ -374,21 +539,29 @@ def package(args: argparse.Namespace) -> None:
             "--log",
             *get_signing_args(),
         ],
-        cwd=out_dir,
+        cwd=output_dir,
         env=get_briefcase_environ(),
     )
-    package_path = next((out_dir / "dist").iterdir())
+    if args.portable:
+        package_portable_archive(output_dir, artifact_version)
+        return
+
+    package_path = next((output_dir / "dist").iterdir())
     package_path.rename(
-        package_path.with_stem(f"anki-{version}{get_platform_suffix()}")
+        package_path.with_stem(f"anki-{artifact_version}{get_platform_suffix()}")
     )
 
 
 def main(args: Sequence[str] | None = None) -> argparse.Namespace:
-    out_dir.mkdir(exist_ok=True)
     parser = argparse.ArgumentParser(
         prog="build_installer", description="Build the Briefcase installer."
     )
     parser.add_argument("--version", help="Anki version")
+    parser.add_argument(
+        "--portable",
+        action="store_true",
+        help="Build an isolated portable application archive",
+    )
     subparsers = parser.add_subparsers(help="Briefcase command (build/package)")
     build_parser = subparsers.add_parser("build", help="Compile/build app")
     build_parser.add_argument("--aqt_wheel", help="Path to the aqt wheel file")
@@ -401,6 +574,7 @@ def main(args: Sequence[str] | None = None) -> argparse.Namespace:
     package_parser.set_defaults(func=package)
 
     parsed = parser.parse_args(args)
+    get_output_dir(parsed).mkdir(parents=True, exist_ok=True)
     parsed.func(parsed)
 
     return parsed

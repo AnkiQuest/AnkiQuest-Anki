@@ -38,6 +38,7 @@ impl crate::services::CardsService for Collection {
     ) -> error::Result<anki_proto::collection::OpChanges> {
         let mut cards = Vec::with_capacity(input.cards.len());
         for proto_card in input.cards {
+<<<<<<< HEAD
             let missing_internal_stability = proto_card
                 .memory_state
                 .as_ref()
@@ -53,6 +54,33 @@ impl crate::services::CardsService for Collection {
                         stored.difficulty,
                     )
                     .or(Some(stored));
+=======
+            let incomplete = proto_card.memory_state.as_ref().is_some_and(|state| {
+                state.stability_internal.is_none() || state.stability_fast.is_none()
+            });
+            let mut card: Card = proto_card.try_into()?;
+            if let Some(state) = card.memory_state {
+                let edited_s90 = self
+                    .storage
+                    .get_card(card.id)?
+                    .and_then(|old| old.memory_state)
+                    .is_some_and(|old| {
+                        state.stability != old.stability
+                            && state.stability_internal == old.stability_internal
+                            && state.stability_fast == old.stability_fast
+                    });
+                if incomplete || edited_s90 {
+                    let preset = self.fsrs_preset_for_card(&card)?;
+                    let fsrs = FSRS::new(&preset.params)?;
+                    if edited_s90 || preset.fsrs_version == crate::deckconfig::FsrsVersion::Seven {
+                        card.memory_state = fsrs_memory_state_for_s90_and_difficulty(
+                            &fsrs,
+                            state.stability,
+                            state.difficulty,
+                        )
+                        .or(Some(state));
+                    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 }
             }
             cards.push(card);
@@ -127,6 +155,10 @@ impl TryFrom<anki_proto::cards::Card> for Card {
             desired_retention: c.desired_retention,
             decay: c.decay,
             last_review_time: c.last_review_time_secs.map(TimestampSecs),
+<<<<<<< HEAD
+=======
+            review_step_secs: c.review_step_secs,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_history_reset_after: c.rwkv_history_reset_after,
             custom_data: c.custom_data,
         })
@@ -158,6 +190,10 @@ impl From<Card> for anki_proto::cards::Card {
             desired_retention: c.desired_retention,
             decay: c.decay,
             last_review_time_secs: c.last_review_time.map(|t| t.0),
+<<<<<<< HEAD
+=======
+            review_step_secs: c.review_step_secs,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_history_reset_after: c.rwkv_history_reset_after,
             custom_data: c.custom_data,
         }
@@ -269,6 +305,26 @@ mod tests {
         assert_eq!(state.difficulty, 6.0);
         let s90 = fsrs.interval_at_retrievability(state.into(), 0.9);
         assert!((s90 - 20.0).abs() < 0.01, "{s90}");
+<<<<<<< HEAD
+=======
+        let mut card: anki_proto::cards::Card = col.storage.get_card(card_id)?.unwrap().into();
+        card.memory_state.as_mut().unwrap().stability = 50.0;
+        let _ = CardsService::update_cards(
+            &mut col,
+            anki_proto::cards::UpdateCardsRequest {
+                cards: vec![card],
+                skip_undo_entry: false,
+            },
+        )?;
+        let edited = col
+            .storage
+            .get_card(card_id)?
+            .unwrap()
+            .memory_state
+            .unwrap();
+        assert_eq!(edited.stability, 50.0);
+        assert!((fsrs.s90(edited.into()) - 50.0).abs() < 0.01);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(())
     }
 }

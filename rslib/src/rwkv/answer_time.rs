@@ -1,8 +1,19 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Answer-time prediction for the small model's optional answer-time head
 //! (`time_head.f32.bin` next to the weights).
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+// License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+
+//! Answer-time prediction for a model's optional answer-time head
+//! (`time_head.f32.bin` next to the weights). The answer time is the whole
+//! time on the card, front and back: from the question shown to the grade
+//! press, capped at the preset's maximum answer seconds ("recalled and
+//! answered within S s" includes reading the back).
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 //!
 //! The head reads the frozen trunk at a query plus 26 causal features of the
 //! history before it. [`AnswerTimeHistory`] computes those features with the
@@ -24,8 +35,17 @@ pub const ANSWER_TIME_BINS: usize = 16;
 pub const ANSWER_TIME_FAST_BINS: usize = 7;
 /// Index of the elapsed-days feature; the next one is the new-card flag.
 pub(crate) const ANSWER_TIME_ELAPSED_FEATURE: usize = 23;
+<<<<<<< HEAD
 /// The only answer-time head file format this runtime reads.
 pub(crate) const ANSWER_TIME_FORMAT_VERSION: f32 = 1.0;
+=======
+/// The answer-time head file formats this runtime reads: 1, heads trained on
+/// normal inputs and later-day reviews only (they predict queries on a later
+/// day than the card's previous review); 2, heads trained on show-time inputs
+/// with same-day reviews included (they predict every query but a card's
+/// first review).
+pub(crate) const ANSWER_TIME_FORMAT_VERSIONS: [f32; 2] = [1.0, 2.0];
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
 /// ln 8 s: the centre of every ln-time feature (Python `math.log(8.0)`).
 const LN8: f64 = 2.0794415416798357;
@@ -247,6 +267,44 @@ impl AnswerTimePrediction {
             .iter()
             .sum()
     }
+<<<<<<< HEAD
+=======
+
+    /// Per-grade probability of an answer taking less than `seconds`.
+    ///
+    /// Inside a bin, interpolate linearly in log time, as the median does.
+    /// The first and last bins are open-ended, so their interiors cannot be
+    /// interpolated; thresholds must be between their boundaries, inclusive.
+    pub fn probabilities_under_seconds(&self, seconds: f64) -> Option<[f32; 4]> {
+        self.probabilities_under_seconds_f64(seconds)
+            .map(|values| values.map(|value| value as f32))
+    }
+
+    /// [`Self::probabilities_under_seconds`] before the rounding to f32.
+    pub(crate) fn probabilities_under_seconds_f64(&self, seconds: f64) -> Option<[f64; 4]> {
+        if !seconds.is_finite() || !(0.5..=60.0).contains(&seconds) {
+            return None;
+        }
+        let edges = answer_time_bin_edges_millis().map(|edge| edge / 1000.0);
+        Some(std::array::from_fn(|grade| {
+            let mut cumulative = 0.0_f64;
+            for (bin, &upper) in edges.iter().enumerate() {
+                let probability = f64::from(self.probabilities[grade][bin]);
+                if seconds >= upper {
+                    cumulative += probability;
+                } else {
+                    // The first bin ends at 0.5s, and valid thresholds are
+                    // never inside that open-ended bin.
+                    let lower = edges[bin - 1];
+                    let fraction = (seconds / lower).ln() / (upper / lower).ln();
+                    cumulative += probability * fraction.clamp(0.0, 1.0);
+                    break;
+                }
+            }
+            cumulative.clamp(0.0, 1.0)
+        }))
+    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 /// The reference's `median_log_s`: linear in ln time inside the bin where
@@ -284,6 +342,34 @@ mod tests {
     use super::*;
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn answer_time_threshold_interpolates_between_bin_edges() {
+        let mut probabilities = [[0.0; ANSWER_TIME_BINS]; 4];
+        for grade in &mut probabilities {
+            grade[6] = 0.2;
+            grade[7] = 0.6;
+            grade[8] = 0.2;
+        }
+        let prediction = AnswerTimePrediction {
+            probabilities,
+            button_probabilities: [0.25; 4],
+        };
+        let edges = answer_time_bin_edges_millis();
+        let lower = edges[6] / 1000.0;
+        let upper = edges[7] / 1000.0;
+        let midpoint = (lower * upper).sqrt();
+
+        assert!((prediction.probabilities_under_seconds(lower).unwrap()[2] - 0.2).abs() < 1e-6);
+        assert!((prediction.probabilities_under_seconds(midpoint).unwrap()[2] - 0.5).abs() < 1e-6);
+        assert!((prediction.probabilities_under_seconds(upper).unwrap()[2] - 0.8).abs() < 1e-6);
+        assert_eq!(prediction.probabilities_under_seconds(f64::NAN), None);
+        assert_eq!(prediction.probabilities_under_seconds(0.49), None);
+        assert_eq!(prediction.probabilities_under_seconds(60.1), None);
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn answer_time_history_matches_the_reference_rule() {
         let mut history = AnswerTimeHistory::new();
         let empty = history.features(1, -1);

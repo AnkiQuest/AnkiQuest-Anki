@@ -3,7 +3,10 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+<<<<<<< HEAD
 use crate::collection::RwkvCountCards;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::deckconfig::DeckConfig;
 use crate::deckconfig::DeckConfigId;
 use crate::decks::limits::LimitTreeMap;
@@ -20,6 +23,12 @@ pub(crate) struct DueCounts {
     pub new: u32,
     pub review: u32,
     pub review_limit_exempt: u32,
+<<<<<<< HEAD
+=======
+    /// RWKV-Instant reviews pulled only to reach the daily minimum, counted
+    /// apart from `review` when new cards ignore the minimum.
+    pub rwkv_minimum_review: u32,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     /// interday+intraday
     pub learning: u32,
 
@@ -60,6 +69,10 @@ impl Collection {
         self.storage.due_counts(
             timing.days_elapsed,
             learn_cutoff,
+<<<<<<< HEAD
+=======
+            timing.now,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             timing.next_day_at.adding_secs(-86_400),
             timing.next_day_at,
         )
@@ -154,14 +167,25 @@ impl Collection {
             .iter()
             .filter_map(|deck_id| counts.get(deck_id).map(|counts| (*deck_id, counts.clone())))
             .collect();
+<<<<<<< HEAD
         let Some((min_intervening_reviews, min_elapsed_secs)) =
             rwkv_scope_order_settings(context, score_deck_id)
+=======
+        let Some(RwkvScopeOrderSettings {
+            min_intervening_reviews,
+            min_elapsed_secs,
+            new_cards_ignore_minimum_reviews,
+        }) = rwkv_scope_order_settings(context, score_deck_id)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         else {
             return Ok(counts);
         };
 
         let mut pull_candidates = Vec::new();
+<<<<<<< HEAD
         let mut waiting = HashSet::new();
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         for (card_id, score) in scores {
             let Some(metadata) = metadata.get(card_id) else {
                 continue;
@@ -186,6 +210,7 @@ impl Collection {
                 score.target_retention,
             );
             let rwkv_due = matches!(eligibility, RwkvReviewScoreEligibility::Eligible);
+<<<<<<< HEAD
             if !rwkv_due
                 && score
                     .target_retention
@@ -193,6 +218,8 @@ impl Collection {
             {
                 waiting.insert(*card_id);
             }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let Some(counts) = counts.get_mut(&metadata.current_deck_id) else {
                 continue;
             };
@@ -269,10 +296,17 @@ impl Collection {
         pull_candidates.sort_unstable_by(|(card_a, score_a, _), (card_b, score_b, _)| {
             score_a.total_cmp(score_b).then_with(|| card_a.cmp(card_b))
         });
+<<<<<<< HEAD
         let mut minimum = HashSet::new();
         for depth in minimums.rwkv_review_minimum_depths() {
             for &(card_id, _, deck_id) in &pull_candidates {
                 if minimum.contains(&card_id)
+=======
+        let mut selected = HashSet::new();
+        for depth in minimums.rwkv_review_minimum_depths() {
+            for &(card_id, _, deck_id) in &pull_candidates {
+                if selected.contains(&card_id)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     || !minimums.rwkv_review_minimum_remaining_at_depth(deck_id, depth)?
                 {
                     continue;
@@ -281,6 +315,7 @@ impl Collection {
                     if minimums.reserve_counted_rwkv_reviews(deck_id, 1)? == 0 {
                         continue;
                     }
+<<<<<<< HEAD
                     counts.review = counts.review.saturating_add(1);
                     minimum.insert(card_id);
                 }
@@ -289,6 +324,17 @@ impl Collection {
         self.state
             .rwkv_count_cards
             .insert(score_deck_id, RwkvCountCards { minimum, waiting });
+=======
+                    if new_cards_ignore_minimum_reviews {
+                        counts.rwkv_minimum_review = counts.rwkv_minimum_review.saturating_add(1);
+                    } else {
+                        counts.review = counts.review.saturating_add(1);
+                    }
+                    selected.insert(card_id);
+                }
+            }
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         Ok(counts)
     }
@@ -307,22 +353,45 @@ impl Collection {
     }
 }
 
+<<<<<<< HEAD
 /// The scope deck's RWKV repeat-spacing settings, or None when instant RWKV
+=======
+struct RwkvScopeOrderSettings {
+    min_intervening_reviews: u32,
+    min_elapsed_secs: u32,
+    new_cards_ignore_minimum_reviews: bool,
+}
+
+/// The scope deck's RWKV ordering settings, or None when instant RWKV
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 /// ordering is off and the FSRS counts stand.
 fn rwkv_scope_order_settings(
     context: &RwkvReviewCountContext<'_>,
     score_deck_id: DeckId,
+<<<<<<< HEAD
 ) -> Option<(u32, u32)> {
+=======
+) -> Option<RwkvScopeOrderSettings> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     context
         .decks
         .get(&score_deck_id)
         .and_then(|deck| deck.config_id())
         .and_then(|config_id| context.configs.get(&config_id))
         .filter(|config| config.inner.rwkv_review_instant_order_enabled)
+<<<<<<< HEAD
         .map(|config| {
             (
                 config.inner.rwkv_review_min_intervening_reviews,
                 config.inner.rwkv_review_min_elapsed_secs,
             )
+=======
+        .map(|config| RwkvScopeOrderSettings {
+            min_intervening_reviews: config.inner.rwkv_review_min_intervening_reviews,
+            min_elapsed_secs: config.inner.rwkv_review_min_elapsed_secs,
+            new_cards_ignore_minimum_reviews: config
+                .inner
+                .rwkv_review_new_cards_ignore_minimum_reviews,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         })
 }

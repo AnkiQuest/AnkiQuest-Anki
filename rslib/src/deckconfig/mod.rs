@@ -16,6 +16,7 @@ pub use anki_proto::deck_config::deck_config::config::NewCardSortOrder;
 pub use anki_proto::deck_config::deck_config::config::QuestionAction;
 pub use anki_proto::deck_config::deck_config::config::ReviewCardOrder;
 pub use anki_proto::deck_config::deck_config::config::ReviewMix;
+pub use anki_proto::deck_config::deck_config::config::SuspendedCardOrder;
 pub use anki_proto::deck_config::deck_config::Config as DeckConfigInner;
 pub(crate) use fork_fields::deck_config_inner_for_storage;
 pub(crate) use fork_fields::restore_fork_fields_from_other;
@@ -23,6 +24,10 @@ pub use schema11::DeckConfSchema11;
 pub use schema11::NewCardOrderSchema11;
 pub(crate) use update::fsrs7_enable_scheduling_penalties;
 pub(crate) use update::fsrs7_optimize_include_same_day_reviews;
+<<<<<<< HEAD
+=======
+pub(crate) use update::update_deck_limits;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 pub use update::UpdateDeckConfigsRequest;
 
 /// Old deck config and cards table store 250% as 2500.
@@ -34,6 +39,10 @@ use crate::scheduler::states::review::INITIAL_EASE_FACTOR;
 
 define_newtype!(DeckConfigId, i64);
 
+<<<<<<< HEAD
+=======
+const DECK_OPTIONS_KEY: &str = "jschoreels.deckoptions";
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 pub const DEFAULT_REVIEW_FUZZ_BASE: f32 = 1.0;
 pub const DEFAULT_REVIEW_FUZZ_FACTOR_SHORT: f32 = 0.15;
 pub const DEFAULT_REVIEW_FUZZ_FACTOR_MID: f32 = 0.10;
@@ -88,6 +97,12 @@ const DEFAULT_DECK_CONFIG_INNER: DeckConfigInner = DeckConfigInner {
     rwkv_review_refresh_on_exit: false,
     rwkv_review_allow_same_day_review: DEFAULT_RWKV_REVIEW_ALLOW_SAME_DAY_REVIEW,
     same_day_reviews_ignore_review_limit: false,
+<<<<<<< HEAD
+=======
+    include_suspended_cards_in_learnable_pool: false,
+    suspended_card_order: SuspendedCardOrder::Mixed as i32,
+    new_card_gather_field: String::new(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     rwkv_review_instant_order_enabled: false,
     rwkv_review_dynamic_preset_replay: false,
     rwkv_review_candidate_refresh_enabled: false,
@@ -98,6 +113,10 @@ const DEFAULT_DECK_CONFIG_INNER: DeckConfigInner = DeckConfigInner {
         DEFAULT_RWKV_REVIEW_FIRST_REVIEW_ELAPSED_FROM_CARD_CREATION,
     rwkv_review_enforce_grade_order: DEFAULT_RWKV_REVIEW_ENFORCE_GRADE_ORDER,
     rwkv_review_minimum_reviews_per_day: 0,
+<<<<<<< HEAD
+=======
+    rwkv_review_new_cards_ignore_minimum_reviews: false,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     disable_autoplay: false,
     cap_answer_time_to_secs: 60,
     show_timer: false,
@@ -163,7 +182,11 @@ impl DeckConfig {
         let Ok(other) = serde_json::from_slice::<serde_json::Value>(&self.inner.other) else {
             return ReviewMix::MixWithReviews;
         };
+<<<<<<< HEAD
         let Some(metadata) = other.get("jschoreels.deckoptions") else {
+=======
+        let Some(metadata) = other.get(DECK_OPTIONS_KEY) else {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             return ReviewMix::MixWithReviews;
         };
         if let Some(value) = metadata.get("intraday_learning_mix") {
@@ -184,6 +207,7 @@ impl DeckConfig {
         }
     }
 
+<<<<<<< HEAD
     /// kuma3: with new cards mixed into reviews, one new card after this many
     /// reviews; None spreads them evenly (Anki's mix).
     pub(crate) fn reviews_per_new_card(&self) -> Option<u32> {
@@ -196,6 +220,8 @@ impl DeckConfig {
             .map(|n| n.min(9999) as u32)
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn params_usable_in_current_fsrs(params: &[f32]) -> bool {
         matches!(params.len(), 17 | 19 | 21 | 34) && params.iter().all(|w| w.is_finite())
     }
@@ -484,6 +510,7 @@ fn ensure_u32_valid(val: &mut u32, default: u32, min: u32, max: u32) {
 
 #[cfg(test)]
 mod tests {
+<<<<<<< HEAD
 
     use std::assert_matches;
 
@@ -681,6 +708,11 @@ mod tests {
     }
 
     #[test]
+=======
+    use super::*;
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn intraday_learning_mix_reads_modes_and_legacy_toggle() -> Result<()> {
         for (metadata, expected) in [
             (serde_json::json!({}), ReviewMix::MixWithReviews),

@@ -1,0 +1,627 @@
+# RWKV FAQ
+
+This FAQ explains RWKV as a spaced-repetition algorithm and summarizes what
+the RWKV support in this Anki fork currently does. It uses the benchmark
+description, the linked message-level discussions, and the repository
+implementation. It intentionally leaves out individual bug reports,
+temporary workarounds, and
+subjective comparisons unless they clarify a stable behavior.
+
+Behavior can differ between RWKV variants, add-ons, forks, and versions. The
+fork-specific statements below describe the current repository and may change
+as the code changes.
+
+Last reviewed: 2026-10-28.
+
+## Sources
+
+- [TheMoeWay: deck-scope question](https://discord.com/channels/617136488840429598/1525841501622370476/1551521915452002356)
+- [TheMoeWay: calibration-bucket question](https://discord.com/channels/617136488840429598/1525841501622370476/1552174896539238511)
+- [TheMoeWay: RWKV-Instant interval explanation](https://discord.com/channels/617136488840429598/1525841501622370476/1553715420295462957)
+- [Anki: RWKV-Curve/Instant question](https://discord.com/channels/368267295601983490/1526305928603766784/1552363440973025311)
+- [Anki: deck/preset context reply](https://discord.com/channels/368267295601983490/1526305928603766784/1552364924376850545)
+- [Anki: mobile-support reply](https://discord.com/channels/368267295601983490/1347982145418694747/1553731488997052537)
+- [Reddit: fork description](https://www.reddit.com/r/Anki/comments/1w0p9qc/comment/paqq1oe/)
+- [SRS benchmark: RWKV features](https://github.com/open-spaced-repetition/srs-benchmark#features-note)
+- GitHub, 2026-10-31 — [FSRS7-Instant experiment](https://github.com/open-spaced-repetition/srs-benchmark/pull/360)
+
+## Table of contents
+
+- [Terminology](#terminology)
+- [1. What RWKV is and how it learns](#1-what-rwkv-is-and-how-it-learns)
+  - [What is RWKV?](#what-is-rwkv)
+  - [Does RWKV train itself on my collection?](#does-rwkv-train-itself-on-my-collection)
+  - [What features does RWKV use?](#what-features-does-rwkv-use)
+  - [Does RWKV use card content?](#does-rwkv-use-card-content)
+  - [Does RWKV adapt to different users and subjects?](#does-rwkv-adapt-to-different-users-and-subjects)
+- [2. RWKV-Instant and RWKV-Curve](#2-rwkv-instant-and-rwkv-curve)
+  - [How do RWKV-Instant and RWKV-Curve differ?](#how-do-rwkv-instant-and-rwkv-curve-differ)
+  - [Why does fresh review information matter?](#why-does-fresh-review-information-matter)
+  - [How do intervals and desired retention fit in?](#how-do-intervals-and-desired-retention-fit-in)
+  - [How do answer buttons affect the model?](#how-do-answer-buttons-affect-the-model)
+- [3. Collection, deck, and preset scope](#3-collection-deck-and-preset-scope)
+  - [What scope does the model use?](#what-scope-does-the-model-use)
+  - [Can decks and presets have different behavior?](#can-decks-and-presets-have-different-behavior)
+  - [What happens when a card or preset moves?](#what-happens-when-a-card-or-preset-moves)
+- [4. Scheduling, limits, and workload](#4-scheduling-limits-and-workload)
+  - [Do load balancing and review fuzz apply to RWKV?](#do-load-balancing-and-review-fuzz-apply-to-rwkv)
+  - [How does the fork handle daily review limits?](#how-does-the-fork-handle-daily-review-limits)
+  - [Can RWKV-Instant repeat a card when same-day reviews are disabled?](#can-rwkv-instant-repeat-a-card-when-same-day-reviews-are-disabled)
+  - [How do the same-day settings interact?](#how-do-the-same-day-settings-interact)
+  - [Does RWKV override standard sibling burying?](#does-rwkv-override-standard-sibling-burying)
+  - [Does RWKV guarantee fewer reviews than FSRS?](#does-rwkv-guarantee-fewer-reviews-than-fsrs)
+- [5. Calibration and prediction history](#5-calibration-and-prediction-history)
+  - [What does a calibration bucket mean?](#what-does-a-calibration-bucket-mean)
+  - [Does the first answer on a new card count?](#does-the-first-answer-on-a-new-card-count)
+  - [How are learning and relearning steps represented?](#how-are-learning-and-relearning-steps-represented)
+- [6. History and state in this fork](#6-history-and-state-in-this-fork)
+  - [Which review events enter the RWKV history?](#which-review-events-enter-the-rwkv-history)
+  - [How is RWKV state rebuilt?](#how-is-rwkv-state-rebuilt)
+  - [Which model does the fork use, and what does leak-free mean?](#which-model-does-the-fork-use-and-what-does-leak-free-mean)
+- [7. Platform and implementation scope](#7-platform-and-implementation-scope)
+  - [Does the fork run on mobile?](#does-the-fork-run-on-mobile)
+  - [Is this an official Anki release?](#is-this-an-official-anki-release)
+  - [What are the resource and performance trade-offs?](#what-are-the-resource-and-performance-trade-offs)
+  - [What does this fork add to Anki?](#what-does-this-fork-add-to-anki)
+- [Repository code references](#repository-code-references)
+
+## Terminology
+
+- **R** means estimated retrievability: the probability that a card will be
+  recalled at a given moment.
+- **Desired retention (DR)** is a target retrievability used by interval-based
+  scheduling. It is a scheduling target, not a new set of model weights.
+- **Model state** is the information carried forward between review events. In
+  a recurrent model, it is what lets the next prediction depend on prior
+  history.
+- **RWKV-Instant** is the more dynamic variant. It predicts recall directly and
+  does not treat the displayed interval as its only scheduling signal.
+- **RWKV-Curve** is the interval-producing variant. It presents the model's
+  behavior through a more conventional forgetting-curve-style schedule.
+
+## 1. What RWKV is and how it learns
+
+### What is RWKV?
+
+RWKV is a neural-network-based spaced-repetition scheduler. The SRS benchmark
+describes its modified RWKV architecture as combining properties of recurrent
+neural networks and Transformers. In a scheduler, the model processes review
+events and produces a recall prediction or another scheduling signal.
+
+The important difference from a small formula that only transforms the current
+card's interval and grade is that RWKV can carry information from a longer
+review history. In the benchmark, that history includes all cards in the
+collection. The exact inputs and scheduling behavior depend on the RWKV model
+variant and the integration using it.
+
+### Does RWKV train itself on my collection?
+
+Not in normal use. The model weights are trained beforehand. When the fork
+loads RWKV for a collection, it replays the available review history and
+updates model state; it does not run a per-user gradient-optimization step
+before making predictions.
+
+This distinction is useful:
+
+- **Pretraining** learns shared model weights from many users.
+- **State updates** adapt those weights to the current collection's review
+  history.
+
+State adaptation can make the model personal without copying another user's
+memories into the collection. The exact state representation is an
+implementation detail, not a claim that the model has one independent neural
+network per user.
+
+### What features does RWKV use?
+
+The benchmark describes RWKV as using interval lengths and grades together
+with features such as:
+
+- review duration;
+- the number of new and reviewed cards completed that day;
+- sibling-card information;
+- deck and preset hierarchy; and
+- calendar context such as the day, month, and year.
+
+The available features are model- and build-dependent. A feature listed by the
+benchmark should not be assumed to exist in every RWKV fork or every model
+version.
+
+### Does RWKV use card content?
+
+The benchmark dataset contains review metadata rather than card text, images,
+or audio, so the benchmarked RWKV model does not learn from card content. The
+fork's scheduling inputs are review events and collection metadata, not a
+semantic analysis of the words or images on a card.
+
+### Does RWKV adapt to different users and subjects?
+
+Yes, through the combination of shared pretrained weights and collection
+history. The model can use learner-level signals while also receiving card,
+note, deck, and preset context. This allows it to adapt without requiring a
+separate parameter-optimization run for each user.
+
+That does not guarantee better predictions for every collection. Benchmark
+results are population-level measurements, and individual behavior, data
+quality, and the model version still matter.
+
+## 2. RWKV-Instant and RWKV-Curve
+
+| Variant          | Scheduling behavior                                                                                           | Main consequence                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **RWKV-Instant** | Predicts the probability of recall immediately before a review and orders cards from the current model state. | The displayed interval is not authoritative; a card may return sooner or later than a conventional scheduler would choose. |
+| **RWKV-Curve**   | Uses RWKV predictions to produce interval-based, forgetting-curve-style scheduling.                           | Intervals and due dates are easier to interpret, while the model still uses its learned state.                             |
+
+### How do RWKV-Instant and RWKV-Curve differ?
+
+RWKV-Instant predicts recall directly at the moment a review is considered. It
+does not assume a traditional monotonic forgetting curve, so its outputs can
+look unusual: it may not reach exactly 100%, and a predicted recall
+probability can sometimes increase with time when other state features change.
+
+RWKV-Curve exposes the model through interval-producing behavior. It is the
+closer fit for a user who wants a conventional interval display while still
+using RWKV's learned representation. This distinction is also illustrated in
+the [RWKV-Curve/Instant discussion](https://discord.com/channels/368267295601983490/1526305928603766784/1552363440973025311).
+
+### Why does fresh review information matter?
+
+An experimental
+[FSRS7-Instant study](https://github.com/open-spaced-repetition/srs-benchmark/pull/360)
+keeps FSRS-7's formula and updates its 34 parameters after each review. On users
+1–300, it reports 7.1% lower per-user mean LogLoss than FSRS-7 when predictions
+use parameters updated up to review time (0.3269 versus 0.3519). When predictions
+instead use parameters from just after the card's previous review, the reported
+change is +0.4%, with the 95% confidence interval for the paired LogLoss
+difference including zero. The scheduling-time comparison therefore shows no
+comparable improvement.
+
+These results support the value of fresh review information for predicting
+current retrievability. They remain experimental prediction-accuracy results;
+they do not measure achieved retention or review workload. For the practical
+effect on the displayed count, see
+[How should I interpret the due count in RWKV-Instant?](FAQ.md#how-should-i-interpret-the-due-count-in-rwkv-instant)
+
+### Which model does RWKV-Instant use?
+
+Each size runs only its own two models (since 2026-11-13, the family wiring
+(SM114); the models below are those of the 2026-11 release candidate): a two-head
+model and an Instant-Only model. With the default size, Small, a profile whose
+presets use both RWKV-Instant and RWKV-Curve runs RWKV-Instant on the longer Small
+Instant-Only model (SM113), trained only to predict the next answer when a card is
+shown. Tiny uses the six-layer Tiny Instant-Only model (SM130), and Big uses its own
+show-time instant-only big model (SM99). On 722 held-out users (show-time inputs)
+SM113's Instant LogLoss is within 0.01% of SM99's, and the six-layer Tiny's 0.58%
+above it. No Instant-Only model has a trained forgetting curve:
+
+- When no preset uses RWKV-Curve (neither as scheduler nor as RWKV-Instant's
+  fallback), the size's Instant-Only model runs alone, one model state: the longer
+  Small Instant-Only model (SM113) for Small, the six-layer Tiny Instant-Only model
+  (SM130) for Tiny, the show-time instant-only big model (SM99) for Big. Due dates,
+  intervals and memory states come from the FSRS fallback, Card Info shows FSRS
+  stability and retrievability without the RWKV-Curve S90 (the answer-time estimate
+  comes from the Instant-Only model's own head), and the RWKV
+  workload simulation is unavailable (Deck Options says to turn on RWKV-Curve in a
+  preset first).
+- When presets use both, the Instant-Only model runs beside the size's two-head
+  model, which gives RWKV-Curve, the RWKV intervals and the workload simulation:
+  for Small the show-time two-head cool-down for Small (SM118), for Tiny the
+  six-layer Tiny two-head model (SM130), for Big the show-time big model (SM91s2).
+  The answer-time estimate comes from the Instant-Only model's head (every model
+  has one). That keeps two model states, and answers replay on both. **Use one
+  model for RWKV** under Advanced makes both schedulers share the size's two-head
+  model instead (one model state; the pair's state is rebuilt once). On 722
+  held-out users the shared two-head model's Instant LogLoss is 0.24% higher than
+  the Instant-Only model's for Small (SM118 vs SM113) and 0.20% higher for Tiny.
+  The setting has no effect without RWKV-Curve.
+
+Saving a model size or the one-model setting applies the new choice immediately.
+If it changes the models in use, Anki offers to rebuild RWKV state from history;
+if the models are unchanged, it keeps the existing state. Choosing **Cancel**
+leaves RWKV state unavailable until you build it, for example with **Build Cache**
+in Deck Options.
+Saving a preset that turns RWKV-Curve on also switches at once. Details:
+[integration report](docs/rwkv-sm98-2026-11-10.MD).
+
+### How do intervals and desired retention fit in?
+
+An interval is an important input and output for conventional scheduling, but
+it is not RWKV-Instant's only signal. Instant uses the current predicted recall
+and queue policy to decide which cards to present; the displayed interval does
+not by itself determine the next review. The [fork's interval explanation](https://discord.com/channels/617136488840429598/1525841501622370476/1553715420295462957)
+describes the same separation between Instant and interval-producing
+schedulers.
+
+The fork contains hooks for desired-retention overrides and reads desired
+retention from the relevant scheduling context. An add-on or configuration can
+provide different targets for different cards or decks when its integration
+matches the fork. Changing desired retention changes scheduling targets; it
+does not retrain the RWKV weights.
+
+### How do answer buttons affect the model?
+
+Again, Hard, Good, and Easy are review outcomes supplied to the scheduler.
+Again represents a failure; Hard, Good, and Easy represent increasing levels
+of successful recall. Using Hard as a substitute for Again gives the model a
+different signal from the one intended by Anki's grading semantics.
+
+The fork also distinguishes learning, relearning, filtered, manually
+rescheduled, and ordinary review events. Their state labels and queue handling
+are described in the implementation sections below.
+
+## 3. Collection, deck, and preset scope
+
+### What scope does the model use?
+
+The benchmark describes RWKV as reading the review history of all cards. The
+fork also carries context for cards, notes, decks, presets, and collection-wide
+state. As a result, a review in one deck can contribute to shared learner
+context while deck and preset features tell the model where that review came
+from. This collection-wide behavior is the subject of the [deck-scope question](https://discord.com/channels/617136488840429598/1525841501622370476/1551521915452002356),
+and a separate [deck/preset discussion](https://discord.com/channels/368267295601983490/1526305928603766784/1552364924376850545)
+highlights the contextual features.
+
+This is not the same as treating all subjects as identical. It means that the
+model can combine general learner signals with subject- and deck-specific
+context.
+
+### Can decks and presets have different behavior?
+
+Yes. Deck and preset hierarchy are available to the model, and Anki's normal
+deck and preset settings continue to apply. Desired-retention and review-limit
+values can also be resolved from the applicable deck or preset.
+
+There is no general promise that decks are statistically independent. If strict
+isolation is required, use separate profiles or another explicit isolation
+boundary rather than relying only on deck names.
+
+### What happens when a card or preset moves?
+
+Moving a card, changing its deck hierarchy, or changing its preset changes the
+context used by the scheduler. The fork can therefore recalculate dependent
+card, note, deck, or preset state and change predictions or due ordering.
+That is a consequence of a stateful, hierarchy-aware scheduler; it is not a
+permanent deletion of review history.
+
+## 4. Scheduling, limits, and workload
+
+### Where do I select the scheduler?
+
+In Deck Options, use **Scheduler → Review scheduler** to choose FSRS-6,
+FSRS-7, RWKV-Curve, or RWKV-Instant for the preset. Instant adds a separate
+**Fallback : Due-Date Calculator**: choose FSRS or Curve for stored due dates
+used by mobile sync and statistics. Instant ignores those dates when selecting
+reviews. The separate Curve and Instant enable switches have
+been replaced by these selectors. Older FSRS versions are no longer offered;
+existing saved choices are preserved until you explicitly select a current model.
+
+**Machine Learning Based scheduling** remains collection-wide. Choosing a model
+enables it; other presets keep their own model choices. Turning it off restores
+SM2 for native intervals, while the existing per-preset RWKV settings remain
+independent.
+
+### Do load balancing and review fuzz apply to RWKV?
+
+**Enable load balancer** and **Enable review fuzz** in Deck Options are both
+collection-wide switches. The review-fuzz tooltip currently says "this preset",
+but the scheduler reads the collection-wide setting.
+
+| Scheduling path                          | Load balancer                                                                           | Review fuzz                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **RWKV-Curve while reviewing**           | Yes, for day-based answer intervals up to 90 days, within the available fuzz window.    | Yes, for day-based passing answer intervals.         |
+| **RWKV-Instant scored review selection** | No. Instant chooses eligible reviews from current recall predictions and spacing rules. | No. Fuzz does not change Instant's recall threshold. |
+
+Instant's **Fallback : Due-Date Calculator** still uses these settings when
+calculating day-based answer intervals, whether the fallback is FSRS or Curve.
+Those stored due dates are used by mobile clients and statistics; they do not
+determine when a scored review becomes eligible in Instant.
+
+The interval rules have a few exceptions:
+
+- Disabling review fuzz leaves the load balancer without a range of days to
+  choose from, so it cannot spread reviews across days even if its switch is on.
+- Curve uses seconds for generated intervals below 12 hours in the learning
+  queues or below one day in the Review queue. Same-day reviews must be enabled
+  for generated short intervals. Review fuzz and load balancing apply to
+  whole-day review intervals.
+- Day-based intervals below 2.5 days receive no fuzz. Curve's Again interval
+  when answering a review card is also clamped without fuzz or load balancing.
+
+The separate **Reschedule With RWKV-Curve** bulk action currently bypasses both
+settings. It writes the predicted whole-day intervals and due dates directly;
+the live-answer behavior above applies when reviewing cards.
+
+### How does the fork handle daily review limits?
+
+The fork still uses Anki's normal review limits and queue truncation. RWKV
+orders or filters candidates, after which the applicable limits determine how
+many cards are gathered. The current code does not solve for a requested daily
+cap by automatically changing desired retention or rewriting intervals.
+
+The RWKV-specific `minimum_reviews_per_day` setting is a floor used by Instant
+ordering, not a maximum. It applies to the selected deck and its subdecks as one
+group, pulling the lowest-retrievability cards if needed. Enable **Also honor
+subdeck minimums** on a deck to enforce its direct subdecks' own minimums;
+each subdeck independently decides whether to include its children. This option
+is deck-specific and can be applied to all subdecks when saving. Same-day-review
+exemptions and the option that lets new cards ignore the review limit can also
+make the final count differ from a simple cap.
+
+Reviews pulled forward to reach the minimum use the review limit before new
+cards do. When the review limit also applies to new cards, a minimum equal to
+the maximum reviews can leave no new cards. Turn on **New cards ignore minimum
+reviews** in Daily Limits to gather and show new cards first; the minimum then
+only fills the review capacity left after them, and new cards do not count
+toward it. With Instant enabled, these settings and **Also honor subdeck
+minimums** appear in Daily Limits in either layout; **New cards ignore minimum
+reviews** is greyed out while the minimum is 0. Instant workload forecasts follow
+the same order.
+
+### Can RWKV-Instant repeat a card when same-day reviews are disabled?
+
+Turning off **Allow same day review for (re)learning steps** blocks ordinary
+same-day repeats selected by RWKV-Instant. It also makes FSRS and RWKV-Curve
+schedule generated intervals in whole days. Configured learning and
+relearning steps still apply.
+
+**Skip learning and relearning queues with FSRS/RWKV** determines where the
+steps go. Turn it on to schedule a preset `10m` step as a review due in ten
+minutes. Generated intervals under one day also use Review when same-day
+reviews are enabled. In Review, these cards follow the selected review order,
+daily review limits, and applicable Instant spacing rules.
+
+Same-day Again answers do not add another lapse or trigger leech handling,
+across queue settings and schedulers. This also covers rescheduling filtered
+decks and **Grade Now**. A review card's first answer of a scheduler day still
+adds a lapse when answered Again; later answers that day do not, even after an
+earlier successful answer. All answers remain in review history and update the
+model.
+
+### How do the same-day settings interact?
+
+FSRS-7 and RWKV-Curve decide answer intervals, while RWKV-Instant independently
+decides whether a review card can enter the queue. They share **Allow same day
+review for (re)learning steps**, which is shown when FSRS or Instant is enabled.
+The decision tree shows both paths. When Instant is enabled, its spacing
+minimums also apply to learning/relearning selection, including Learn ahead:
+
+```mermaid
+flowchart TD
+    A{"Scheduling path"}
+
+    A -->|FSRS-7 / RWKV-Curve| D{"Does a preset step<br/>apply to this answer?"}
+    D -->|Yes| E["Use the configured step delay"]
+    D -->|No| F{"Allow same day review for<br/>(re)learning steps On?"}
+    F -->|No| C["Schedule as Review<br/>Minimum interval: 1 day"]
+    F -->|Yes| G{"Under the queue's short-interval cutoff?<br/>12 hours in learning, one day in Review"}
+    G -->|Yes| H["Use the generated delay"]
+    G -->|No| C
+
+    E --> B{"Skip learning and<br/>relearning queues?"}
+    H --> B
+    B -->|Yes| R["Schedule a timed review"]
+    B -->|No| S["Use a learning or relearning queue"]
+    R --> Q{"RWKV-Instant enabled?"}
+    S --> Q
+    Q -->|No| P
+    Q -->|Yes| L
+
+    A -->|RWKV-Instant| I{"Allow same day review for<br/>(re)learning steps On?"}
+    I -->|No| J["Same-day RWKV review repeat blocked"]
+    I -->|Yes| L{"Minimum other answers reached<br/>since this card's last answer?"}
+    L -->|No| M["Wait for enough other answers"]
+    L -->|Yes| N{"Minimum seconds elapsed<br/>since this card's last answer?"}
+    N -->|No| O["Wait for enough elapsed time"]
+    N -->|Yes| P["Card eligible for selection<br/>Other queue conditions still apply"]
+```
+
+The **Same-Day Repeats** row sets minimum other reviews and elapsed seconds
+between repeats. Both must be satisfied; a value of `0`
+removes that minimum. Their defaults are **5 other answers** and **30 seconds**.
+For example, values of **3** and **90** require both three other answers and
+90 elapsed seconds before the card can repeat while RWKV-Instant is enabled.
+This includes learning/relearning cards, even when a step is already due or
+Learn ahead would offer it early. Waiting preserves the card's saved interval
+and learning steps. Learning cards continue to follow those intervals; Instant's
+recall threshold is not added to their selection rules.
+
+**Allow same day review for (re)learning steps** defaults to on. RWKV-Instant
+can select ordinary same-day reviews through its recall and spacing rules,
+including cards with a future stored review day. For cards with a timed step
+in Review, the due time and spacing rules determine eligibility.
+
+### Does RWKV override standard sibling burying?
+
+No. The fork uses Anki's normal bury settings: `bury_new`, `bury_reviews`, and
+`bury_interday_learning`. RWKV-Instant does not decide independently whether
+sibling cards are buried. The deck configuration remains the source of that
+policy.
+
+### Does RWKV guarantee fewer reviews than FSRS?
+
+No. Predictive accuracy and workload are different measurements. A model can
+predict recall well without producing a fixed number of reviews, and
+RWKV-Instant can request short-term reviews when its current state predicts
+that a card is at risk.
+
+The fork therefore does not provide a universal conversion such as “RWKV at
+90% equals FSRS at 90%,” nor does it guarantee a particular review count for a
+given desired-retention value.
+
+## 5. Calibration and prediction history
+
+### What does a calibration bucket mean?
+
+A calibration graph groups reviews by predicted recall probability and compares
+the predictions with the observed outcomes. A 90% bucket means that the
+reviews in that bucket were predicted near 90%; it is not a permanent label
+attached to a card. This is the interpretation behind the [calibration-bucket question](https://discord.com/channels/617136488840429598/1525841501622370476/1552174896539238511)
+in the discussion.
+
+For RWKV, a graph can replay the current model over historical reviews. Anki
+does not reliably record which scheduler produced every historical prediction,
+so a replay shows what the current model would predict for the past, not
+necessarily what it predicted on the original review date.
+
+### Does the first answer on a new card count?
+
+In this fork's RWKV calibration cache, an eligible first learning answer is
+included and receives a prediction before the answer is applied. It is not the
+same model context as a mature review: when enabled, the first answer can use
+elapsed time since card creation, while later reviews use elapsed time since
+the previous review.
+
+The history builder retains the learning sequence used for replay, so an older
+superseded sequence may not be replayed. This is a property of the fork's
+calibration history, not a statement that all external graphs use the same
+filtering rules.
+
+### How are learning and relearning steps represented?
+
+The replay assigns explicit states to learning, review, relearning, filtered,
+manual, and rescheduled events. Learning and relearning events also use their
+corresponding queues; mature reviews use the review queue.
+
+The prediction cache records the revlog identifier, prediction, sample role,
+and fold information, but not every state label directly in the cache row. A
+graph that needs to separate learning, relearning, and mature reviews should
+join the cache to the corresponding revlog data.
+
+## 6. History and state in this fork
+
+### Which review events enter the RWKV history?
+
+The current replay query accepts revlog types 0 through 5 and excludes filtered
+rows with `type = 3` and `factor = 0`. Eligible learning, review, relearning,
+filtered, manual, and rescheduled events can therefore affect the replayed
+state.
+
+The code does not assign a fixed numerical weight such as “one filtered review
+changes R by X.” The effect depends on the trained model, the preceding state,
+and the other features in the review sequence.
+
+### How is RWKV state rebuilt?
+
+The fork reconstructs RWKV state by replaying eligible history in order and
+refreshing the prediction cache. Live answers update the relevant model state
+immediately; a rebuild is the mechanism used to bring cached state back in
+line with the collection history after a substantial change.
+
+The exact time and memory cost depend on the collection, the model, and the
+runtime. The repository does not define one fixed rebuild time for all users.
+
+### Which model does the fork use, and what does leak-free mean?
+
+The bundled model weights are not covered by the code's license: see
+[WEIGHTS-NOTICE.md](qt/aqt/rwkv_inference/WEIGHTS-NOTICE.md).
+
+Deck Options → RWKV → Advanced offers three sizes:
+
+- **Small** (the default): the show-time two-head cool-down for Small (SM118) for
+  RWKV-Curve (the 2026-11 release candidate; the show-time retrain (SM92) before),
+  331,511 parameters, 8.3× fewer than the big model, beside the longer Small
+  Instant-Only model (SM113) for RWKV-Instant. Both have the same size: about 3.9 KB
+  of state per card and note each at the default storage precision (2,545 B per
+  card, 1,315 B per note). SM118's show-time Curve LogLoss on 722 held-out users is
+  0.300016 (SM92: 0.300356).
+- **Tiny**: the six-layer Tiny two-head model (SM130) for RWKV-Curve beside the
+  six-layer Tiny Instant-Only model (SM130) for RWKV-Instant (the 2026-11 release
+  candidate), 185,057 parameters each (Small's 331,511): one card layer, one note
+  layer and shorter deck, preset and user streams, 6 layer steps instead of 13. About
+  2.6 KB of state per card and note each at the default storage precision (1,315 B
+  per card and per note, 32% less than Small). On 722 held-out users its Curve
+  LogLoss is 0.47% higher than Small's and its Instant LogLoss 0.52% (two-head) /
+  0.56% (Instant-Only) higher, within the +1% budget chosen for Tiny. Both models
+  have an answer-time head.
+- **Big**: the show-time big model (SM91s2) for RWKV-Curve, beside the
+  show-time instant-only big model (SM99) for RWKV-Instant (since 2026-11-12), as
+  the former Legacy choice. It is the big model (1 leak-free epoch) trained one more epoch
+  on the time since the last review measured when the card is shown, the time
+  Anki gives the model. On those inputs its Instant LogLoss is 0.35% lower and
+  its Curve LogLoss 0.06% lower (a tie) than the big model (1 leak-free epoch)
+  (722 held-out users).
+
+The show-time retrain of the release (SM92) stays a preserved choice for profiles
+that already hold it (Deck Options lists it only for them): it is the small
+model (SM63) retrained so that the time since a card's last review is measured the way Anki
+measures it, up to the moment the card is shown, not up to the moment it is
+answered. It only pays off once Anki schedules by querying the model at show time
+(retrievability below the desired retention). Until then the normal-input model
+is better: on normal inputs SM63 scores 0.30003 Curve / 0.27654 Instant against
+0.30024 / 0.27676 for SM92 (722 users). SM92 stays bundled.
+
+In the public training data, a card that was deleted before the export is
+missing from the cards table. A naive feature builder then marks its note,
+deck and preset as missing, which tells a model that the card will be deleted
+later. Live Anki never reviews a deleted card, so that is information from the
+future. SM72 and SM92 were trained and scored without it: the three missing-identity
+inputs are always zero, and the fork forces them to zero whenever SM72
+(all its cool-downs, from epoch 15, 20 and 25) or SM92 is selected. The fork's history replay already skips deleted cards' reviews, so
+every replayed review has its real note, deck and preset.
+
+On held-out users, with leak-free inputs for every model, SM72's LogLoss is
+within about 0.4% of the big model (1 leak-free epoch) and within about 0.2%
+of the original big model used at the time, for both Curve and Instant. On the inputs Anki
+actually gives (intervals measured when the card is shown), SM92's Instant
+LogLoss is about 0.3% lower than SM72's and its Curve LogLoss is unchanged. See
+[the model documentation](docs/rwkv.MD#show-time-retrain-of-the-release-sm92)
+for the full tables.
+
+## 7. Platform and implementation scope
+
+### Does the fork run on mobile?
+
+The [fork description](https://www.reddit.com/r/Anki/comments/1w0p9qc/comment/paqq1oe/)
+is desktop-focused. A [mobile-support reply](https://discord.com/channels/368267295601983490/1347982145418694747/1553731488997052537)
+reports that AnkiWeb sync works, while the mobile client falls back to FSRS-6
+scheduling rather than running the desktop fork's FSRS-7 or RWKV behavior.
+Verify the current fork release before relying on that behavior, because
+mobile support is version-specific.
+
+### Is this an official Anki release?
+
+No. The [fork description](https://www.reddit.com/r/Anki/comments/1w0p9qc/comment/paqq1oe/)
+describes it as an unofficial, experimental build for testing scheduling ideas
+in real use. It should not be treated as a promise about the behavior or
+support policy of official Anki releases.
+
+### What are the resource and performance trade-offs?
+
+RWKV keeps and updates more state than a small formula-only scheduler, and
+replaying a large collection can require noticeable time or memory. The exact
+cost depends on the model implementation, collection size, and hardware; this
+FAQ does not assign a universal hardware requirement.
+
+### What does this fork add to Anki?
+
+The current fork integrates RWKV with Anki's existing collection and scheduler
+model. In practical terms, it provides:
+
+- RWKV-Instant and RWKV-Curve scheduling modes;
+- replay and incremental updates over review history;
+- deck, preset, card, note, and collection context;
+- calibration and prediction-history support;
+- desired-retention and review-limit integration; and
+- normal Anki learning, relearning, review, queue-limit, and sibling-burying
+  behavior around the RWKV prediction layer.
+
+These are integration capabilities, not guarantees that every model version
+will improve retention, reduce workload, or behave like FSRS.
+
+## Repository code references
+
+The fork-specific statements above are primarily grounded in these repository
+areas:
+
+- `qt/aqt/rwkv_scheduler.py` for model inputs, replay, prediction caching,
+  desired-retention resolution, and calibration handling;
+- `rslib/src/rwkv/` for RWKV history queries and state processing;
+- `rslib/src/storage/revlog/` for revlog filtering and review kinds;
+- `rslib/src/decks/limits.rs` for daily limits and RWKV minimum-review
+  handling;
+- `rslib/src/scheduler/answering/` and
+  `rslib/src/scheduler/queue/builder/` for answer transitions, queueing, and
+  sibling burying;
+- `rslib/src/scheduler/states/` for review fuzz, load balancing, and intraday
+  interval rules; and
+- `rslib/src/scheduler/rwkv.rs` for applying bulk RWKV-Curve rescheduling.

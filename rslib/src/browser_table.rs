@@ -15,6 +15,7 @@ use crate::card_rendering::prettify_av_tags;
 use crate::notetype::CardTemplate;
 use crate::notetype::NotetypeKind;
 use crate::prelude::*;
+use crate::scheduler::fsrs::memory_state::fsrs_current_retrievability_for_state;
 use crate::scheduler::timespan::time_span;
 use crate::scheduler::timing::SchedTimingToday;
 use crate::template::RenderedNode;
@@ -112,7 +113,9 @@ impl Card {
 
     /// Returns the card's due date as a timestamp if it has one.
     fn due_time(&self, timing: &SchedTimingToday) -> Option<TimestampSecs> {
-        if self.queue == CardQueue::Learn {
+        if let Some(due) = self.review_step_due_at() {
+            Some(due)
+        } else if self.queue == CardQueue::Learn {
             Some(TimestampSecs(self.original_or_current_due() as i64))
         } else if self.is_due_in_days() {
             Some(
@@ -129,6 +132,7 @@ impl Card {
     /// If last_review_date isn't stored in the card, this uses card.due and
     /// card.ivl to infer the elapsed time, which won't be accurate if
     /// 'set due date' or an add-on has changed the due date.
+<<<<<<< HEAD
     pub(crate) fn seconds_since_last_review(&self, timing: &SchedTimingToday) -> Option<u32> {
         if let Some(last_review_time) = self.last_review_time {
             Some(timing.now.elapsed_secs_since_clamped(last_review_time))
@@ -142,6 +146,15 @@ impl Card {
             let last_review_time = TimestampSecs(self.original_or_current_due() as i64);
             Some(timing.now.elapsed_secs_since_clamped(last_review_time))
         }
+=======
+    pub(crate) fn days_since_last_review(&self, timing: &SchedTimingToday) -> f32 {
+        timing.fsrs_elapsed_seconds(
+            self.last_review_time,
+            self.original_or_current_due(),
+            self.interval,
+        ) as f32
+            / 86_400.0
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 }
 
@@ -283,7 +296,7 @@ impl Collection {
                 .as_ref()
                 .or_invalid("Active browser columns not set.")?,
         );
-        RowContext::new(self, id, notes_mode, card_render_required(&columns))?.browser_row(&columns)
+        RowContext::new(self, id, notes_mode, &columns)?.browser_row(&columns)
     }
 
     fn get_note_maybe_with_fields(&self, id: NoteId, _with_fields: bool) -> Result<Note> {
@@ -346,12 +359,8 @@ fn rendered_nodes_to_str(nodes: &[RenderedNode]) -> String {
 }
 
 impl RowContext {
-    fn new(
-        col: &mut Collection,
-        id: i64,
-        notes_mode: bool,
-        with_card_render: bool,
-    ) -> Result<Self> {
+    fn new(col: &mut Collection, id: i64, notes_mode: bool, columns: &[Column]) -> Result<Self> {
+        let with_card_render = card_render_required(columns);
         let cards;
         let note;
         if notes_mode {
@@ -387,6 +396,7 @@ impl RowContext {
             None
         };
         let timing = col.timing_today()?;
+<<<<<<< HEAD
         let fsrs_retrievability = cards[0]
             .memory_state
             .zip(cards[0].seconds_since_last_review(&timing))
@@ -398,6 +408,22 @@ impl RowContext {
                 )
             })
             .transpose()?;
+=======
+        let fsrs_retrievability = if columns.contains(&Column::Retrievability) {
+            let card = &cards[0];
+            card.memory_state.and_then(|state| {
+                let preset = col.fsrs_metric_preset_for_card(card).ok()?;
+                fsrs_current_retrievability_for_state(
+                    &preset.params,
+                    state,
+                    card.days_since_last_review(&timing),
+                )
+                .ok()
+            })
+        } else {
+            None
+        };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let fsrs_stability = cards[0].memory_state.map(|state| state.stability);
         let render_context = if with_card_render {
             RenderContext::new(col, &cards[0], &note, &notetype)
@@ -701,7 +727,10 @@ mod tests {
     use crate::card::FsrsMemoryState;
     use crate::deckconfig::FsrsVersion;
     use crate::deckconfig::UpdateDeckConfigsRequest;
+<<<<<<< HEAD
     use crate::scheduler::fsrs::memory_state::fsrs_current_retrievability_for_state;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     use crate::search::SortMode;
 
     fn fsrs7_params_for_retrievability_test() -> Vec<f32> {
@@ -743,6 +772,35 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn unreadable_preset_leaves_only_the_retrievability_cell_empty() -> Result<()> {
+        let mut col = Collection::new();
+        crate::tests::NoteAdder::basic(&mut col).add(&mut col);
+        let mut card = col.get_first_card();
+        card.memory_state = Some(FsrsMemoryState {
+            stability: 10.0,
+            stability_internal: 10.0,
+            stability_fast: None,
+            difficulty: 5.0,
+        });
+        col.storage.update_card(&card)?;
+        col.storage
+            .db
+            .execute("update deck_config set config = x'ff' where id = 1", [])?;
+
+        col.state.active_browser_columns = Some(Arc::new(vec![Column::Notetype]));
+        assert_eq!(col.browser_row_for_id(card.id.0)?.cells[0].text, "Basic");
+        col.state.active_browser_columns =
+            Some(Arc::new(vec![Column::Notetype, Column::Retrievability]));
+        let row = col.browser_row_for_id(card.id.0)?;
+        assert_eq!(row.cells[0].text, "Basic");
+        assert_eq!(row.cells[1].text, "");
+        Ok(())
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn retrievability_cell_uses_selected_model_curve() -> Result<()> {
         let mut col = Collection::new();
         let params = fsrs7_params_for_retrievability_test();
@@ -768,7 +826,16 @@ mod tests {
         card.decay = Some(params[23]);
         col.storage.update_card(&card)?;
 
+<<<<<<< HEAD
         let ctx = RowContext::new(&mut col, cid.0, false, false)?;
+=======
+        let ctx = RowContext::new(
+            &mut col,
+            cid.0,
+            false,
+            &[Column::Stability, Column::Retrievability],
+        )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let actual = ctx.get_cell_text(Column::Retrievability)?;
         let expected = fsrs_current_retrievability_for_state(&params, state, elapsed_days)?;
         assert_eq!(actual, format!("{:.0}%", expected * 100.0));
@@ -799,7 +866,11 @@ mod tests {
             col.storage.update_card(&card)?;
         }
 
+<<<<<<< HEAD
         let ctx = RowContext::new(&mut col, note.id.0, true, false)?;
+=======
+        let ctx = RowContext::new(&mut col, note.id.0, true, &[Column::Retrievability])?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let expected = time_span(31_000.0 * 86_400.0, &ctx.tr, false);
         assert_eq!(ctx.get_cell_text(Column::Interval)?, expected);
         Ok(())
@@ -827,7 +898,16 @@ mod tests {
         });
         col.storage.update_card(&card)?;
 
+<<<<<<< HEAD
         let ctx = RowContext::new(&mut col, cid.0, false, false)?;
+=======
+        let ctx = RowContext::new(
+            &mut col,
+            cid.0,
+            false,
+            &[Column::Stability, Column::Retrievability],
+        )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let actual = ctx.get_cell_text(Column::Stability)?;
         assert!(
             (s90 - stability).abs() > 0.001,

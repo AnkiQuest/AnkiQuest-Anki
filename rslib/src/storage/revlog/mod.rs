@@ -28,8 +28,12 @@ pub(crate) const RWKV_REVIEW_RETRIEVABILITY_CACHE_TABLE: &str =
 const REVIEW_RETRIEVABILITY_CACHE_CLEANUP_FULL_SYNC_MARKER: &str =
     "reviewRetrievabilityCacheCleanupFullSync";
 const REVIEW_RETRIEVABILITY_CACHE_WRITE_SAVEPOINT: &str = "review_retrievability_cache_write";
+<<<<<<< HEAD
 /// Effective desktop-compatible reset boundary for the card aliased as `c`.
 pub(crate) const RWKV_HISTORY_RESET_AFTER_SQL: &str = "coalesce(
+=======
+const RWKV_HISTORY_RESET_AFTER_SQL: &str = "coalesce(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     (select case when json_valid(cast(val as text)) then
        case when json_type(cast(val as text), '$.after') = 'integer'
        then max(json_extract(cast(val as text), '$.after'), 0) end end
@@ -624,7 +628,11 @@ impl SqliteStorage {
             .map_err(Into::into)
     }
 
+<<<<<<< HEAD
     /// The newest scheduling answer not followed by a Forget reset.
+=======
+    /// The newest scheduling answer that has not been followed by a reset.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) fn last_unreset_review(&self, card_id: CardId) -> Result<Option<RevlogId>> {
         self.db
             .prepare_cached(
@@ -774,6 +782,7 @@ impl SqliteStorage {
         &self,
         ignored_review_ids: &[RevlogId],
     ) -> Result<(Vec<RwkvHistoricalReviewRow>, Vec<i64>)> {
+<<<<<<< HEAD
         self.rwkv_historical_review_rows_with_cutoffs(ignored_review_ids, &HashMap::new(), None)
             .map(|(rows, active, _)| (rows, active))
     }
@@ -781,13 +790,22 @@ impl SqliteStorage {
     /// Also returns how many revlog rows were scanned and the newest one's id:
     /// the whole revlog without `card_id` and ignored ids, so the replay stamp
     /// needn't count it again.
+=======
+        self.rwkv_historical_review_rows_with_cutoffs(ignored_review_ids, &HashMap::new())
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) fn rwkv_historical_review_rows_with_cutoffs(
         &self,
         ignored_review_ids: &[RevlogId],
         preserved_learning_start_cutoffs: &HashMap<i64, i64>,
+<<<<<<< HEAD
         // Only this card's reviews (what is kept of a card depends only on its own).
         card_id: Option<CardId>,
     ) -> Result<RwkvHistoricalReviewRows> {
+=======
+    ) -> Result<(Vec<RwkvHistoricalReviewRow>, Vec<i64>)> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let (ignored_clause, active_ignored_review_ids) = if ignored_review_ids.is_empty() {
             (String::new(), Vec::new())
         } else {
@@ -814,6 +832,7 @@ impl SqliteStorage {
                 .collect::<std::result::Result<Vec<i64>, _>>()?;
             (format!("and r.id not in {ids}"), active)
         };
+<<<<<<< HEAD
         let card_clause = card_id.map_or(String::new(), |id| format!("and r.cid = {}", id.0));
         // The cards and resets are joined here, not in SQL: a cards lookup per
         // review and the resets read through the cid index (random reads into
@@ -903,6 +922,63 @@ order by r.id"
                 is_learning_start: false,
             });
         }
+=======
+        // Rows come back in rowid (review id) order, so no sort or window
+        // function is needed; the per-card replay start is derived below.
+        // Forget keeps the revlog. Scan it in table order for reset markers,
+        // then resolve the latest boundary (including the synced marker) once
+        // per reviewed card instead of parsing card/config JSON per answer.
+        let sql = format!(
+            "with latest_resets as (
+  select cid, max(id) as reset_id
+  from revlog not indexed
+  where type = 4 and ease = 0 and factor = 0
+  group by cid
+), reviewed_cards as materialized (
+  select c.id, c.nid, case when c.odid != 0 then c.odid else c.did end as deck_id,
+    max(coalesce(resets.reset_id, 0), {RWKV_HISTORY_RESET_AFTER_SQL}) as reset_id
+  from cards c
+  left join latest_resets resets on resets.cid = c.id
+  where c.type != 0
+)
+select
+  r.id,
+  r.cid,
+  c.nid,
+  c.deck_id,
+  r.ease,
+  r.time,
+  r.type,
+  cast(r.ivl as integer),
+  cast(r.factor as integer)
+from revlog r
+join reviewed_cards c on c.id = r.cid
+where r.ease between 1 and 4
+  and r.type in (0, 1, 2, 3, 4, 5)
+  and not (r.type = 3 and r.factor = 0)
+  and r.id > c.reset_id
+  {ignored_clause}
+order by r.id"
+        );
+        let mut rows = self
+            .db
+            .prepare(&sql)?
+            .query_map([], |row| {
+                Ok(RwkvHistoricalReviewRow {
+                    review_id: row.get(0)?,
+                    card_id: row.get(1)?,
+                    note_id: row.get(2)?,
+                    deck_id: row.get(3)?,
+                    ease: row.get(4)?,
+                    duration_millis: row.get(5)?,
+                    review_kind: row.get(6)?,
+                    interval_days: row.get(7)?,
+                    ease_factor: row.get(8)?,
+                    is_learning_start: false,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         // A cutoff needs a retained prefix to preserve. A legacy cutoff before
         // Forget must not turn the first post-reset Learning answer into a
         // continuation of the discarded sequence.
@@ -923,7 +999,11 @@ order by r.id"
             .collect();
         retain_rwkv_rows_from_latest_learning_start(&mut rows, &cutoffs);
 
+<<<<<<< HEAD
         Ok((rows, active_ignored_review_ids, scanned))
+=======
+        Ok((rows, active_ignored_review_ids))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     pub(crate) fn get_revlog_entries_for_searched_cards_after_stamp(
@@ -1083,7 +1163,10 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+<<<<<<< HEAD
     use crate::card::CardType;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     use crate::collection::Collection;
     use crate::collection::CollectionBuilder;
 
@@ -1924,7 +2007,10 @@ with latest_resets as (
   where r.ease between 1 and 4
     and r.type in (0, 1, 2, 3, 4, 5)
     and not (r.type = 3 and r.factor = 0)
+<<<<<<< HEAD
     and c.type != 0
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     and r.id > coalesce(resets.reset_id, 0)
     and r.id > ({RWKV_HISTORY_RESET_AFTER_SQL})
     {ignored_clause}
@@ -1974,7 +2060,11 @@ order by e.id, e.cid"
 
     #[test]
     fn rwkv_historical_review_rows_match_window_query() -> Result<()> {
+<<<<<<< HEAD
         let (mut col, _tempdir, _col_path) = temp_collection("rwkv-historical-rows")?;
+=======
+        let (col, _tempdir, _col_path) = temp_collection("rwkv-historical-rows")?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut seed = 0x2545_f491_4f6c_dd1d_u64;
         let mut next = |bound: u64| {
             seed ^= seed << 13;
@@ -1982,6 +2072,7 @@ order by e.id, e.cid"
             seed ^= seed << 17;
             seed % bound
         };
+<<<<<<< HEAD
         let mut card_ids = Vec::new();
         col.transact_no_undo(|col| {
             for card_index in 0..40_i64 {
@@ -2043,6 +2134,56 @@ order by e.id, e.cid"
             }
             Ok(())
         })?;
+=======
+        for card_index in 0..40_i64 {
+            let card_id = 1_000 + card_index;
+            let odid = if card_index % 7 == 0 { 9 } else { 0 };
+            let card_type = if card_index % 2 == 0 { 2 } else { 0 };
+            let data = if card_index % 4 == 0 {
+                r#"{"rwkv_reset_after":13000}"#
+            } else {
+                ""
+            };
+            col.storage.db.execute(
+                "insert into cards (id, nid, did, ord, mod, usn, type, queue, due, ivl,
+                 factor, reps, lapses, left, odue, odid, flags, data)
+                 values (?, ?, ?, 0, 0, 0, ?, 0, 0, 0, 0, 0, 0, 0, 0, ?, 0, ?)",
+                params![
+                    card_id,
+                    card_id / 3,
+                    1 + card_index % 4,
+                    card_type,
+                    odid,
+                    data
+                ],
+            )?;
+        }
+        // Card 5000 has reviews but no card row, so the join drops them.
+        let card_ids = (1_000..1_040).chain([5_000]).collect::<Vec<i64>>();
+        let mut review_ids = Vec::new();
+        for review_index in 0..2_000_i64 {
+            let review_id = 10_000 + review_index * 3 + next(3) as i64;
+            let card_id = card_ids[next(card_ids.len() as u64) as usize];
+            // Bias towards learning rows so cards restart learning often.
+            let kind = [0, 0, 0, 1, 1, 2, 3, 4, 5, 6][next(10) as usize];
+            let ease = next(6) as i64;
+            let factor = if next(5) == 0 { 0 } else { 2_500 };
+            col.storage.db.execute(
+                "insert into revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type)
+                 values (?, ?, 0, ?, ?, 0, ?, ?, ?)",
+                params![
+                    review_id,
+                    card_id,
+                    ease,
+                    next(40) as i64 - 10,
+                    factor,
+                    next(60_000) as i64,
+                    kind
+                ],
+            )?;
+            review_ids.push(review_id);
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         let (rows, active) = col.storage.rwkv_historical_review_rows(&[])?;
         assert!(active.is_empty());
@@ -2081,6 +2222,7 @@ order by e.id, e.cid"
         Ok(())
     }
 }
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod test {
@@ -2427,3 +2569,5 @@ mod test {
         ));
     }
 }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007

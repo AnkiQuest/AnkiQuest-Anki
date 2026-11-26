@@ -1,0 +1,406 @@
+<!--
+Copyright: Ankitects Pty Ltd and contributors
+License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+-->
+<script lang="ts">
+    import { DeckId } from "@generated/anki/decks_pb";
+    import { UpdateDeckConfigsMode } from "@generated/anki/deck_config_pb";
+    import { Empty } from "@generated/anki/generic_pb";
+    import * as tr from "@generated/ftl";
+    import { postProto } from "@generated/post";
+    import type Carousel from "bootstrap/js/dist/carousel";
+    import type Modal from "bootstrap/js/dist/modal";
+
+    import DynamicallySlottable from "$lib/components/DynamicallySlottable.svelte";
+    import HelpModal from "$lib/components/HelpModal.svelte";
+    import Item from "$lib/components/Item.svelte";
+    import SettingTitle from "$lib/components/SettingTitle.svelte";
+    import SwitchRow from "$lib/components/SwitchRow.svelte";
+    import TitledContainer from "$lib/components/TitledContainer.svelte";
+    import type { HelpItem } from "$lib/components/types";
+
+    import { commitEditing, type DeckOptionsState, fsrsParams } from "./lib";
+    import RwkvRepeatSpacing from "./RwkvRepeatSpacing.svelte";
+    import RwkvModelOptions from "./RwkvModelOptions.svelte";
+    import SimulatorModal from "./SimulatorModal.svelte";
+    import { buildSimulateFsrsRequest } from "./simulate-fsrs-request";
+    import SpinBoxFloatRow from "./SpinBoxFloatRow.svelte";
+
+    export let state: DeckOptionsState;
+    export let study = false;
+    export let onPresetChange: () => void;
+
+    const config = state.currentConfig;
+    const defaults = state.defaults;
+    const newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit;
+    const reviewFuzzEnabled = state.reviewFuzzEnabled;
+    const reviewFuzzBase = state.reviewFuzzBase;
+    const reviewFuzzFactorShort = state.reviewFuzzFactorShort;
+    const reviewFuzzFactorMid = state.reviewFuzzFactorMid;
+    const reviewFuzzFactorLong = state.reviewFuzzFactorLong;
+
+    let forceBuildingRwkvStateCache = false;
+    let preparingCalibrationData = false;
+    let reschedulingRwkvReviewCards = false;
+    $: rwkvActionInProgress =
+        forceBuildingRwkvStateCache ||
+        preparingCalibrationData ||
+        reschedulingRwkvReviewCards;
+
+    const settings = {
+        rwkvEnforceGradeOrder: {
+            title: tr.deckConfigRwkvReviewEnforceGradeOrder(),
+            help: tr.deckConfigRwkvReviewEnforceGradeOrderTooltip(),
+        },
+        rwkvCandidateRefresh: {
+            title: tr.deckConfigRwkvReviewCandidateRefresh(),
+            help: tr.deckConfigRwkvReviewCandidateRefreshTooltip(),
+        },
+        rwkvPrecomputeNextCard: {
+            title: tr.deckConfigRwkvReviewPrecomputeNextCard(),
+            help: tr.deckConfigRwkvReviewPrecomputeNextCardTooltip(),
+        },
+        rwkvRefreshInterval: {
+            title: tr.deckConfigRwkvReviewRefreshInterval(),
+            help: tr.deckConfigRwkvReviewRefreshIntervalTooltip(),
+        },
+        rwkvFirstReviewElapsed: {
+            title: tr.deckConfigRwkvReviewFirstReviewElapsedFromCardCreation(),
+            help: tr.deckConfigRwkvReviewFirstReviewElapsedFromCardCreationTooltip(),
+        },
+        rwkvRepeatSpacing: {
+            title: tr.deckConfigRwkvRepeatSpacingTitle(),
+            help: tr.deckConfigRwkvRepeatSpacingTooltip(),
+        },
+    };
+    const settingKeys = Object.keys(settings);
+    const helpSections: HelpItem[] = Object.values(settings);
+
+    let modal: Modal;
+    let carousel: Carousel;
+    let rwkvWorkloadModal: Modal;
+
+    $: simulateFsrsRequest = buildSimulateFsrsRequest({
+        config: $config,
+        params: fsrsParams($config, defaults),
+        search: `preset:"${state.getCurrentNameForSearch()}" -is:suspended`,
+        newCardsIgnoreReviewLimit: $newCardsIgnoreReviewLimit,
+        reviewFuzzEnabled: $reviewFuzzEnabled,
+        reviewFuzzBase: $reviewFuzzBase,
+        reviewFuzzFactorShort: $reviewFuzzFactorShort,
+        reviewFuzzFactorMid: $reviewFuzzFactorMid,
+        reviewFuzzFactorLong: $reviewFuzzFactorLong,
+    });
+
+    function openHelpModal(index: number): void {
+        modal.show();
+        carousel.to(index);
+    }
+
+    function openSettingHelp(key: string): void {
+        openHelpModal(settingKeys.indexOf(key));
+    }
+
+    async function forceBuildRwkvStateCache(): Promise<void> {
+        forceBuildingRwkvStateCache = true;
+        try {
+            await saveRwkvDeckOptions();
+            await postProto("forceBuildRwkvStateCache", new Empty({}), Empty);
+        } finally {
+            forceBuildingRwkvStateCache = false;
+        }
+    }
+
+    async function prepareCalibrationData(): Promise<void> {
+        preparingCalibrationData = true;
+        try {
+            await saveRwkvDeckOptions();
+            await postProto("recomputeRwkvCalibrationData", new Empty({}), Empty);
+        } finally {
+            preparingCalibrationData = false;
+        }
+    }
+
+    async function rescheduleRwkvReviewCards(): Promise<void> {
+        reschedulingRwkvReviewCards = true;
+        try {
+            await saveRwkvDeckOptions();
+            await postProto(
+                "rescheduleRwkvReviewCards",
+                new DeckId({ did: state.getTargetDeckId() }),
+                Empty,
+            );
+        } finally {
+            reschedulingRwkvReviewCards = false;
+        }
+    }
+
+    async function saveRwkvDeckOptions(): Promise<void> {
+        await commitEditing();
+        await state.save(UpdateDeckConfigsMode.NORMAL);
+    }
+
+    function showRwkvWorkloadModal(): void {
+        simulateFsrsRequest.reviewLimit = 9999;
+        rwkvWorkloadModal?.show();
+    }
+</script>
+
+{#if $config.rwkvReviewEnabled || $config.rwkvReviewInstantOrderEnabled}
+    <TitledContainer title={"RWKV"}>
+        <HelpModal
+            title={"RWKV"}
+            url=""
+            slot="tooltip"
+            {helpSections}
+            on:mount={(e) => {
+                modal = e.detail.modal;
+                carousel = e.detail.carousel;
+            }}
+        />
+        <DynamicallySlottable slotHost={Item} api={{}}>
+            {#if $config.rwkvReviewInstantOrderEnabled}
+                <div class="rwkv-mode-heading rwkv-instant-heading">
+                    <h2>RWKV-Instant</h2>
+                    <span class="rwkv-mode-badge">
+                        {tr.deckConfigRwkvRecommended()}
+                    </span>
+                    <span class="rwkv-mode-subtitle">
+                        {tr.deckConfigRwkvInstantSubtitle()}
+                    </span>
+                </div>
+                <p class="rwkv-description rwkv-instant-description">
+                    {tr.deckConfigRwkvInstantDescription()}
+                </p>
+
+                <h2 class="rwkv-subheading">Same-Day Repeats</h2>
+
+                <RwkvRepeatSpacing
+                    {study}
+                    bind:reviews={$config.rwkvReviewMinInterveningReviews}
+                    bind:seconds={$config.rwkvReviewMinElapsedSecs}
+                    defaultReviews={defaults.rwkvReviewMinInterveningReviews}
+                    defaultSeconds={defaults.rwkvReviewMinElapsedSecs}
+                    onHelp={() => openSettingHelp("rwkvRepeatSpacing")}
+                />
+            {/if}
+
+            {#if $config.rwkvReviewEnabled}
+                <div
+                    class="rwkv-mode-heading"
+                    class:rwkv-mode-divider={$config.rwkvReviewInstantOrderEnabled}
+                >
+                    <h2>RWKV-Curve</h2>
+                    <span class="rwkv-mode-subtitle">
+                        {tr.deckConfigRwkvCurveSubtitle()}
+                    </span>
+                </div>
+                <p class="rwkv-description">{tr.deckConfigRwkvCurveDescription()}</p>
+
+                <Item>
+                    <SwitchRow
+                        bind:value={$config.rwkvReviewEnforceGradeOrder}
+                        defaultValue={defaults.rwkvReviewEnforceGradeOrder}
+                    >
+                        <SettingTitle
+                            on:click={() => openSettingHelp("rwkvEnforceGradeOrder")}
+                        >
+                            {tr.deckConfigRwkvReviewEnforceGradeOrder()}
+                        </SettingTitle>
+                    </SwitchRow>
+                </Item>
+
+                <button
+                    class="btn btn-outline-primary"
+                    disabled={rwkvActionInProgress}
+                    on:click={() => rescheduleRwkvReviewCards()}
+                >
+                    {#if reschedulingRwkvReviewCards}
+                        Rescheduling Cards with RWKV-Curve Intervals...
+                    {:else}
+                        Reschedule Cards with RWKV-Curve Intervals
+                    {/if}
+                </button>
+            {/if}
+
+            {#if $config.rwkvReviewEnabled || $config.rwkvReviewInstantOrderEnabled}
+                <h2 class="rwkv-subheading">Maintenance</h2>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button
+                        class="btn btn-outline-primary"
+                        disabled={rwkvActionInProgress}
+                        on:click={() => forceBuildRwkvStateCache()}
+                        title="Rebuild RWKV review state from history."
+                    >
+                        {#if forceBuildingRwkvStateCache}
+                            Rebuilding RWKV State...
+                        {:else}
+                            Build Cache
+                        {/if}
+                    </button>
+
+                    <button
+                        class="btn btn-outline-primary"
+                        disabled={rwkvActionInProgress}
+                        on:click={() => prepareCalibrationData()}
+                        title="Rebuild historical FSRS and RWKV predictions for calibration graphs."
+                    >
+                        {#if preparingCalibrationData}
+                            Preparing Calibration Data...
+                        {:else}
+                            Prepare Calibration Data
+                        {/if}
+                    </button>
+                </div>
+            {/if}
+
+            <details class="rwkv-advanced" open={study}>
+                <summary>{tr.deckConfigAdvancedTitle()}</summary>
+                <RwkvModelOptions {state} disabled={rwkvActionInProgress} />
+
+                {#if $config.rwkvReviewInstantOrderEnabled}
+                    <h2 class="rwkv-subheading">RWKV-Instant</h2>
+                    <SwitchRow
+                        bind:value={$config.rwkvReviewPrecomputeNextCard}
+                        defaultValue={defaults.rwkvReviewPrecomputeNextCard}
+                    >
+                        <SettingTitle
+                            on:click={() => openSettingHelp("rwkvPrecomputeNextCard")}
+                        >
+                            {tr.deckConfigRwkvReviewPrecomputeNextCard()}
+                        </SettingTitle>
+                    </SwitchRow>
+                    <SwitchRow
+                        bind:value={$config.rwkvReviewCandidateRefreshEnabled}
+                        defaultValue={defaults.rwkvReviewCandidateRefreshEnabled}
+                    >
+                        <SettingTitle
+                            on:click={() => openSettingHelp("rwkvCandidateRefresh")}
+                        >
+                            {tr.deckConfigRwkvReviewCandidateRefresh()}
+                        </SettingTitle>
+                    </SwitchRow>
+                    <SpinBoxFloatRow
+                        bind:value={$config.rwkvReviewRefreshInterval}
+                        inlineLabel={study
+                            ? tr.deckConfigRwkvReviewRefreshInterval()
+                            : undefined}
+                        defaultValue={defaults.rwkvReviewRefreshInterval}
+                        min={1}
+                        max={10000}
+                        step={1}
+                    >
+                        <SettingTitle
+                            on:click={() => openSettingHelp("rwkvRefreshInterval")}
+                        >
+                            {tr.deckConfigRwkvReviewRefreshInterval()}
+                        </SettingTitle>
+                    </SpinBoxFloatRow>
+                {/if}
+
+                <h2 class="rwkv-subheading">Compare</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    <button
+                        class="btn btn-outline-primary"
+                        disabled={rwkvActionInProgress}
+                        on:click={() => showRwkvWorkloadModal()}
+                    >
+                        Compare RWKV with FSRS
+                    </button>
+                </div>
+            </details>
+        </DynamicallySlottable>
+    </TitledContainer>
+{/if}
+
+<SimulatorModal
+    bind:modal={rwkvWorkloadModal}
+    workload
+    rwkvWorkload
+    compareWorkloads
+    {state}
+    {simulateFsrsRequest}
+    computing={rwkvActionInProgress}
+    openHelpModal={openSettingHelp}
+    {onPresetChange}
+/>
+
+<style>
+    .rwkv-mode-heading {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem 0.625rem;
+        margin: 1.25rem 0 0.375rem;
+    }
+
+    .rwkv-mode-heading h2 {
+        color: var(--fg);
+        font-size: 1.0625rem;
+        font-weight: 600;
+        line-height: 1.4;
+        margin: 0;
+    }
+
+    .rwkv-instant-heading {
+        margin-top: 0;
+        margin-bottom: 0.25rem;
+    }
+
+    .rwkv-description.rwkv-instant-description {
+        margin-bottom: 0.375rem;
+    }
+
+    .rwkv-mode-subtitle {
+        color: var(--fg-subtle);
+        font-size: 0.8125rem;
+    }
+
+    .rwkv-mode-badge {
+        background: var(--canvas-inset);
+        border: 1px solid var(--border-subtle);
+        border-radius: 1rem;
+        color: var(--fg-link);
+        font-size: 0.6875rem;
+        font-weight: 500;
+        line-height: 1.4;
+        padding: 0.125rem 0.5rem;
+    }
+
+    .rwkv-mode-divider {
+        border-top: 1px solid var(--border-subtle);
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+    }
+
+    .rwkv-description {
+        color: var(--fg-subtle);
+        font-size: 0.875rem;
+        font-style: italic;
+        margin: 0.25rem 0 1rem;
+    }
+
+    .rwkv-subheading {
+        color: var(--fg-subtle);
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin: 1rem 0 0.25rem;
+    }
+
+    .rwkv-advanced {
+        border-top: 1px solid var(--border-subtle);
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+    }
+
+    .rwkv-advanced summary {
+        cursor: pointer;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+
+    .btn {
+        margin-bottom: 0.375rem;
+    }
+</style>

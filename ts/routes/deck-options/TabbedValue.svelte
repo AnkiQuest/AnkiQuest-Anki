@@ -8,9 +8,12 @@
     component's value. Whenever it's deactivated, its setter is called with its
     disabledValue. */
     import type { ValueTab } from "./lib";
+    import EnumSelector from "$lib/components/EnumSelector.svelte";
 
     export let tabs: ValueTab[];
     export let value: number;
+    export let compact = false;
+    export let inlineLabel: string | undefined = undefined;
 
     let activeTab = lastSetTab();
     $: onTabChanged(activeTab);
@@ -42,13 +45,24 @@
     const handleClick = (tabValue: number) => () => (activeTab = tabValue);
 </script>
 
-<ul>
-    {#each tabs as tab, idx}
-        <li class:active={activeTab === idx}>
-            <button on:click={handleClick(idx)}>{tab.title}</button>
-        </li>
-    {/each}
-</ul>
+{#if inlineLabel}
+    <EnumSelector
+        bind:value={activeTab}
+        choices={tabs.map((tab, value) => ({ label: tab.title, value }))}
+        inlineValue
+        accessibleLabel={inlineLabel}
+    />
+{:else}
+    <ul class:compact>
+        {#each tabs as tab, idx}
+            <li class:active={activeTab === idx}>
+                <button aria-pressed={activeTab === idx} on:click={handleClick(idx)}>
+                    {tab.title}
+                </button>
+            </li>
+        {/each}
+    </ul>
+{/if}
 
 <style lang="scss">
     ul {
@@ -83,5 +97,33 @@
     }
     button:hover {
         color: var(--fg);
+    }
+
+    ul.compact {
+        width: auto;
+        margin: 0;
+        padding: 0.125rem;
+        background: var(--canvas-inset);
+        border-radius: 0.5rem;
+    }
+
+    .compact button {
+        min-height: 1.75rem;
+        padding: 0.1875rem 0.75rem;
+        border: 1px solid transparent;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+    }
+
+    .compact li.active > button {
+        background: var(--canvas-elevated);
+        border: 1px solid var(--border);
+        border-radius: 0.375rem;
+    }
+
+    @media (pointer: coarse) {
+        .compact button {
+            min-height: 44px;
+        }
     }
 </style>

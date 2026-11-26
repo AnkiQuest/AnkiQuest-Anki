@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 -- Each value is an index seek in (did, queue, due) per active deck, so the
 -- query does not visit every card of the deck.
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 SELECT EXISTS (
     SELECT 1
     FROM cards
@@ -8,7 +11,11 @@ SELECT EXISTS (
         FROM active_decks
       )
       AND queue IN (:review_queue, :day_learn_queue)
+<<<<<<< HEAD
       AND due <= :today
+=======
+      AND DUE_PREDICATE
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
   ) AS review_remaining,
   EXISTS (
     SELECT 1

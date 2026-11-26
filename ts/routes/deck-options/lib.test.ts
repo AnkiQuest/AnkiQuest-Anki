@@ -7,13 +7,17 @@
 
 import { protoBase64 } from "@bufbuild/protobuf";
 import {
+    DeckConfig_Config_FsrsVersion,
     DeckConfig_Config_LeechAction,
     DeckConfigsForUpdate,
+    DeckConfigsForUpdate_CurrentDeck_Limits,
+    RwkvProfileSettings,
     UpdateDeckConfigsMode,
 } from "@generated/anki/deck_config_pb";
 import { get } from "svelte/store";
 import { expect, test } from "vitest";
 
+import { defaultScheduleCopyOptions } from "./apply-schedule";
 import { DeckOptionsState } from "./lib";
 
 const exampleData = {
@@ -75,8 +79,9 @@ const exampleData = {
         },
     ],
     currentDeck: {
-        name: "Default::child",
+        name: "Default::\"child\"",
         configId: 1618570764780n,
+        subtreeConfigIds: [1n, 1618570764780n],
     },
     defaults: {
         config: {
@@ -100,15 +105,79 @@ const exampleData = {
 };
 
 function startingState(): DeckOptionsState {
-    return new DeckOptionsState(
-        123n,
-        new DeckConfigsForUpdate(exampleData),
-    );
+    return new DeckOptionsState(123n, new DeckConfigsForUpdate(exampleData));
 }
+
+test("RWKV usage includes every preset and follows unsaved scheduler changes", () => {
+    const data = new DeckConfigsForUpdate(exampleData);
+    data.allConfig[0].config!.config!.rwkvReviewEnabled = true;
+    data.allConfig[1].config!.config!.rwkvReviewInstantOrderEnabled = true;
+    const state = new DeckOptionsState(123n, data);
+    expect(get(state.rwkvSchedulerUsage)).toEqual({ curve: true, instant: true });
+    state.currentConfig.update((config) => {
+        config.rwkvReviewInstantOrderEnabled = false;
+        return config;
+    });
+    expect(get(state.rwkvSchedulerUsage)).toEqual({ curve: true, instant: false });
+});
+
+test.each([
+    ["legacy", "legacy"],
+    ["sm40", "sm72e25"],
+    ["sm36", "sm72e25"],
+    ["sm55", "sm72e25"],
+    ["sm56", "sm72e25"],
+    ["sm72", "sm72e25"],
+    ["sm72e20", "sm72e25"],
+    ["sm63", "sm72e25"],
+    ["sm72e25", "sm72e25"],
+    ["sm92", "sm92"],
+    ["tiny", "tiny"],
+])("saving RWKV model %s selects %s without changing precision or pending state", (model, expected) => {
+    const data = new DeckConfigsForUpdate(exampleData);
+    data.rwkvProfileSettings = new RwkvProfileSettings({ model, statePrecision: "int8" });
+    const state = new DeckOptionsState(123n, data);
+    expect(state.dataForSaving(UpdateDeckConfigsMode.NORMAL).rwkvProfileSettings).toMatchObject({
+        model: expected,
+        statePrecision: "int8",
+    });
+    expect(state.dataForSaving(UpdateDeckConfigsMode.COMPUTE_ALL_PARAMS).rwkvProfileSettings?.model).toBe(model);
+    expect(get(state.rwkvProfileSettings).model).toBe(model);
+    expect(data.rwkvProfileSettings.model).toBe(model);
+});
+
+test("RWKV model and storage are global pending changes, independent of the selected preset", async () => {
+    const state = startingState();
+    state.resolveOriginalConfigs();
+    expect(await state.isModified()).toBe(false);
+    state.rwkvProfileSettings.update((settings) => {
+        settings.model = "legacy";
+        settings.statePrecision = "int8";
+        return settings;
+    });
+    expect(await state.isModified()).toBe(true);
+    state.setCurrentIndex(1);
+    expect(get(state.rwkvProfileSettings).model).toBe("legacy");
+    expect(state.dataForSaving(UpdateDeckConfigsMode.NORMAL).rwkvProfileSettings).toMatchObject({
+        model: "legacy",
+        statePrecision: "int8",
+    });
+    expect(state.dataForSaving(UpdateDeckConfigsMode.NORMAL).configs.at(-1)?.config).not.toHaveProperty(
+        "rwkvProfileSettings",
+    );
+});
 
 test("start", () => {
     const state = startingState();
-    expect(state.currentDeck.name).toBe("Default::child");
+    expect(state.currentDeck.name).toBe("Default::\"child\"");
+});
+
+test("subtree presets and search names", () => {
+    const state = startingState();
+    expect(state.getSubtreeConfigIds()).toStrictEqual([1n, 1618570764780n]);
+    expect(state.getConfigById(1n)?.name).toBe("Default");
+    expect(state.getCurrentNameForSearch()).toBe("another one");
+    expect(state.getCurrentDeckNameForSearch()).toBe("Default::\\\"child\\\"");
 });
 
 test("deck list", () => {
@@ -234,6 +303,14 @@ test("saving", () => {
     expect(out.configs!.length).toBe(1);
     expect(out.configs![0].name).toBe("another one");
     expect(out.mode).toBe(UpdateDeckConfigsMode.NORMAL);
+    expect(out.fsrsShortTermWithStepsEnabled).toBe(false);
+    expect(out.fsrsLearningQueuesDisabled).toBe(false);
+
+    state.fsrsShortTermWithStepsEnabled.set(true);
+    state.fsrsLearningQueuesDisabled.set(true);
+    out = state.dataForSaving(UpdateDeckConfigsMode.NORMAL);
+    expect(out.fsrsShortTermWithStepsEnabled).toBe(true);
+    expect(out.fsrsLearningQueuesDisabled).toBe(true);
 
     // rename, then change current deck
     state.setCurrentName("zzz");
@@ -263,6 +340,49 @@ test("saving", () => {
     out = state.dataForSaving(UpdateDeckConfigsMode.APPLY_TO_CHILDREN);
     expect(out.removedConfigIds).toStrictEqual([1618570764780n]);
     expect(out.configs!.map((c) => c.name)).toStrictEqual(["Default"]);
+});
+
+test("subdeck minimum option is deck-specific and can be applied to descendants", async () => {
+    const state = startingState();
+    state.resolveOriginalConfigs();
+    expect(await state.isModified()).toBe(false);
+    state.rwkvRespectSubdeckMinimums.set(true);
+    state.rwkvApplyRespectSubdeckMinimumsToChildren.set(true);
+    expect(await state.isModified()).toBe(true);
+    const request = state.dataForSaving(UpdateDeckConfigsMode.NORMAL);
+    expect(request.limits?.rwkvRespectSubdeckMinimums).toBe(true);
+    expect(request.limits?.rwkvApplyRespectSubdeckMinimumsToChildren).toBe(true);
+    expect(
+        state.dataForSaving(UpdateDeckConfigsMode.COMPUTE_ALL_PARAMS).limits
+            ?.rwkvApplyRespectSubdeckMinimumsToChildren,
+    ).toBe(false);
+});
+
+test("clears incompatible FSRS params across presets for optimize all", () => {
+    const state = startingState();
+    const defaultConfig = state.getConfigById(1n)!;
+    const otherConfig = state.getConfigById(1618570764780n)!;
+
+    defaultConfig.config!.fsrsVersion = DeckConfig_Config_FsrsVersion.SEVEN;
+    defaultConfig.config!.fsrsParams7 = Array(35).fill(1);
+    otherConfig.config!.fsrsVersion = DeckConfig_Config_FsrsVersion.SIX;
+    otherConfig.config!.fsrsParams6 = [Number.NaN, ...Array(20).fill(1)];
+
+    expect(state.incompatibleFsrsParamPresetNames()).toStrictEqual([
+        "another one",
+        "Default",
+    ]);
+    expect(state.clearIncompatibleFsrsParams()).toBe(2);
+    expect(state.incompatibleFsrsParamPresetNames()).toStrictEqual([]);
+    expect(get(state.currentConfig).fsrsParams6).toStrictEqual([]);
+
+    const out = state.dataForSaving(UpdateDeckConfigsMode.COMPUTE_ALL_PARAMS);
+    expect(out.configs!.map((config) => config.name)).toStrictEqual([
+        "Default",
+        "another one",
+    ]);
+    expect(out.configs![0].config!.fsrsParams7).toStrictEqual([]);
+    expect(out.configs![1].config!.fsrsParams6).toStrictEqual([]);
 });
 
 test("aux data", () => {
@@ -308,4 +428,68 @@ test("aux data", () => {
             },
         },
     ]);
+});
+
+test("bulk schedule copies save changed presets while preserving deck limits and unrelated fields", async () => {
+    const data = new DeckConfigsForUpdate(exampleData);
+    data.currentDeck!.limits = new DeckConfigsForUpdate_CurrentDeck_Limits({ desiredRetention: 0.95 });
+    const source = data.allConfig[1].config!.config!;
+    source.rwkvReviewInstantOrderEnabled = true;
+    source.fsrsVersion = DeckConfig_Config_FsrsVersion.SIX;
+    source.desiredRetention = 0.9;
+    source.fsrsParams6 = Array(21).fill(2);
+    source.rwkvReviewMinElapsedSecs = 30;
+    source.fsrsDynamicDesiredRetentionParams = Array(15).fill(3);
+    source.other = new TextEncoder().encode(JSON.stringify({ fsrs7IncludeSameDayOptimize: false, addon: "source" }));
+    const state = new DeckOptionsState(123n, data);
+    state.resolveOriginalConfigs();
+    state.addConfig("new preset");
+    state.setCurrentIndex(get(state.configList).findIndex((entry) => entry.name === "another one"));
+    state.applyScheduleToAllPresets(defaultScheduleCopyOptions());
+
+    const out = state.dataForSaving(UpdateDeckConfigsMode.NORMAL);
+    expect(out.configs!.map((config) => config.name)).toEqual(["Default", "new preset", "another one"]);
+    for (const config of out.configs!) {
+        expect(config.config!.rwkvReviewInstantOrderEnabled).toBe(true);
+        expect(config.config!.fsrsVersion).toBe(DeckConfig_Config_FsrsVersion.SIX);
+        expect(config.config!.desiredRetention).toBe(0.9);
+        expect(config.config!.fsrsParams6).toEqual(Array(21).fill(2));
+        expect(config.config!.rwkvReviewMinElapsedSecs).toBe(30);
+        expect(config.config!.fsrsDynamicDesiredRetentionParams).toEqual(Array(15).fill(3));
+    }
+    expect(out.configs![0].config!.newPerDay).toBe(10);
+    expect(out.configs![0].config!.learnSteps).toEqual([1, 10]);
+    expect(JSON.parse(new TextDecoder().decode(out.configs![0].config!.other))).toEqual({
+        new: { separate: true },
+        rev: { fuzz: 0.05, minSpace: 1 },
+        fsrs7IncludeSameDayOptimize: false,
+    });
+    expect(out.limits!.desiredRetention).toBe(0.95);
+    expect(state.getConfigById(1618570764780n)!.config!.other).toEqual(source.other);
+    expect(await state.isModified()).toBe(true);
+});
+
+test("copied retention stays an unsaved change after first selecting the destination preset", async () => {
+    const data = new DeckConfigsForUpdate(exampleData);
+    data.allConfig[0].config!.config!.desiredRetention = 0.8;
+    data.allConfig[1].config!.config!.desiredRetention = 0.9;
+    const state = new DeckOptionsState(123n, data);
+    state.resolveOriginalConfigs();
+    expect(await state.isModified()).toBe(false);
+    state.applyScheduleToAllPresets({ scheduler: false, fallback: false, settings: false, retention: true });
+    state.setCurrentIndex(1);
+    await state.markCurrentPresetAsLoaded();
+    expect(get(state.currentConfig).desiredRetention).toBe(0.9);
+    expect(await state.isModified()).toBe(true);
+    expect(state.dataForSaving(UpdateDeckConfigsMode.NORMAL).configs!.map((config) => config.name))
+        .toEqual(["Default"]);
+});
+
+test("applying no categories leaves other presets out of the save request", async () => {
+    const state = startingState();
+    state.resolveOriginalConfigs();
+    state.applyScheduleToAllPresets({ scheduler: false, fallback: false, settings: false, retention: false });
+    expect(await state.isModified()).toBe(false);
+    expect(state.dataForSaving(UpdateDeckConfigsMode.NORMAL).configs!.map((config) => config.name))
+        .toEqual(["another one"]);
 });

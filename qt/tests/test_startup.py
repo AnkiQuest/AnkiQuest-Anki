@@ -1,16 +1,25 @@
+<<<<<<< HEAD
 # Copyright: Anki Software, LLC and contributors
+=======
+# Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
+<<<<<<< HEAD
 from typing import Any, Callable
 from unittest.mock import MagicMock, patch
+=======
+from unittest.mock import patch
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
 import pytest
 
 import aqt
+<<<<<<< HEAD
 from aqt.profiles import ProfileManager, VideoDriver
 
 
@@ -26,6 +35,9 @@ def get_fake_app_class(on_init: Callable) -> type[FakeApp]:
             on_init()
 
     return FakeAppSub
+=======
+from aqt.profiles import ProfileManager
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
 
 @patch.dict(os.environ)
@@ -34,6 +46,7 @@ def test_ui_scale_is_applied_before_app_is_created(
 ) -> None:
     # Qt reads QT_SCALE_FACTOR when the app is constructed, so setting it
     # afterwards has no effect (#5676)
+<<<<<<< HEAD
     monkeypatch.setattr(ProfileManager, "uiScale", lambda self: 2.0)
     seen: list[str | None] = []
     fake_app_class = get_fake_app_class(
@@ -41,10 +54,26 @@ def test_ui_scale_is_applied_before_app_is_created(
     )
     monkeypatch.setattr(aqt, "AnkiApp", fake_app_class)
     monkeypatch.setattr(aqt, "setupGL", MagicMock())
+=======
+    monkeypatch.delenv("QT_SCALE_FACTOR", raising=False)
+    monkeypatch.setattr(ProfileManager, "uiScale", lambda self: 2.0)
+    seen: list[str | None] = []
+
+    class FakeApp:
+        def __init__(self, argv: list[str]) -> None:
+            seen.append(os.environ.get("QT_SCALE_FACTOR"))
+
+        def secondInstance(self) -> bool:
+            # makes _run() return right after creating the app
+            return True
+
+    monkeypatch.setattr(aqt, "AnkiApp", FakeApp)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
     aqt._run(["anki", "-b", str(tmp_path)], exec=False)
 
     assert seen == ["2.0"]
+<<<<<<< HEAD
 
 
 @pytest.mark.parametrize(
@@ -78,3 +107,5 @@ def test_run_applies_video_driver_before_app_is_created(
     aqt._run(["anki", "-b", str(tmp_path), *extra_args], exec=False)
 
     assert events == [("setupGL", expected_driver), ("app created", None)]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007

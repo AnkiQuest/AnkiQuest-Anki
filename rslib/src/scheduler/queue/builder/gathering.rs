@@ -4,6 +4,10 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hasher;
+<<<<<<< HEAD
+=======
+use std::sync::Arc;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use std::time::Instant;
 
 use fnv::FnvHasher;
@@ -17,6 +21,10 @@ use crate::card::CardQueue;
 use crate::collection::RwkvReviewQueueScoreEntry;
 use crate::deckconfig::NewCardGatherPriority;
 use crate::deckconfig::ReviewCardOrder;
+<<<<<<< HEAD
+=======
+use crate::deckconfig::SuspendedCardOrder;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::decks::limits::LimitKind;
 use crate::prelude::*;
 use crate::scheduler::fsrs::preset::FsrsPresetCard;
@@ -26,8 +34,15 @@ use crate::scheduler::rwkv::rwkv_review_candidate_metadata;
 use crate::scheduler::rwkv::rwkv_review_relative_overdueness;
 use crate::scheduler::rwkv::rwkv_review_score_eligibility;
 use crate::scheduler::rwkv::rwkv_review_score_eligibility_ignoring_retention;
+<<<<<<< HEAD
 use crate::scheduler::rwkv::RwkvReviewScoreEligibility;
 use crate::scheduler::timing::SchedTimingToday;
+=======
+use crate::scheduler::rwkv::RwkvReviewCandidateMetadata;
+use crate::scheduler::rwkv::RwkvReviewScoreEligibility;
+use crate::scheduler::timing::SchedTimingToday;
+use crate::storage::card::learnable::learnable_suspended_filter;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::storage::card::NewCardSorting;
 
 #[derive(Debug, Clone, Copy)]
@@ -39,17 +54,54 @@ struct DueCardForRetrievabilitySort {
 
 pub(super) const RWKV_REVIEW_GATHER_MIN_CHUNK_SIZE: usize = 256;
 
+<<<<<<< HEAD
+=======
+/// The part of an RWKV-Instant review gather that can run after new cards:
+/// the daily-minimum pass and the final review sort.
+enum RwkvReviewGatherTail {
+    Priority {
+        ranked_scores: Vec<(CardId, RwkvReviewQueueScoreEntry)>,
+        priorities: HashMap<CardId, f32>,
+    },
+    ConfiguredOrder {
+        scores: Arc<HashMap<CardId, RwkvReviewQueueScoreEntry>>,
+        cards: Vec<(DueCard, bool)>,
+        metadata: HashMap<CardId, RwkvReviewCandidateMetadata>,
+        eligibility_by_card: HashMap<CardId, RwkvReviewScoreEligibility>,
+    },
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl QueueBuilder {
     pub(super) fn gather_cards(&mut self, col: &mut Collection) -> Result<()> {
         if self.context.sort_options.uses_rwkv_review_order() {
             self.gather_intraday_learning_cards(col)?;
             self.gather_due_cards(col, DueCardKind::Learning)?;
+<<<<<<< HEAD
             if self.context.uses_rwkv_review_order() {
                 self.gather_review_cards_with_rwkv_scores(col)?;
             } else {
                 self.gather_due_cards(col, DueCardKind::Review)?;
             }
             self.gather_new_cards(col)?;
+=======
+            let tail = if self.context.uses_rwkv_review_order() {
+                self.gather_review_cards_with_rwkv_scores(col)?
+            } else {
+                self.gather_due_cards(col, DueCardKind::Review)?;
+                None
+            };
+            // With the option on, new cards take their share of the daily
+            // limits before reviews pulled only to reach the minimum.
+            let new_first = self.context.sort_options.new_cards_ignore_minimum_reviews();
+            if new_first {
+                self.gather_new_cards(col)?;
+            }
+            self.finish_rwkv_review_gather(col, tail)?;
+            if !new_first {
+                self.gather_new_cards(col)?;
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             return Ok(());
         }
 
@@ -67,7 +119,14 @@ impl QueueBuilder {
         Ok(())
     }
 
+<<<<<<< HEAD
     fn gather_review_cards_with_rwkv_scores(&mut self, col: &mut Collection) -> Result<()> {
+=======
+    fn gather_review_cards_with_rwkv_scores(
+        &mut self,
+        col: &mut Collection,
+    ) -> Result<Option<RwkvReviewGatherTail>> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if matches!(
             self.context.sort_options.review_order,
             ReviewCardOrder::RetrievabilityAscending
@@ -80,9 +139,18 @@ impl QueueBuilder {
         }
     }
 
+<<<<<<< HEAD
     fn gather_review_cards_by_rwkv_priority(&mut self, col: &mut Collection) -> Result<()> {
         if self.review_limit_stops_gathering() {
             return Ok(());
+=======
+    fn gather_review_cards_by_rwkv_priority(
+        &mut self,
+        col: &mut Collection,
+    ) -> Result<Option<RwkvReviewGatherTail>> {
+        if self.review_gather_finished() {
+            return Ok(None);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
 
         let scores = self.context.rwkv_review_queue_scores.clone().unwrap();
@@ -131,7 +199,11 @@ impl QueueBuilder {
         let mut chunk_size = (self.limits.remaining_root_limit(LimitKind::Review) as usize)
             .max(RWKV_REVIEW_GATHER_MIN_CHUNK_SIZE)
             .min(remaining_scores.len());
+<<<<<<< HEAD
         while !remaining_scores.is_empty() && !self.review_limit_stops_gathering() {
+=======
+        while !remaining_scores.is_empty() && !self.review_gather_finished() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             if chunk_size < remaining_scores.len() {
                 remaining_scores.select_nth_unstable_by(chunk_size, compare_scores);
             }
@@ -155,7 +227,11 @@ impl QueueBuilder {
             };
 
             for &(card_id, score) in score_chunk.iter() {
+<<<<<<< HEAD
                 if self.review_limit_stops_gathering() {
+=======
+                if self.review_gather_finished() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     break;
                 }
                 let Some(card) = cards_by_id.get(&card_id).copied() else {
@@ -196,6 +272,7 @@ impl QueueBuilder {
 
         let scored_card_ids = ranked_scores.iter().map(|(card_id, _)| *card_id).collect();
         self.gather_due_review_cards_without_rwkv_scores(col, &scored_card_ids)?;
+<<<<<<< HEAD
         if !self.review_limit_stops_gathering() && self.limits.any_rwkv_review_minimum_remaining() {
             self.gather_rwkv_review_minimum_cards(col, &ranked_scores)?;
         }
@@ -206,6 +283,20 @@ impl QueueBuilder {
     fn gather_review_cards_by_configured_order(&mut self, col: &mut Collection) -> Result<()> {
         if self.review_limit_stops_gathering() {
             return Ok(());
+=======
+        Ok(Some(RwkvReviewGatherTail::Priority {
+            ranked_scores,
+            priorities,
+        }))
+    }
+
+    fn gather_review_cards_by_configured_order(
+        &mut self,
+        col: &mut Collection,
+    ) -> Result<Option<RwkvReviewGatherTail>> {
+        if self.review_gather_finished() {
+            return Ok(None);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
 
         let scores = self.context.rwkv_review_queue_scores.clone().unwrap();
@@ -247,14 +338,24 @@ impl QueueBuilder {
             self.context.timing,
             self.context.sort_options.review_order,
             self.context.fsrs,
+<<<<<<< HEAD
             |card| {
                 cards.push(card);
+=======
+            |card, is_due| {
+                cards.push((card, is_due));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 Ok(true)
             },
         )?;
 
+<<<<<<< HEAD
         for card in cards.iter().copied() {
             if self.review_limit_stops_gathering() {
+=======
+        for (card, is_due) in cards.iter().copied() {
+            if self.review_gather_finished() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 break;
             }
             let eligible = if scored_card_ids.contains(&card.id) {
@@ -263,7 +364,11 @@ impl QueueBuilder {
                     Some(RwkvReviewScoreEligibility::Eligible)
                 )
             } else {
+<<<<<<< HEAD
                 card.due <= self.context.timing.days_elapsed as i32
+=======
+                is_due
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             };
             if eligible {
                 if metadata.contains_key(&card.id) {
@@ -274,6 +379,7 @@ impl QueueBuilder {
             }
         }
 
+<<<<<<< HEAD
         if self.limits.any_rwkv_review_minimum_remaining() {
             let mut pull_candidates = cards.clone();
             pull_candidates.sort_by(|card_a, card_b| {
@@ -357,6 +463,142 @@ impl QueueBuilder {
                 .copied()
                 .unwrap_or(usize::MAX)
         });
+=======
+        Ok(Some(RwkvReviewGatherTail::ConfiguredOrder {
+            scores,
+            cards,
+            metadata,
+            eligibility_by_card,
+        }))
+    }
+
+    /// Runs the daily-minimum pass and the final review sort of an RWKV-Instant
+    /// review gather.
+    fn finish_rwkv_review_gather(
+        &mut self,
+        col: &mut Collection,
+        tail: Option<RwkvReviewGatherTail>,
+    ) -> Result<()> {
+        match tail {
+            None => {}
+            Some(RwkvReviewGatherTail::Priority {
+                ranked_scores,
+                priorities,
+            }) => {
+                if !self.review_limit_stops_gathering()
+                    && self.limits.any_rwkv_review_minimum_remaining()
+                {
+                    self.gather_rwkv_review_minimum_cards(col, &ranked_scores)?;
+                }
+                self.sort_review_cards_by_rwkv_priority(&priorities);
+            }
+            Some(RwkvReviewGatherTail::ConfiguredOrder {
+                scores,
+                cards,
+                metadata,
+                eligibility_by_card,
+            }) => {
+                if self.limits.any_rwkv_review_minimum_remaining() {
+                    self.gather_rwkv_review_minimum_cards_in_configured_order(
+                        &scores,
+                        &cards,
+                        &metadata,
+                        &eligibility_by_card,
+                    )?;
+                }
+                let configured_position: HashMap<_, _> = cards
+                    .iter()
+                    .enumerate()
+                    .map(|(position, (card, _))| (card.id, position))
+                    .collect();
+                self.review.sort_by_key(|card| {
+                    configured_position
+                        .get(&card.id)
+                        .copied()
+                        .unwrap_or(usize::MAX)
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn gather_rwkv_review_minimum_cards_in_configured_order(
+        &mut self,
+        scores: &HashMap<CardId, RwkvReviewQueueScoreEntry>,
+        cards: &[(DueCard, bool)],
+        metadata: &HashMap<CardId, RwkvReviewCandidateMetadata>,
+        eligibility_by_card: &HashMap<CardId, RwkvReviewScoreEligibility>,
+    ) -> Result<()> {
+        let mut pull_candidates = cards.iter().map(|(card, _)| *card).collect::<Vec<_>>();
+        pull_candidates.sort_by(|card_a, card_b| {
+            let score_a = scores
+                .get(&card_a.id)
+                .map(|score| score.retrievability)
+                .filter(|score| score.is_finite());
+            let score_b = scores
+                .get(&card_b.id)
+                .map(|score| score.retrievability)
+                .filter(|score| score.is_finite());
+            match (score_a, score_b) {
+                (Some(score_a), Some(score_b)) => score_a
+                    .total_cmp(&score_b)
+                    .then_with(|| card_a.id.cmp(&card_b.id)),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        });
+        let mut attempted = HashSet::new();
+        for depth in self.limits.rwkv_review_minimum_depths() {
+            for card in pull_candidates.iter().copied() {
+                if !self.limits.any_rwkv_review_minimum_remaining()
+                    || self.review_limit_stops_gathering()
+                {
+                    break;
+                }
+                if attempted.contains(&card.id)
+                    || !self
+                        .limits
+                        .rwkv_review_minimum_remaining_at_depth(card.current_deck_id, depth)?
+                    || !matches!(
+                        eligibility_by_card.get(&card.id),
+                        Some(RwkvReviewScoreEligibility::Blocked)
+                    )
+                    || self.card_ignores_review_limit(card)
+                {
+                    continue;
+                }
+                let score = scores.get(&card.id).or_not_found(card.id)?;
+                let metadata = metadata.get(&card.id).or_not_found(card.id)?;
+                let eligibility = rwkv_review_score_eligibility_ignoring_retention(
+                    score.retrievability,
+                    metadata,
+                    self.context
+                        .sort_options
+                        .rwkv_review_min_intervening_reviews,
+                    self.context.sort_options.rwkv_review_min_elapsed_secs,
+                    score.intervening_reviews,
+                );
+                match eligibility {
+                    RwkvReviewScoreEligibility::Eligible => {}
+                    RwkvReviewScoreEligibility::Deferred { .. } => {
+                        self.deferred_rwkv_reviews.insert(
+                            card.id,
+                            DeferredRwkvReview::from_eligibility(
+                                eligibility,
+                                self.context.timing.now,
+                            )
+                            .unwrap(),
+                        );
+                        continue;
+                    }
+                    RwkvReviewScoreEligibility::Blocked => continue,
+                }
+                self.add_minimum_review(card)?;
+                attempted.insert(card.id);
+            }
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(())
     }
 
@@ -449,7 +691,11 @@ impl QueueBuilder {
                         }
                         RwkvReviewScoreEligibility::Blocked => continue,
                     }
+<<<<<<< HEAD
                     self.add_rwkv_review_card(card)?;
+=======
+                    self.add_minimum_review(card)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     attempted.insert(card_id);
                 }
             }
@@ -462,10 +708,33 @@ impl QueueBuilder {
             && self.limits.root_limit_reached(LimitKind::Review)
     }
 
+<<<<<<< HEAD
     fn add_rwkv_review_card(&mut self, card: DueCard) -> Result<()> {
         self.add_due_card_respecting_review_limit(card)
     }
 
+=======
+    // The preview also needs one eligible review that the limit kept out.
+    fn review_gather_finished(&self) -> bool {
+        self.review_limit_stops_gathering()
+            && self
+                .preview
+                .as_ref()
+                .is_none_or(|trace| trace.review_limit_card.is_some())
+    }
+
+    fn add_rwkv_review_card(&mut self, card: DueCard) -> Result<bool> {
+        self.add_due_card_respecting_review_limit(card)
+    }
+
+    fn add_minimum_review(&mut self, card: DueCard) -> Result<()> {
+        if self.add_rwkv_review_card(card)? {
+            self.minimum_review_ids.insert(card.id);
+        }
+        Ok(())
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn card_ignores_review_limit(&self, card: DueCard) -> bool {
         if !self.context.reviewed_today_card_ids.contains(&card.id) {
             return false;
@@ -479,13 +748,19 @@ impl QueueBuilder {
             .is_some_and(|config| config.inner.same_day_reviews_ignore_review_limit)
     }
 
+<<<<<<< HEAD
     fn add_due_card_respecting_review_limit(&mut self, card: DueCard) -> Result<()> {
+=======
+    /// True if the card was added to the queue.
+    fn add_due_card_respecting_review_limit(&mut self, card: DueCard) -> Result<bool> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let ignore_limit = self.card_ignores_review_limit(card);
         if !ignore_limit
             && self
                 .limits
                 .limit_reached(card.current_deck_id, LimitKind::Review)?
         {
+<<<<<<< HEAD
             return Ok(());
         }
         if self.add_due_card(card) && !ignore_limit {
@@ -493,6 +768,19 @@ impl QueueBuilder {
                 .reserve_review(card.current_deck_id, card.original_deck_id)?;
         }
         Ok(())
+=======
+            if let Some(trace) = &mut self.preview {
+                trace.review_limit_card.get_or_insert(card.id);
+            }
+            return Ok(false);
+        }
+        let added = self.add_due_card(card);
+        if added && !ignore_limit {
+            self.limits
+                .reserve_review(card.current_deck_id, card.original_deck_id)?;
+        }
+        Ok(added)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     fn sort_review_cards_by_rwkv_priority(&mut self, priorities: &HashMap<CardId, f32>) {
@@ -513,7 +801,11 @@ impl QueueBuilder {
         col: &mut Collection,
         scored_card_ids: &HashSet<CardId>,
     ) -> Result<()> {
+<<<<<<< HEAD
         if self.review_limit_stops_gathering() {
+=======
+        if self.review_gather_finished() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             return Ok(());
         }
 
@@ -528,7 +820,11 @@ impl QueueBuilder {
                 if scored_card_ids.contains(&card.id) {
                     return Ok(true);
                 }
+<<<<<<< HEAD
                 if self.review_limit_stops_gathering() {
+=======
+                if self.review_gather_finished() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     return Ok(false);
                 }
                 self.add_due_card_respecting_review_limit(card)?;
@@ -570,6 +866,10 @@ impl QueueBuilder {
             &cards,
             self.context.timing,
             self.context.sort_options.review_order,
+<<<<<<< HEAD
+=======
+            self.preview.as_ref().map(|_| &self.context),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )?;
         let scored = Instant::now();
         let mut with_key = Vec::with_capacity(due_cards.len());
@@ -597,6 +897,12 @@ impl QueueBuilder {
                         .limits
                         .limit_reached(candidate.card.current_deck_id, LimitKind::Review)?)
             {
+<<<<<<< HEAD
+=======
+                if let Some(trace) = &mut self.preview {
+                    trace.review_limit_card.get_or_insert(candidate.card.id);
+                }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 continue;
             }
 
@@ -658,7 +964,11 @@ impl QueueBuilder {
     }
 
     fn gather_due_cards(&mut self, col: &mut Collection, kind: DueCardKind) -> Result<()> {
+<<<<<<< HEAD
         if self.review_limit_stops_gathering() {
+=======
+        if self.review_gather_finished() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             return Ok(());
         }
         col.storage.for_each_due_card_in_active_decks(
@@ -668,6 +978,12 @@ impl QueueBuilder {
             self.context.fsrs,
             |card| {
                 if self.review_limit_stops_gathering() {
+<<<<<<< HEAD
+=======
+                    if let Some(trace) = &mut self.preview {
+                        trace.review_limit_card.get_or_insert(card.id);
+                    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     return Ok(false);
                 }
                 self.add_due_card_respecting_review_limit(card)?;
@@ -677,6 +993,7 @@ impl QueueBuilder {
     }
 
     fn gather_new_cards(&mut self, col: &mut Collection) -> Result<()> {
+<<<<<<< HEAD
         // every order below takes nothing once the root limit is reached, so
         // skip their query over all new cards
         if self.limits.root_limit_reached(LimitKind::New) {
@@ -708,55 +1025,171 @@ impl QueueBuilder {
             NewCardGatherPriority::RandomCards => {
                 self.gather_new_cards_sorted(col, NewCardSorting::RandomCards(salt))
             }
+=======
+        if self.new_gather_finished() {
+            return Ok(());
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
+        let priority = self.context.sort_options.new_gather_priority;
+        let by_deck = matches!(
+            priority,
+            NewCardGatherPriority::Deck | NewCardGatherPriority::DeckThenRandomNotes
+        );
+        let salt = Self::knuth_salt(self.context.timing.days_elapsed);
+        let active_decks = col.storage.get_active_deck_ids_sorted()?;
+        let suspended_filter = learnable_suspended_filter(
+            active_decks.iter().copied(),
+            &self.context.deck_map,
+            &self.context.config_map,
+            self.context.timing,
+        );
+        let sort = match priority {
+            NewCardGatherPriority::NoteFieldAscending
+            | NewCardGatherPriority::NoteFieldDescending => {
+                let field = self.context.sort_options.new_gather_field.clone();
+                return col.storage.for_each_new_card_by_field(
+                    &field,
+                    priority == NewCardGatherPriority::NoteFieldDescending,
+                    self.context.sort_options.suspended_card_order,
+                    suspended_filter.as_deref(),
+                    |card| {
+                        self.gather_new_card_if_eligible(card)?;
+                        Ok(!self.new_gather_finished())
+                    },
+                );
+            }
+            NewCardGatherPriority::Deck
+            | NewCardGatherPriority::LowestPosition
+            | NewCardGatherPriority::AscendingRetrievability
+            | NewCardGatherPriority::DescendingRetrievability => NewCardSorting::LowestPosition,
+            NewCardGatherPriority::HighestPosition => NewCardSorting::HighestPosition,
+            NewCardGatherPriority::DeckThenRandomNotes | NewCardGatherPriority::RandomNotes => {
+                NewCardSorting::RandomNotes(salt)
+            }
+            NewCardGatherPriority::RandomCards => NewCardSorting::RandomCards(salt),
+        };
+        // The usual deck-first gather can stop at the limit without sorting
+        // the entire deck tree when there is only one group.
+        if by_deck && suspended_filter.is_none() {
+            return self.gather_new_cards_by_deck(col, &active_decks, sort);
+        }
+        let scores = self.context.rwkv_review_queue_scores.clone();
+        col.storage.with_new_card_candidates(
+            sort,
+            by_deck,
+            suspended_filter.as_deref(),
+            |new, suspended| {
+                if let (
+                    Some(scores),
+                    NewCardGatherPriority::AscendingRetrievability
+                    | NewCardGatherPriority::DescendingRetrievability,
+                ) = (scores, priority)
+                {
+                    let descending = priority == NewCardGatherPriority::DescendingRetrievability;
+                    let new = new_cards_by_retrievability(new, &scores, descending)?;
+                    let suspended = new_cards_by_retrievability(suspended, &scores, descending)?;
+                    self.gather_new_card_groups(
+                        &mut new.into_iter().map(Ok),
+                        &mut suspended.into_iter().map(Ok),
+                    )
+                } else {
+                    self.gather_new_card_groups(new, suspended)
+                }
+            },
+        )
     }
 
     fn gather_new_cards_by_deck(
         &mut self,
         col: &mut Collection,
+        deck_ids: &[DeckId],
         sort: NewCardSorting,
     ) -> Result<()> {
-        for deck_id in col.storage.get_active_deck_ids_sorted()? {
-            if self.limits.root_limit_reached(LimitKind::New) {
+        for &deck_id in deck_ids {
+            if self.new_gather_finished() {
                 break;
             }
-            if self.limits.limit_reached(deck_id, LimitKind::New)? {
+            if self.limits.limit_reached(deck_id, LimitKind::New)? && !self.needs_preview_boundary()
+            {
                 continue;
             }
             col.storage
                 .for_each_new_card_in_deck(deck_id, sort, |card| {
-                    let limit_reached = self.limits.limit_reached(deck_id, LimitKind::New)?;
-                    if !limit_reached && self.add_new_card(card) {
-                        self.limits
-                            .decrement_deck_and_parent_limits(deck_id, LimitKind::New)?;
-                    }
-                    Ok(!limit_reached)
+                    self.gather_new_card_if_eligible(card)?;
+                    Ok(!self.limits.limit_reached(deck_id, LimitKind::New)?
+                        || self.needs_preview_boundary())
                 })?;
         }
 
         Ok(())
     }
 
-    fn gather_new_cards_sorted(
+    fn gather_new_card_groups(
         &mut self,
-        col: &mut Collection,
-        order: NewCardSorting,
+        new: &mut dyn Iterator<Item = Result<NewCard>>,
+        suspended: &mut dyn Iterator<Item = Result<NewCard>>,
     ) -> Result<()> {
-        col.storage
-            .for_each_new_card_in_active_decks(order, |card| {
-                if self.limits.root_limit_reached(LimitKind::New) {
-                    return Ok(false);
-                }
-                if !self
-                    .limits
-                    .limit_reached(card.current_deck_id, LimitKind::New)?
-                    && self.add_new_card(card)
-                {
-                    self.limits
-                        .decrement_deck_and_parent_limits(card.current_deck_id, LimitKind::New)?;
-                }
-                Ok(true)
-            })
+        let day = self.context.timing.days_elapsed;
+        let studied = self.context.root_deck.new_rev_counts(day).0;
+        let mut suspended_next = self
+            .new
+            .first()
+            .map_or((i64::from(day) + i64::from(studied)) % 2 != 0, |pinned| {
+                !pinned.suspended
+            });
+        while !self.new_gather_finished() {
+            let prefer_suspended = match self.context.sort_options.suspended_card_order {
+                SuspendedCardOrder::Mixed => suspended_next,
+                SuspendedCardOrder::SuspendedBeforeNew => true,
+                SuspendedCardOrder::NewBeforeSuspended => false,
+            };
+            let next = if prefer_suspended {
+                suspended.next().or_else(|| new.next())
+            } else {
+                new.next().or_else(|| suspended.next())
+            };
+            let Some(card) = next.transpose()? else { break };
+            if self.gather_new_card_if_eligible(card)? {
+                suspended_next = !card.suspended;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn gather_new_card_if_eligible(&mut self, card: NewCard) -> Result<bool> {
+        let deck = card.current_deck_id;
+        if let Some(limit) = self.limits.exhausted_new_limit(deck)? {
+            if let Some(trace) = &mut self.preview {
+                trace.new_limit_card.get_or_insert((card.id, limit));
+            }
+            return Ok(false);
+        }
+        if !self.add_new_card(card) {
+            if let Some(trace) = &mut self.preview {
+                trace.sibling.get_or_insert(card.id);
+            }
+            return Ok(false);
+        }
+        if self.context.sort_options.new_cards_ignore_minimum_reviews() {
+            // Minimum pulls are gathered after new cards, so they must only use
+            // the review capacity that new cards leave.
+            self.limits.reserve_new_card(deck)?;
+        } else {
+            self.limits
+                .decrement_deck_and_parent_limits(deck, LimitKind::New)?;
+        }
+        Ok(true)
+    }
+
+    fn needs_preview_boundary(&self) -> bool {
+        self.preview
+            .as_ref()
+            .is_some_and(|trace| trace.new_limit_card.is_none())
+    }
+
+    fn new_gather_finished(&self) -> bool {
+        self.limits.root_limit_reached(LimitKind::New) && !self.needs_preview_boundary()
     }
 
     fn gather_new_cards_by_retrievability(
@@ -846,6 +1279,14 @@ impl QueueBuilder {
                 DueCardKind::Learning => false,
             })
             .unwrap_or_default();
+<<<<<<< HEAD
+=======
+        if bury_this_card {
+            if let Some(trace) = &mut self.preview {
+                trace.sibling.get_or_insert(card.id);
+            }
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         !bury_this_card
     }
 
@@ -874,6 +1315,7 @@ impl QueueBuilder {
     }
 }
 
+<<<<<<< HEAD
 fn elapsed_seconds_since_last_review(card: &DueCardWithState, timing: SchedTimingToday) -> u32 {
     if let Some(last_review_time) = card.last_review_time {
         timing.now.elapsed_secs_since_clamped(last_review_time)
@@ -887,6 +1329,25 @@ fn elapsed_seconds_since_last_review(card: &DueCardWithState, timing: SchedTimin
             timing.days_elapsed.saturating_sub(review_day as u32) * 86_400
         }
     }
+=======
+fn new_cards_by_retrievability(
+    rows: &mut dyn Iterator<Item = Result<NewCard>>,
+    scores: &HashMap<CardId, RwkvReviewQueueScoreEntry>,
+    descending: bool,
+) -> Result<Vec<NewCard>> {
+    let mut cards = rows.collect::<Result<Vec<_>>>()?;
+    // Unscored cards follow scored cards in their original gather order.
+    let score = |id| {
+        scores
+            .get(&id)
+            .map(|score| score.retrievability)
+            .filter(|score| score.is_finite())
+            .map(|score| if descending { -score } else { score })
+            .unwrap_or(f32::INFINITY)
+    };
+    cards.sort_by(|a, b| score(a.id).total_cmp(&score(b.id)));
+    Ok(cards)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 fn exact_review_order_keys(
@@ -894,6 +1355,10 @@ fn exact_review_order_keys(
     cards: &[DueCardWithState],
     timing: SchedTimingToday,
     order: ReviewCardOrder,
+<<<<<<< HEAD
+=======
+    draft: Option<&super::Context>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 ) -> Result<Vec<f32>> {
     let started = Instant::now();
     // Cards without memory state use the legacy fallback and need no preset.
@@ -909,7 +1374,16 @@ fn exact_review_order_keys(
         })
         .collect::<Vec<_>>();
     let selected = Instant::now();
+<<<<<<< HEAD
     let presets = col.fsrs_presets_for_card_inputs(&fsrs_cards)?;
+=======
+    let presets = match draft {
+        Some(draft) => {
+            col.fsrs_metric_presets_for_draft(&fsrs_cards, &draft.deck_map, &draft.config_map)?
+        }
+        None => col.fsrs_metric_presets_for_card_inputs(&fsrs_cards)?,
+    };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let resolved = Instant::now();
     let mut models = HashMap::new();
     let keys = cards
@@ -923,8 +1397,17 @@ fn exact_review_order_keys(
                         entry.insert(FSRS::new(&preset.params)?)
                     }
                 };
+<<<<<<< HEAD
                 let elapsed_days =
                     (elapsed_seconds_since_last_review(card, timing) as f32 / 86_400.0).max(0.0);
+=======
+                let elapsed_days = timing.fsrs_elapsed_seconds(
+                    card.last_review_time,
+                    card.original_or_current_due(),
+                    card.interval,
+                ) as f32
+                    / 86_400.0;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 let key = if matches!(order, ReviewCardOrder::RelativeOverdueness) {
                     let target = card
                         .desired_retention
@@ -977,6 +1460,10 @@ pub(super) fn benchmark_retrievability_sort(col: &mut Collection) -> Result<()> 
         &cards,
         timing,
         ReviewCardOrder::RetrievabilityAscending,
+<<<<<<< HEAD
+=======
+        None,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     )?;
     let entries = cards
         .iter()

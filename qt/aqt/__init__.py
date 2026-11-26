@@ -87,6 +87,15 @@ appShared = "https://ankiweb.net/shared/"
 appUpdate = "https://ankiweb.net/update/desktop"
 appHelpSite = HELP_SITE
 
+
+def is_portable() -> bool:
+    return os.environ.get("ANKI_PORTABLE") == "1"
+
+
+def application_name() -> str:
+    return "Anki Portable" if is_portable() else "Anki"
+
+
 from aqt.main import AnkiQt  # isort:skip
 from aqt.profiles import ProfileManager, VideoDriver  # isort:skip
 
@@ -740,6 +749,7 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
         traceback.print_exc()
         pm = None
 
+<<<<<<< HEAD
     # Safe mode forces software rendering, which must be set up before the app is
     # created, so Shift has to be checked without relying on Qt
     safe_mode = opts.safemode or shift_held_before_app()
@@ -748,6 +758,9 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
         driver = VideoDriver.Software if safe_mode else pm.video_driver()
         # gl workarounds; some of them only take effect before the app is created
         setupGL(pm, driver)
+=======
+    if pm:
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         # apply user-provided scale factor
         os.environ["QT_SCALE_FACTOR"] = str(pm.uiScale())
 
@@ -769,19 +782,31 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
         os.environ["QT_QPA_PLATFORM"] = "windows:altgr"
 
     # create the app
+<<<<<<< HEAD
     QCoreApplication.setApplicationName("Anki")
     QGuiApplication.setDesktopFileName("anki")
     app = AnkiApp(argv, safe_mode)
+=======
+    QCoreApplication.setApplicationName(application_name())
+    QGuiApplication.setDesktopFileName("anki-portable" if is_portable() else "anki")
+    app = AnkiApp(argv)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     if app.secondInstance():
         # we've signaled the primary instance, so we should close
         return None
 
     if pm:
+<<<<<<< HEAD
         if app.safeMode and driver != VideoDriver.Software:
             # Shift was only detected by Qt (e.g. on Linux, where the settings
             # setupGL() makes still take effect after the app is created)
             driver = VideoDriver.Software
             setupGL(pm, driver)
+=======
+        driver = pm.video_driver() if not app.safeMode else VideoDriver.Software
+        # gl workarounds
+        setupGL(pm, driver)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     else:
         if i18n_setup:
             QMessageBox.critical(
@@ -875,6 +900,10 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
     import aqt.main
 
     mw = aqt.main.AnkiQt(app, pm, backend, opts, args)
+    if is_portable():
+        from aqt.portable_update import finish_startup
+
+        QTimer.singleShot(0, finish_startup)
     if exec:
         print("Starting main loop...")
         app.exec()

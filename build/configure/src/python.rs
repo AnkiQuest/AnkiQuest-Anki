@@ -172,6 +172,10 @@ impl BuildAction for BuildWheel {
         build.add_variable("pyenv_path", "$builddir/pyenv");
         build.add_env_var("UV_PROJECT_ENVIRONMENT", "$pyenv_path");
 
+        // Wheel builds run concurrently, so keep their uv caches isolated.
+        build.add_variable("uv_cache_dir", format!("$builddir/uv-cache/{}", self.name));
+        build.add_env_var("UV_CACHE_DIR", "$uv_cache_dir");
+
         // Set output directory
         build.add_variable("out_dir", "$builddir/wheels/");
 
@@ -212,6 +216,11 @@ pub fn check_python(build: &mut Build) -> Result<()> {
         "check:pytest:tools",
         PythonTest {
             folder: "tools/tests",
+<<<<<<< HEAD
+=======
+            ignore: None,
+            python_path: &["tools"],
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             deps: inputs![glob!["tools/**/*.py"]],
         },
     )?;

@@ -15,6 +15,10 @@ use super::parser::SearchNode;
 use super::parser::StateKind;
 use super::parser::TemplateKind;
 use super::ReturnItemType;
+<<<<<<< HEAD
+=======
+use super::RwkvDueKind;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use super::RWKV_DUE_TABLE;
 use crate::card::CardQueue;
 use crate::card::CardType;
@@ -45,6 +49,12 @@ pub(crate) struct SqlWriter<'a> {
     table: RequiredTable,
     card_id_filter_table: Option<&'static str>,
     first_grade_table: Option<&'static str>,
+<<<<<<< HEAD
+=======
+    /// The RWKV due table holds RWKV-Instant rows for this search, so `is:due`
+    /// follows them for cards whose preset uses RWKV-Instant.
+    rwkv_instant_due: bool,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl SqlWriter<'_> {
@@ -61,9 +71,21 @@ impl SqlWriter<'_> {
             table: item_type.required_table(),
             card_id_filter_table: None,
             first_grade_table: None,
+<<<<<<< HEAD
         }
     }
 
+=======
+            rwkv_instant_due: false,
+        }
+    }
+
+    pub(super) fn with_rwkv_instant_due(mut self, enabled: bool) -> Self {
+        self.rwkv_instant_due = enabled;
+        self
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(super) fn with_card_id_filter_table(mut self, table: &'static str) -> Self {
         self.card_id_filter_table = Some(table);
         self
@@ -604,15 +626,50 @@ impl SqlWriter<'_> {
                 CardQueue::UserBuried as i8
             ),
             StateKind::Suspended => write!(self.sql, "c.queue = {}", CardQueue::Suspended as i8),
-            StateKind::Due => write!(
+            StateKind::Due if self.rwkv_instant_due => write!(
                 self.sql,
                 "(\
-                (c.queue in ({rev},{daylrn}) and c.due <= {today}) or \
+                (c.queue = {daylrn} and {due_by_day_or_step}) or \
+                (c.queue = {rev} and case \
+                 when exists(select 1 from {RWKV_DUE_TABLE} rd \
+                  where rd.cid = c.id and rd.kind = {instant_preset}) \
+                 then exists(select 1 from {RWKV_DUE_TABLE} rd \
+                  where rd.cid = c.id and rd.kind = {instant_due}) \
+                 else {due_by_day_or_step} end) or \
                 (c.queue in ({lrn},{previewrepeat}) and c.due <= {learncutoff})\
                 )",
                 rev = CardQueue::Review as i8,
                 daylrn = CardQueue::DayLearn as i8,
-                today = timing.days_elapsed,
+                instant_preset = RwkvDueKind::InstantPreset as u8,
+                instant_due = RwkvDueKind::InstantDue as u8,
+                due_by_day_or_step = crate::storage::card::due_day_or_review_step_sql(
+                    "c.",
+                    &timing.days_elapsed.to_string(),
+                    &timing.now.0.to_string(),
+                ),
+                lrn = CardQueue::Learn as i8,
+                previewrepeat = CardQueue::PreviewRepeat as i8,
+                learncutoff = TimestampSecs::now().0 + (self.col.learn_ahead_secs() as i64),
+            ),
+<<<<<<< HEAD
+            StateKind::RwkvDue => write!(
+                self.sql,
+                "exists (select 1 from {RWKV_DUE_TABLE} rd \
+                 where rd.cid = c.id and rd.kind = 0)"
+=======
+            StateKind::Due | StateKind::FsrsDue => write!(
+                self.sql,
+                "(\
+                (c.queue in ({rev},{daylrn}) and {due_by_day_or_step}) or \
+                (c.queue in ({lrn},{previewrepeat}) and c.due <= {learncutoff})\
+                )",
+                rev = CardQueue::Review as i8,
+                daylrn = CardQueue::DayLearn as i8,
+                due_by_day_or_step = crate::storage::card::due_day_or_review_step_sql(
+                    "c.",
+                    &timing.days_elapsed.to_string(),
+                    &timing.now.0.to_string(),
+                ),
                 lrn = CardQueue::Learn as i8,
                 previewrepeat = CardQueue::PreviewRepeat as i8,
                 learncutoff = TimestampSecs::now().0 + (self.col.learn_ahead_secs() as i64),
@@ -620,12 +677,19 @@ impl SqlWriter<'_> {
             StateKind::RwkvDue => write!(
                 self.sql,
                 "exists (select 1 from {RWKV_DUE_TABLE} rd \
-                 where rd.cid = c.id and rd.kind = 0)"
+                 where rd.cid = c.id and rd.kind = {})",
+                RwkvDueKind::InstantDue as u8
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ),
             StateKind::RwkvCurveDue => write!(
                 self.sql,
                 "exists (select 1 from {RWKV_DUE_TABLE} rd \
+<<<<<<< HEAD
                  where rd.cid = c.id and rd.kind = 1)"
+=======
+                 where rd.cid = c.id and rd.kind = {})",
+                RwkvDueKind::CurveDue as u8
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ),
             StateKind::UserBuried => write!(self.sql, "c.queue = {}", CardQueue::UserBuried as i8),
             StateKind::SchedBuried => {

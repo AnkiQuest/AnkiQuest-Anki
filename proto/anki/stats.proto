@@ -16,7 +16,12 @@ service StatsService {
   rpc Graphs(GraphsRequest) returns (GraphsResponse);
   rpc GetGraphPreferences(generic.Empty) returns (GraphPreferences);
   rpc SetGraphPreferences(GraphPreferences) returns (generic.Empty);
+<<<<<<< HEAD
   rpc CardMemoryMetrics(CardMemoryMetricsRequest) returns (CardMemoryMetricsResponse);
+=======
+  rpc CardMemoryMetrics(CardMemoryMetricsRequest)
+      returns (CardMemoryMetricsResponse);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
   rpc CardDetails(CardDetailsRequest) returns (CardDetailsResponse);
 }
 
@@ -90,6 +95,18 @@ message CardStatsResponse {
     string label = 1;
     string value = 2;
   }
+<<<<<<< HEAD
+=======
+  message AnswerTimeRecallPoint {
+    uint32 seconds = 1;
+    // P(Hard, Good or Easy and answer time below seconds).
+    float recall = 2;
+    // P(Good and answer time below seconds).
+    float good = 3;
+    // P(Easy and answer time below seconds).
+    float easy = 4;
+  }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
   message StatsRevlogEntry {
     int64 time = 1;
     RevlogEntry.ReviewKind review_kind = 2;
@@ -131,10 +148,18 @@ message CardStatsResponse {
   optional string original_deck = 22;
   optional float desired_retention = 23;
   repeated float fsrs_params = 24;
+<<<<<<< HEAD
   bool fsrs_enabled = 25;
   repeated CardInfoRow extra_rows = 26;
   // Desktop diagnostics may be temporarily busy or waiting for state recovery.
   bool rwkv_retry_pending = 27;
+=======
+  repeated CardInfoRow extra_rows = 25;
+  // Desktop diagnostics may be temporarily busy or waiting for state recovery.
+  bool rwkv_retry_pending = 26;
+  // Desktop RWKV answer-time estimates, absent when the head is unavailable.
+  repeated AnswerTimeRecallPoint rwkv_answer_time_recall = 27;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 message GraphsRequest {

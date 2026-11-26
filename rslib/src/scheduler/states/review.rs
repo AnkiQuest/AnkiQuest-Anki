@@ -4,6 +4,10 @@
 use super::button_intervals::button_intervals;
 use super::button_intervals::ButtonInterval;
 use super::button_intervals::DayRule;
+<<<<<<< HEAD
+=======
+use super::button_intervals::FuzzedDays;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use super::interval_kind::IntervalKind;
 use super::CardState;
 use super::LearnState;
@@ -66,8 +70,12 @@ impl ReviewState {
 
     pub(crate) fn next_states(self, ctx: &StateContext) -> SchedulingStates {
         if let Some(states) = &ctx.fsrs_next_states {
+<<<<<<< HEAD
             let again_step = ctx.fsrs_uses_learning_queues()
                 && ctx.relearn_steps.again_delay_secs_learn().is_some();
+=======
+            let again_step = ctx.relearn_steps.again_delay_secs_learn().is_some();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let intervals = button_intervals(
                 ctx,
                 [
@@ -84,11 +92,19 @@ impl ReviewState {
                            answer: fn(Self, u32, i32, &StateContext) -> ReviewState|
              -> CardState {
                 match interval {
+<<<<<<< HEAD
                     Some(ButtonInterval::Days {
                         days,
                         fuzz_delta_days,
                     }) => answer(self, days, fuzz_delta_days, ctx).into(),
                     Some(ButtonInterval::Secs(scheduled_secs)) => {
+=======
+                    Some(ButtonInterval::InDays(FuzzedDays {
+                        days,
+                        fuzz_delta_days,
+                    })) => answer(self, days, fuzz_delta_days, ctx).into(),
+                    Some(ButtonInterval::InSecs(scheduled_secs)) => {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                         let review = answer(self, 1, 0, ctx);
                         RelearnState {
                             learning: LearnState {
@@ -174,12 +190,16 @@ impl ReviewState {
             leeched,
             memory_state,
         };
+<<<<<<< HEAD
         let again_delay = if ctx.fsrs_uses_learning_queues() {
             ctx.relearn_steps.again_delay_secs_learn()
         } else {
             None
         };
         if let Some(again_delay) = again_delay {
+=======
+        if let Some(again_delay) = ctx.relearn_steps.again_delay_secs_learn() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             RelearnState {
                 learning: LearnState {
                     remaining_steps: ctx.relearn_steps.remaining_for_failed(),
@@ -190,10 +210,17 @@ impl ReviewState {
                 review: again_review,
             }
             .into()
+<<<<<<< HEAD
         } else if let Some(ButtonInterval::Secs(scheduled_secs)) = interval {
             RelearnState {
                 learning: LearnState {
                     remaining_steps: ctx.relearn_steps.remaining_for_failed(),
+=======
+        } else if let Some(ButtonInterval::InSecs(scheduled_secs)) = interval {
+            RelearnState {
+                learning: LearnState {
+                    remaining_steps: 0,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     scheduled_secs,
                     elapsed_secs: 0,
                     memory_state,

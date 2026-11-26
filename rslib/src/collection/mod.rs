@@ -8,7 +8,10 @@ mod transact;
 pub(crate) mod undo;
 
 use std::collections::HashMap;
+<<<<<<< HEAD
 use std::collections::HashSet;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -28,7 +31,10 @@ use crate::notetype::Notetype;
 use crate::notetype::NotetypeId;
 use crate::progress::ProgressState;
 use crate::require;
+<<<<<<< HEAD
 use crate::revlog::RevlogId;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::scheduler::fsrs::preset::FsrsPresetOverlayCache;
 use crate::scheduler::queue::CardQueues;
 use crate::scheduler::queue::DeferredRwkvReview;
@@ -38,6 +44,7 @@ use crate::scheduler::rwkv::rwkv_review_score_eligibility;
 use crate::scheduler::rwkv::RwkvReviewScoreEligibility;
 use crate::scheduler::timing::SchedTimingToday;
 use crate::scheduler::SchedulerInfo;
+use crate::search::writer::normalize_search;
 use crate::storage::SchemaVersion;
 use crate::storage::SqliteStorage;
 use crate::timestamp::TimestampMillis;
@@ -153,6 +160,7 @@ pub struct CollectionState {
     pub(crate) deck_cache: HashMap<DeckId, Arc<Deck>>,
     pub(crate) scheduler_info: Option<SchedulerInfo>,
     pub(crate) card_queues: Option<CardQueues>,
+<<<<<<< HEAD
     /// kuma3: the card the reviewer shows (the last next-card fetch) and its
     /// mtime then. Every queue build keeps it first while it is unchanged,
     /// until it is answered: RWKV drops the queues when its scores change
@@ -178,6 +186,11 @@ pub struct CollectionState {
     pub(crate) fsrs_preset_overlay_cache: Option<FsrsPresetOverlayCache>,
     /// Unfiltered per-note field populations used by add-on percentile rules.
     pub(crate) addon_retention_populations: HashMap<(NotetypeId, u16), Arc<Vec<f64>>>,
+=======
+    pub(crate) pending_new_review_mix: Option<NewReviewMixProgress>,
+    pub(crate) rwkv_retrievability_scores: Option<RwkvRetrievabilityScores>,
+    pub(crate) fsrs_preset_overlay_cache: Option<FsrsPresetOverlayCache>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) active_browser_columns: Option<Arc<Vec<browser_table::Column>>>,
     /// True if legacy Python code has executed SQL that has modified the
     /// database, requiring modification time to be bumped.
@@ -216,6 +229,13 @@ pub(crate) struct RwkvRetrievabilityScores {
     scores: HashMap<CardId, RwkvRetrievabilityScore>,
     review_queue_scores: Option<RwkvReviewQueueScores>,
     stats_graph_scores: VecDeque<RwkvStatsGraphScores>,
+<<<<<<< HEAD
+=======
+    /// Prepared for the next filtered deck build, which takes it.
+    pending_filtered_build_scores: Option<RwkvStatsGraphScores>,
+    /// Taken by the filtered deck build in progress.
+    active_filtered_build_scores: Option<RwkvStatsGraphScores>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     deck_count_scores: HashMap<DeckId, HashMap<CardId, RwkvReviewQueueScoreEntry>>,
 }
 
@@ -228,9 +248,41 @@ struct RwkvRetrievabilityScore {
 #[derive(Debug, Clone)]
 struct RwkvStatsGraphScores {
     search: String,
+<<<<<<< HEAD
     scores: HashMap<CardId, RwkvStatsGraphScoreEntry>,
 }
 
+=======
+    /// `search` in normalized form, so a search can find the scores prepared
+    /// for exactly that search.
+    normalized_search: Option<String>,
+    /// The scores carry RWKV-Instant eligibility inputs.
+    instant_due: bool,
+    scores: HashMap<CardId, RwkvStatsGraphScoreEntry>,
+}
+
+/// Search key under which Python publishes the scores prepared for a filtered
+/// deck build. Those scores are kept apart and used by one build only.
+pub(crate) const RWKV_FILTERED_BUILD_SNAPSHOT_KEY: &str = "rwkv:filtered-deck-build";
+
+/// Which prepared scores a search may use for RWKV due states.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum RwkvDueScoreSource<'a> {
+    /// Scores prepared for exactly this normalized search.
+    ExactSearch(&'a str),
+    /// Stats-graph scores stored under this search key.
+    Stats(&'a str),
+    /// Scores taken by the filtered deck build in progress.
+    FilteredBuild,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RwkvDueScoreSnapshot {
+    pub(crate) scores: HashMap<CardId, RwkvStatsGraphScoreEntry>,
+    pub(crate) instant_due: bool,
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // Different stats filters can be prepared concurrently. Keep a small set of
 // recent snapshots so one request cannot invalidate another before it renders.
 const MAX_RWKV_STATS_GRAPH_SEARCHES: usize = 8;
@@ -333,6 +385,7 @@ impl RwkvRetrievabilityScores {
         (!scores.is_empty()).then_some(scores)
     }
 
+<<<<<<< HEAD
     fn stats_graph_score_entries(
         &self,
         stats_search: Option<&str>,
@@ -340,6 +393,8 @@ impl RwkvRetrievabilityScores {
         self.stats_graph_score_map(stats_search).cloned()
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn stats_graph_score_map(
         &self,
         stats_search: Option<&str>,
@@ -350,11 +405,42 @@ impl RwkvRetrievabilityScores {
                 .iter()
                 .rev()
                 .find(|entry| entry.search == search),
+<<<<<<< HEAD
             None => self.stats_graph_scores.back(),
+=======
+            // A filtered deck build uses the scores prepared for it.
+            None => self
+                .active_filtered_build_scores
+                .as_ref()
+                .or(self.stats_graph_scores.back()),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         .map(|entry| &entry.scores)
     }
 
+<<<<<<< HEAD
+=======
+    fn due_score_snapshot(&self, source: RwkvDueScoreSource<'_>) -> Option<RwkvDueScoreSnapshot> {
+        match source {
+            RwkvDueScoreSource::ExactSearch(normalized_search) => self
+                .stats_graph_scores
+                .iter()
+                .rev()
+                .find(|entry| entry.normalized_search.as_deref() == Some(normalized_search)),
+            RwkvDueScoreSource::Stats(search) => self
+                .stats_graph_scores
+                .iter()
+                .rev()
+                .find(|entry| entry.search == search),
+            RwkvDueScoreSource::FilteredBuild => self.active_filtered_build_scores.as_ref(),
+        }
+        .map(|entry| RwkvDueScoreSnapshot {
+            scores: entry.scores.clone(),
+            instant_due: entry.instant_due,
+        })
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_queue_scores(
         &self,
         deck_id: DeckId,
@@ -417,11 +503,34 @@ impl RwkvRetrievabilityScores {
         &mut self,
         search: String,
         scores: HashMap<CardId, RwkvStatsGraphScoreEntry>,
+<<<<<<< HEAD
     ) {
         self.stats_graph_scores
             .retain(|entry| entry.search != search);
         self.stats_graph_scores
             .push_back(RwkvStatsGraphScores { search, scores });
+=======
+        instant_due: bool,
+    ) {
+        if search == RWKV_FILTERED_BUILD_SNAPSHOT_KEY {
+            self.pending_filtered_build_scores = Some(RwkvStatsGraphScores {
+                search,
+                normalized_search: None,
+                instant_due,
+                scores,
+            });
+            return;
+        }
+        let normalized_search = normalize_search(&search).ok();
+        self.stats_graph_scores
+            .retain(|entry| entry.search != search);
+        self.stats_graph_scores.push_back(RwkvStatsGraphScores {
+            search,
+            normalized_search,
+            instant_due,
+            scores,
+        });
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         while self.stats_graph_scores.len() > MAX_RWKV_STATS_GRAPH_SEARCHES {
             self.stats_graph_scores.pop_front();
         }
@@ -523,6 +632,11 @@ impl RwkvRetrievabilityScores {
         self.scores.is_empty()
             && self.review_queue_scores.is_none()
             && self.stats_graph_scores.is_empty()
+<<<<<<< HEAD
+=======
+            && self.pending_filtered_build_scores.is_none()
+            && self.active_filtered_build_scores.is_none()
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             && self.deck_count_scores.is_empty()
     }
 
@@ -671,6 +785,11 @@ impl Collection {
                 scores: HashMap::new(),
                 review_queue_scores: None,
                 stats_graph_scores: VecDeque::new(),
+<<<<<<< HEAD
+=======
+                pending_filtered_build_scores: None,
+                active_filtered_build_scores: None,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 deck_count_scores: HashMap::new(),
             });
         }
@@ -938,21 +1057,70 @@ impl Collection {
                 )
             })
             .collect();
+<<<<<<< HEAD
         self.set_rwkv_stats_graph_score_entries(search, scores)
+=======
+        self.set_rwkv_stats_graph_score_entries(search, scores, false)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     pub(crate) fn set_rwkv_stats_graph_score_entries(
         &mut self,
         search: String,
         scores: HashMap<CardId, RwkvStatsGraphScoreEntry>,
+<<<<<<< HEAD
     ) -> Result<()> {
         let days_elapsed = self.timing_today()?.days_elapsed;
         self.rwkv_retrievability_scores_mut(days_elapsed)
             .set_stats_graph_scores(search, scores);
+=======
+        instant_due: bool,
+    ) -> Result<()> {
+        let days_elapsed = self.timing_today()?.days_elapsed;
+        self.rwkv_retrievability_scores_mut(days_elapsed)
+            .set_stats_graph_scores(search, scores, instant_due);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         self.clear_empty_rwkv_retrievability_scores();
         Ok(())
     }
 
+<<<<<<< HEAD
+=======
+    /// Moves the scores prepared for a filtered deck build into use by the
+    /// build that is starting. Each prepared set serves one build only.
+    pub(crate) fn begin_rwkv_filtered_build_scores(&mut self) -> Result<bool> {
+        let days_elapsed = self.timing_today()?.days_elapsed;
+        let Some(scores) = self.state.rwkv_retrievability_scores.as_mut() else {
+            return Ok(false);
+        };
+        let same_day = scores.days_elapsed == days_elapsed;
+        let pending = std::mem::take(&mut scores.pending_filtered_build_scores);
+        scores.active_filtered_build_scores = pending.filter(|_| same_day);
+        let found = scores.active_filtered_build_scores.is_some();
+        self.clear_empty_rwkv_retrievability_scores();
+        Ok(found)
+    }
+
+    pub(crate) fn finish_rwkv_filtered_build_scores(&mut self) {
+        if let Some(scores) = self.state.rwkv_retrievability_scores.as_mut() {
+            scores.active_filtered_build_scores = None;
+        }
+        self.clear_empty_rwkv_retrievability_scores();
+    }
+
+    pub(crate) fn rwkv_due_score_snapshot(
+        &self,
+        days_elapsed: u32,
+        source: RwkvDueScoreSource<'_>,
+    ) -> Option<RwkvDueScoreSnapshot> {
+        self.state
+            .rwkv_retrievability_scores
+            .as_ref()
+            .filter(|scores| scores.days_elapsed == days_elapsed)
+            .and_then(|scores| scores.due_score_snapshot(source))
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) fn rwkv_stats_graph_scores_for_search(
         &self,
         days_elapsed: u32,
@@ -965,6 +1133,7 @@ impl Collection {
             .and_then(|scores| scores.stats_graph_scores(search))
     }
 
+<<<<<<< HEAD
     pub(crate) fn rwkv_stats_graph_score_entries_for_search(
         &self,
         days_elapsed: u32,
@@ -977,6 +1146,8 @@ impl Collection {
             .and_then(|scores| scores.stats_graph_score_entries(search))
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[cfg(test)]
     pub(crate) fn set_rwkv_card_info_score(
         &mut self,
@@ -1104,8 +1275,17 @@ mod test {
             }),
             stats_graph_scores: VecDeque::from([RwkvStatsGraphScores {
                 search: "deck:current".into(),
+<<<<<<< HEAD
                 scores: stats_scores,
             }]),
+=======
+                normalized_search: None,
+                instant_due: false,
+                scores: stats_scores,
+            }]),
+            pending_filtered_build_scores: None,
+            active_filtered_build_scores: None,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             deck_count_scores: HashMap::from([(DeckId(1), deck_count_scores)]),
         };
         let expected = HashMap::from([

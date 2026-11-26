@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Offline block-compression experiment; desktop checkpoint formats are
@@ -353,7 +357,11 @@ fn restore_blocks(inference: &mut RwkvInference, path: &Path) -> io::Result<()> 
     let mut states = ReviewStateMaps::default();
     let mut state_bytes = Vec::new();
     for map in [
+<<<<<<< HEAD
         &mut states.card as &mut dyn StateMap,
+=======
+        &mut states.card,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         &mut states.note,
         &mut states.deck,
         &mut states.preset,

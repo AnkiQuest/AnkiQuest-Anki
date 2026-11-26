@@ -848,12 +848,21 @@ fn existing_cards_for_dynamic_desired_retention(
                 return Ok(None);
             };
             card.desired_retention = Some(input.desired_retention);
+<<<<<<< HEAD
             Ok(Card::convert_with_options(
+=======
+            Ok(Card::convert(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 card,
                 input.days_elapsed,
                 memory_state,
                 input.desired_retention,
+<<<<<<< HEAD
                 &shared_params,
+=======
+                shared_params.clone(),
+                &fsrs,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ))
         })
         .collect::<Result<Vec<_>>>()?
@@ -2704,9 +2713,13 @@ pub(crate) mod tests {
                 .collect_vec();
             expected.sort_by_key(|row| row.0);
             let actual = bytes
+<<<<<<< HEAD
                 .as_chunks::<12>()
                 .0
                 .iter()
+=======
+                .chunks_exact(12)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .map(|chunk| {
                     (
                         i64::from_le_bytes(chunk[..8].try_into().unwrap()),

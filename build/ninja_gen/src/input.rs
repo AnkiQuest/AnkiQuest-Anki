@@ -125,24 +125,73 @@ static CACHED_FILES: LazyLock<Vec<Utf8PathBuf>> = LazyLock::new(cache_files);
 /// Walking the source tree once instead of for each glob yields ~4x speed
 /// improvements.
 fn cache_files() -> Vec<Utf8PathBuf> {
-    walkdir::WalkDir::new(".")
+    let mut files: Vec<Utf8PathBuf> = walkdir::WalkDir::new(".")
         // ensure the output order is predictable
         .sort_by_file_name()
         .into_iter()
         .filter_entry(move |e| {
-            // don't walk into symlinks, or the top-level out/, or .git
+            // don't walk into symlinks, the top-level out/ or .git, or agent
+            // worktrees, which are separate checkouts with their own out/
             !(e.path_is_symlink()
-                || (e.depth() == 1 && (e.file_name() == "out" || e.file_name() == ".git")))
+                || (e.depth() == 1 && (e.file_name() == "out" || e.file_name() == ".git"))
+                || e.path() == std::path::Path::new("./.claude/worktrees"))
+                && e.file_name() != "__pycache__"
         })
         .filter_map(move |e| {
             let path = e.as_ref().unwrap().path().strip_prefix("./").unwrap();
             if !path.is_dir() {
+                if path.file_name().is_some_and(|name| name == ".DS_Store")
+                    || path
+                        .extension()
+                        .is_some_and(|extension| extension == "pyc" || extension == "pyo")
+                {
+                    return None;
+                }
                 Some(Utf8PathBuf::from_path_buf(path.to_owned()).unwrap())
             } else {
                 None
             }
         })
-        .collect()
+        .collect();
+    // If a local `../fsrs-rs` path-dependency checkout is present, index its
+    // sources so edits there trigger a rebuild. Upstream builds use a git
+    // revision with no sibling directory, so this is a no-op for them and for
+    // fresh clones (nothing to walk, and the fsrs glob matches nothing).
+    if std::path::Path::new("../fsrs-rs/src").is_dir() {
+        files.extend(cache_local_fsrs_files());
+    }
+    files
+}
+
+/// Index a sibling `../fsrs-rs` path dependency (source + manifest only),
+/// keeping the `../fsrs-rs/...` prefix so ninja can track it as an input.
+fn cache_local_fsrs_files() -> impl Iterator<Item = Utf8PathBuf> {
+    walkdir::WalkDir::new("../fsrs-rs")
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|e| {
+            !(e.path_is_symlink()
+                || (e.depth() == 1
+                    && matches!(e.file_name().to_str(), Some("out" | ".git" | "target"))))
+                && e.file_name() != "__pycache__"
+        })
+        .filter_map(|e| {
+            let path = e.as_ref().unwrap().path();
+            if !path.is_dir() {
+                if path.file_name().is_some_and(|name| name == ".DS_Store")
+                    || path
+                        .extension()
+                        .is_some_and(|extension| extension == "pyc" || extension == "pyo")
+                {
+                    return None;
+                }
+                Some(Utf8PathBuf::from_path_buf(path.to_owned()).unwrap())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
 }
 
 impl Glob {

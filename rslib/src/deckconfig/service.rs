@@ -18,6 +18,13 @@ use crate::scheduler::fsrs::simulator::normalized_fsrs_parameters;
 use crate::scheduler::states::fuzz::StoredReviewFuzzConfig;
 
 impl crate::services::DeckConfigService for Collection {
+    fn preview_study_session(
+        &mut self,
+        input: anki_proto::deck_config::PreviewStudySessionRequest,
+    ) -> Result<anki_proto::deck_config::StudySessionPreview> {
+        self.study_session_preview(input)
+    }
+
     fn add_or_update_deck_config_legacy(
         &mut self,
         input: generic::Json,
@@ -119,6 +126,10 @@ impl crate::services::DeckConfigService for Collection {
 
         let mut config = guard.col.get_optimal_retention_parameters(revlogs)?;
         let fsrs_card_params = std::sync::Arc::new(normalized_fsrs_parameters(&input.w)?);
+<<<<<<< HEAD
+=======
+        let model = fsrs::FSRS::new(&fsrs_card_params)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let cards = guard
             .col
             .storage
@@ -133,6 +144,7 @@ impl crate::services::DeckConfigService for Collection {
                     c.memory_state?,
                     desired_retention,
                     fsrs_card_params.clone(),
+                    &model,
                 )
             })
             .collect::<Vec<fsrs::Card>>();
@@ -222,6 +234,7 @@ impl From<anki_proto::deck_config::DeckConfigId> for DeckConfigId {
 
 #[cfg(test)]
 mod tests {
+<<<<<<< HEAD
     use std::assert_matches;
 
     use anki_proto::generic::Json;
@@ -602,6 +615,9 @@ mod tests {
 
         assert_matches!(result, Err(AnkiError::InvalidInput { .. }));
     }
+=======
+    use super::*;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
     #[test]
     fn update_deck_configs_request_defaults_missing_review_fuzz() {

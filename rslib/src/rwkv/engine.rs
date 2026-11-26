@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use std::borrow::Cow;
@@ -29,7 +33,11 @@ use rusqlite::MAIN_DB;
 use crate::card::CardType;
 use crate::rwkv::answer_time as answer_time_items;
 use crate::rwkv::answer_time::set_answer_time_elapsed;
+<<<<<<< HEAD
 use crate::rwkv::answer_time::ANSWER_TIME_FORMAT_VERSION;
+=======
+use crate::rwkv::answer_time::ANSWER_TIME_FORMAT_VERSIONS;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::scheduler::rwkv::relative_overdueness;
 
 #[path = "architecture.rs"]
@@ -43,6 +51,11 @@ mod instant_forecast_queue;
 mod instant_forecast_sampling;
 #[path = "instant_workload_forecast.rs"]
 mod instant_workload_forecast;
+<<<<<<< HEAD
+=======
+#[path = "lowrank.rs"]
+mod lowrank;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[cfg(test)]
 #[path = "model_bench.rs"]
 mod model_bench;
@@ -52,6 +65,10 @@ mod precision;
 mod workload_comparison;
 #[path = "workload_forecast.rs"]
 mod workload_forecast;
+<<<<<<< HEAD
+=======
+pub use lowrank::RankSchedule;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 pub use precision::StatePrecision;
 #[cfg(test)]
 #[path = "collection_benchmark.rs"]
@@ -323,11 +340,19 @@ fn record_rwkv_scan_step(
     });
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
 const MAX_CHANNEL_MIXER_DIM: usize = 256;
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
 const MAX_LORA_RANK: usize = 16;
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+const MAX_CHANNEL_MIXER_DIM: usize = 256;
+#[cfg(any(not(target_os = "macos"), test))]
+const MAX_LORA_RANK: usize = 16;
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 const RETRIEVABILITY_GEMM_BATCH_SIZE: usize = 128;
 const ID_PLACEHOLDER: i64 = 314_159_265_358_979_323;
 /// Inputs `note_id_is_nan`, `deck_id_is_nan` and `preset_id_is_nan`.
@@ -484,7 +509,11 @@ impl WarmUpStateSpill {
             hasher.update(&(states.len() as u32).to_le_bytes());
             // Only one serialized module is held at a time. Do not build a
             // serialized snapshot or drain the maps before publishing the file.
+<<<<<<< HEAD
             for (id, state) in states.iter() {
+=======
+            for (id, state) in states {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 let bytes = serialize_module_state(state);
                 max_state_bytes = max_state_bytes.max(bytes.len());
                 io::Write::write_all(&mut out, &id.to_le_bytes())?;
@@ -661,7 +690,11 @@ struct ReviewPredictionQueryRef<'a> {
 }
 
 impl ReviewPredictionQueryRef<'_> {
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn layer_state(&self, module_id: usize, layer_id: usize) -> Option<&LayerState> {
         self.state
             .module(module_id)
@@ -736,7 +769,12 @@ impl RwkvInference {
             max_interval_days,
             precision,
         );
+<<<<<<< HEAD
         engine.answer_time_head = AnswerTimeHead::load_beside(&path)?.map(Arc::new);
+=======
+        let inputs = answer_time_inputs(engine.model.layer_plan);
+        engine.answer_time_head = AnswerTimeHead::load_beside(&path, inputs)?.map(Arc::new);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(engine)
     }
 
@@ -751,6 +789,16 @@ impl RwkvInference {
         self.model.card_layers()
     }
 
+<<<<<<< HEAD
+=======
+    /// Layer counts per stream (card, deck, note, preset, user) of the
+    /// loaded checkpoint: its layer plan (the engine's, the tiny model's or
+    /// the six-layer Tiny (SM130)'s).
+    pub fn module_layers(&self) -> [usize; 5] {
+        self.model.layer_plan.module_layers
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     /// Predicts the answer time of each query from the frozen trunk and the
     /// history features of [`crate::rwkv::AnswerTimeHistory::features`]
     /// (computed after every review before the query; their elapsed-days
@@ -781,7 +829,11 @@ impl RwkvInference {
                 ));
             }
             let elapsed = elapsed_days(&request.input, elapsed_seconds(&request.input));
+<<<<<<< HEAD
             if elapsed < 1 {
+=======
+            if elapsed < head.min_elapsed_days() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 out.push(None);
                 continue;
             }
@@ -795,6 +847,173 @@ impl RwkvInference {
         Ok(out)
     }
 
+<<<<<<< HEAD
+=======
+    /// An independent copy that shares the model and its answer-time head
+    /// but no state, for [`Self::fit_answer_time_recalibration`]; `None`
+    /// without the head.
+    pub(crate) fn answer_time_recalibration_worker(&self) -> Option<Self> {
+        self.answer_time_head
+            .is_some()
+            .then(|| self.workload_worker(FeatureState::default(), HashMap::new()))
+    }
+
+    /// Fits the rolling recalibration of the timed answer-time
+    /// probabilities (SM175) for `today`'s 7-day block from the whole
+    /// canonical history `reviews` (the warm-up rows, in order). The history
+    /// is replayed on a private state: the head's raw prediction is taken
+    /// before each time-labelled review of the fit window (a recorded time
+    /// and a query the head predicts, so not a card's first review), exactly
+    /// as Card Info queries it, then the review advances the state.
+    /// `None` without the head or while fewer than 1,000 time-labelled
+    /// reviews precede today's block (the raw model is used). The resident
+    /// state is never touched.
+    pub(crate) fn fit_answer_time_recalibration(
+        &self,
+        reviews: &[ReviewInput],
+        today: i64,
+    ) -> io::Result<Option<crate::rwkv::AnswerTimeRecalibration>> {
+        use crate::rwkv::answer_time_recal as recal;
+        let Some((rows, window, cap)) = self.answer_time_recal_rows(reviews, today)? else {
+            return Ok(None);
+        };
+        let fit_window = recal::AnswerTimeRecalWindow {
+            fit: 0..rows.len(),
+            ..window
+        };
+        Ok(Some(recal::AnswerTimeRecalibration::fit(
+            &rows,
+            &fit_window,
+            cap,
+            recal::ANSWER_TIME_RECAL_SHIPPED,
+        )))
+    }
+
+    /// The fit rows of [`Self::fit_answer_time_recalibration`] (the head's
+    /// raw events before each time-labelled review of the window), the
+    /// window and the user's cap.
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn answer_time_recal_rows(
+        &self,
+        reviews: &[ReviewInput],
+        today: i64,
+    ) -> io::Result<
+        Option<(
+            Vec<crate::rwkv::answer_time_recal::TimedRow>,
+            crate::rwkv::answer_time_recal::AnswerTimeRecalWindow,
+            i64,
+        )>,
+    > {
+        use crate::rwkv::answer_time_recal as recal;
+        let Some(head) = self.answer_time_head.clone() else {
+            return Ok(None);
+        };
+        let min_elapsed = head.min_elapsed_days();
+        // A card's first review (its learning start) has no time label.
+        let mut seen = HashSet::new();
+        let mut labelled = Vec::new();
+        for (index, input) in reviews.iter().enumerate() {
+            let first_review = seen.insert(input.card_id) || input.card_type == Some(0);
+            if !first_review
+                && input.ease.is_some_and(|ease| (1..=4).contains(&ease))
+                && input.duration_millis.is_some_and(|duration| duration > 0)
+                && input.day_offset.is_some()
+                && answer_time_query_elapsed_days(input) >= min_elapsed
+            {
+                labelled.push(index);
+            }
+        }
+        let days: Vec<i64> = labelled
+            .iter()
+            .map(|&index| reviews[index].day_offset.unwrap_or_default())
+            .collect();
+        if !days.windows(2).all(|pair| pair[0] <= pair[1]) {
+            return Ok(None);
+        }
+        let config = recal::ANSWER_TIME_RECAL_SHIPPED;
+        let Some(window) = recal::answer_time_recal_window(&days, today, config) else {
+            return Ok(None);
+        };
+        // The user's cap from every recorded time before the block.
+        let cap = recal::answer_time_user_cap_millis(
+            reviews
+                .iter()
+                .filter(|input| {
+                    input
+                        .day_offset
+                        .is_some_and(|day| day < window.block_start_day)
+                })
+                .filter_map(|input| input.duration_millis),
+        );
+        let first = labelled[window.fit.start];
+        let last = labelled[window.fit.end - 1];
+        let mut worker = self.workload_worker(FeatureState::default(), HashMap::new());
+        let mut history = answer_time_items::AnswerTimeHistory::new();
+        let push = |history: &mut answer_time_items::AnswerTimeHistory, input: &ReviewInput| {
+            history.push(
+                input.card_id,
+                input.ease.map_or(0, i64::from),
+                input.duration_millis.unwrap_or(0),
+            );
+        };
+        for input in &reviews[..first] {
+            push(&mut history, input);
+        }
+        worker.warm_up_reviews(reviews[..first].to_vec(), false)?;
+        let mut rows = Vec::with_capacity(window.fit.len());
+        let mut next = window.fit.start;
+        for (index, input) in reviews.iter().enumerate().take(last + 1).skip(first) {
+            if input.ease.is_none() {
+                push(&mut history, input);
+                continue;
+            }
+            let predict = next < window.fit.end && labelled[next] == index;
+            // Query features first, as the per-review warm-up assigns them.
+            let query = predict.then(|| {
+                let mut query = input.clone();
+                query.is_query = true;
+                query.ease = None;
+                query.duration_millis = None;
+                let elapsed = answer_time_query_elapsed_days(input);
+                (
+                    worker.features.features_for(&query),
+                    history.features(input.card_id, elapsed),
+                )
+            });
+            let features = worker.features.features_for(input);
+            let model = &*worker.model;
+            let state = worker.warm_up_states.state_ref(input);
+            let (time, heads) = match &query {
+                Some((query_features, explicit)) => {
+                    let (time, heads) = rayon::join(
+                        || {
+                            let (frozen, buttons) = model.answer_time_inputs(query_features, state);
+                            head.predict(&frozen, explicit, buttons)
+                        },
+                        || model.review(&features, state),
+                    );
+                    (Some(time), heads)
+                }
+                None => (None, model.review(&features, state)),
+            };
+            if let Some(time) = time {
+                rows.push(recal::TimedRow {
+                    day: input.day_offset.unwrap_or_default(),
+                    grade: input.ease.unwrap_or(1) - 1,
+                    duration_millis: input.duration_millis.unwrap_or(0),
+                    raw: recal::TimedEvents::from_prediction(&time),
+                });
+                next += 1;
+            }
+            worker.features.store_review(input);
+            worker.warm_up_states.store(input, heads.next_state);
+            push(&mut history, input);
+        }
+        debug_assert_eq!(rows.len(), window.fit.len());
+        Ok(Some((rows, window, cap)))
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     /// Feeds the checkpoint leak-free inputs: the missing note, deck and
     /// preset flags are always zero, as in its training data. Call before
     /// the runtime is shared.
@@ -811,10 +1030,18 @@ impl RwkvInference {
         max_interval_days: u32,
         precision: StatePrecision,
     ) -> Self {
+<<<<<<< HEAD
         let (card_precision, note_precision) = match precision {
             StatePrecision::Int4CardsInt8Notes => (StatePrecision::Int4, StatePrecision::Int8),
             precision => (precision, precision),
         };
+=======
+        // The default low-rank policy picks its factor width by the model's
+        // size (its card layers): int8 for Tiny, int6 for Small and Big.
+        let (card_precision, note_precision) = precision
+            .for_card_layers(model.card_layers())
+            .module_precisions();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         model.modules[0].precision = card_precision;
         model.modules[2].precision = note_precision;
         Self {
@@ -967,6 +1194,7 @@ impl RwkvInference {
             .iter()
             .map(|input| self.features.features_for(input))
             .collect::<Vec<_>>();
+<<<<<<< HEAD
         // Compact card and note states are decoded a chunk at a time, not all of
         // a big collection's at once.
         let mut retrievabilities = Vec::with_capacity(inputs.len());
@@ -989,6 +1217,18 @@ impl RwkvInference {
             retrievabilities.extend(self.model.review_retrievability_query_refs(&items)?);
         }
         Ok(retrievabilities)
+=======
+        let work_items = inputs
+            .iter()
+            .zip(features)
+            .map(|(input, features)| ReviewPredictionBorrowedWorkItem {
+                features,
+                state: self.warm_up_states.state_ref(input),
+            })
+            .collect::<Vec<_>>();
+
+        self.model.review_retrievability_many_borrowed(&work_items)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     pub fn predict_retrievability_many_after_review(
@@ -1268,8 +1508,12 @@ impl RwkvInference {
             // The query and answer inputs share card/note/deck/preset ids, so
             // both passes read the same pre-review state and can run in
             // parallel; only the answer pass advances state below.
+<<<<<<< HEAD
             let view = self.warm_up_states.state_view(&input);
             let state = view.as_ref();
+=======
+            let state = self.warm_up_states.state_ref(&input);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let (query_retrievability, heads) = match &query_features {
                 Some(query_features) => {
                     let (retrievability, heads) = rayon::join(
@@ -1314,16 +1558,26 @@ impl RwkvInference {
             query_input.ease = None;
             query_input.duration_millis = None;
             let features = self.features.features_for(&query_input);
+<<<<<<< HEAD
             let query_heads = self.model.review(
                 &features,
                 self.warm_up_states.state_view(&query_input).as_ref(),
             );
+=======
+            let query_heads = self
+                .model
+                .review(&features, self.warm_up_states.state_ref(&query_input));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             predictions.push(query_heads.retrievability);
 
             let features = self.features.features_for(input);
             let heads = self
                 .model
+<<<<<<< HEAD
                 .review(&features, self.warm_up_states.state_view(input).as_ref());
+=======
+                .review(&features, self.warm_up_states.state_ref(input));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             self.features.store_review(input);
             self.curves.insert(input.card_id, heads.curve.clone());
             let next_state = match compression {
@@ -1381,11 +1635,22 @@ impl RwkvInference {
         path: PathBuf,
     ) -> io::Result<()> {
         let mut out = io::BufWriter::new(fs::OpenOptions::new().append(true).open(path)?);
+<<<<<<< HEAD
         let (release, paired) = (&self.warm_up_states, &instant.warm_up_states);
         write_paired_snapshot_state_map(&mut out, &release.card, &paired.card)?;
         write_paired_snapshot_state_map(&mut out, &release.note, &paired.note)?;
         write_paired_snapshot_state_map(&mut out, &release.deck, &paired.deck)?;
         write_paired_snapshot_state_map(&mut out, &release.preset, &paired.preset)?;
+=======
+        for (release, paired) in [
+            (&self.warm_up_states.card, &instant.warm_up_states.card),
+            (&self.warm_up_states.note, &instant.warm_up_states.note),
+            (&self.warm_up_states.deck, &instant.warm_up_states.deck),
+            (&self.warm_up_states.preset, &instant.warm_up_states.preset),
+        ] {
+            write_paired_snapshot_state_map(&mut out, release, paired)?;
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let global = match (
             self.warm_up_states.global.as_ref(),
             instant.warm_up_states.global.as_ref(),
@@ -1793,6 +2058,7 @@ insert into segments (
         Ok(())
     }
 
+<<<<<<< HEAD
     /// What kuma3's offline state file holds, taken now to be written on
     /// another thread: card and note states are shared ([SharedStateMap]),
     /// so this copies pointers, not the states (the deck, preset and global
@@ -1855,6 +2121,8 @@ insert into segments (
         Ok(())
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub fn restore_warm_up_state(
         &mut self,
         card_id: i64,
@@ -1915,8 +2183,13 @@ insert into segments (
             drop(mem::take(&mut self.warm_up_states.note));
             release_free_memory_to_os();
             let [card, note] = spill.read()?;
+<<<<<<< HEAD
             stashed.warm_up_states.card = card.into_iter().collect();
             stashed.warm_up_states.note = note.into_iter().collect();
+=======
+            stashed.warm_up_states.card = card;
+            stashed.warm_up_states.note = note;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         let stashed = self
             .stashed_warm_up_state
@@ -2519,6 +2792,7 @@ insert into segments (
         inputs: &[ReviewInput],
         states: &SimulationStates<'_>,
     ) -> Vec<RwkvWorkloadQueryPrediction> {
+<<<<<<< HEAD
         let features = inputs
             .iter()
             .map(|input| self.features.features_for(input))
@@ -2568,6 +2842,26 @@ insert into segments (
             );
         }
         out
+=======
+        let work_items = inputs
+            .iter()
+            .map(|input| ReviewPredictionBorrowedWorkItem {
+                features: self.features.features_for(input),
+                state: states.state_ref(input),
+            })
+            .collect::<Vec<_>>();
+        let this = &*self;
+        this.model
+            .review_many_borrowed(&work_items, |index, heads| {
+                let (current_interval, current_s90) =
+                    this.current_intervals(&inputs[index], &heads);
+                RwkvWorkloadQueryPrediction {
+                    retrievability: heads.retrievability,
+                    current_interval,
+                    current_s90,
+                }
+            })
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     fn selected_answer_intervals_for_inputs(
@@ -2590,6 +2884,7 @@ insert into segments (
                 .map(|ease| simulated_answer_input(input, ease))
             })
             .collect::<Vec<_>>();
+<<<<<<< HEAD
         let features = answer_inputs
             .iter()
             .map(|input| self.features.features_for(input))
@@ -2597,6 +2892,20 @@ insert into segments (
         let (default_retention, max_interval_days) =
             (self.target_retention, self.max_interval_days);
         let curves = self.review_in_chunks(&answer_inputs, &features, states, |_, heads| heads.curve);
+=======
+        let work_items = answer_inputs
+            .iter()
+            .map(|input| ReviewPredictionBorrowedWorkItem {
+                features: self.features.features_for(input),
+                state: states.state_ref(input),
+            })
+            .collect::<Vec<_>>();
+        let (default_retention, max_interval_days) =
+            (self.target_retention, self.max_interval_days);
+        let curves = self
+            .model
+            .review_many_borrowed(&work_items, |_, heads| heads.curve);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut next = 0;
         inputs
             .iter()
@@ -2634,7 +2943,11 @@ insert into segments (
         input: &ReviewInput,
         states: &mut SimulationStates<'_>,
     ) -> io::Result<()> {
+<<<<<<< HEAD
         let heads = self.review_heads_for_state(input, states.state_view(input).as_ref())?;
+=======
+        let heads = self.review_heads_for_state(input, states.state_ref(input))?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         self.features.store_review(input);
         states.store(input, heads.next_state)
     }
@@ -2771,7 +3084,11 @@ fn read_runtime_cache_state(bytes: &[u8]) -> io::Result<(FeatureState, HashMap<i
         ));
     }
     let features = FeatureState::read_cache_state(&mut cursor)?;
+<<<<<<< HEAD
     let curve_count = cursor.count(16)?; // card id + two vector lengths
+=======
+    let curve_count = cursor.u32()? as usize;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut curves = HashMap::with_capacity(curve_count);
     for _ in 0..curve_count {
         let card_id = cursor.i64()?;
@@ -3491,18 +3808,25 @@ fn id_encoding_dim(kind: IdKind) -> usize {
 }
 
 fn read_id_encodings(cursor: &mut Cursor<'_>) -> io::Result<HashMap<(IdKind, i64), Vec<f32>>> {
+<<<<<<< HEAD
     let count = cursor.count(13)?; // kind + id + vector length
+=======
+    let count = cursor.u32()? as usize;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut values = HashMap::with_capacity(count);
     for _ in 0..count {
         let kind = IdKind::from_cache_code(cursor.u8()?)?;
         let value = cursor.i64()?;
         let encoding = cursor.f32_vec()?;
+<<<<<<< HEAD
         if encoding.len() != id_encoding_dim(kind) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "damaged RWKV id encoding",
             ));
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         values.insert((kind, value), encoding);
     }
     Ok(values)
@@ -3637,6 +3961,19 @@ fn elapsed_seconds(input: &ReviewInput) -> i64 {
         .unwrap_or(-1)
 }
 
+<<<<<<< HEAD
+=======
+/// The elapsed days of the query before a history review, as the
+/// answer-time head reads them (negative for a card's first review).
+fn answer_time_query_elapsed_days(input: &ReviewInput) -> i64 {
+    let mut query = input.clone();
+    query.is_query = true;
+    query.ease = None;
+    query.duration_millis = None;
+    elapsed_days(&query, elapsed_seconds(&query))
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn elapsed_days(input: &ReviewInput, elapsed_seconds: i64) -> i64 {
     if creation_elapsed_is_query_only(input) {
         return -1;
@@ -3947,6 +4284,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
+<<<<<<< HEAD
     /// A count read from the data, refused when that many entries of at least
     /// `entry_bytes` can't fit in what is left: a damaged count would otherwise
     /// reserve gigabytes up front and abort the app.
@@ -3961,6 +4299,8 @@ impl<'a> Cursor<'a> {
         Ok(count)
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn bytes(&mut self, len: usize) -> io::Result<&'a [u8]> {
         let end = self
             .offset
@@ -4027,10 +4367,15 @@ impl<'a> Cursor<'a> {
         // decoding element by element on the state-restore path.
         Ok(self
             .bytes(byte_len)?
+<<<<<<< HEAD
             .as_chunks::<{ std::mem::size_of::<f32>() }>()
             .0
             .iter()
             .map(|bytes| f32::from_le_bytes(*bytes))
+=======
+            .chunks_exact(std::mem::size_of::<f32>())
+            .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .collect())
     }
 
@@ -4066,7 +4411,11 @@ struct SrsModel {
     layer_plan: LayerPlan,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 struct ReviewRetrievabilityScratch {
     feature_hidden: [f32; HEAD_DIM],
     normalized_features: [f32; HEAD_DIM],
@@ -4077,7 +4426,11 @@ struct ReviewRetrievabilityScratch {
     probabilities: [f32; 4],
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Default)]
 struct ReviewRetrievabilityBatchScratch {
     feature_input: Vec<f32>,
@@ -4090,7 +4443,11 @@ struct ReviewRetrievabilityBatchScratch {
     logits: Vec<f32>,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl Default for ReviewRetrievabilityScratch {
     fn default() -> Self {
         Self {
@@ -4105,6 +4462,7 @@ impl Default for ReviewRetrievabilityScratch {
     }
 }
 
+<<<<<<< HEAD
 /// The tiny model is the small architecture without the card's second
 /// layer: its weights hold no `rwkv_modules.0.blocks.1.` tensor at all. Any
 /// other checkpoint keeps the engine's layers (a partly missing layer fails
@@ -4121,6 +4479,30 @@ fn layer_plan_for(weights: &WeightMap) -> LayerPlan {
     } else {
         ENGINE_LAYER_PLAN
     }
+=======
+/// The small engine's plan whose layer counts the weights hold: the tiny
+/// model has no `rwkv_modules.0.blocks.1.` tensor at all (one card layer),
+/// the six-layer Tiny (SM130) also lacks the trailing deck, preset and user
+/// layers. A layer counts when any tensor of it is present. Any other
+/// checkpoint keeps the engine's layers (a partly missing layer fails to
+/// load as before), and the big engine always does.
+fn layer_plan_for(weights: &WeightMap) -> LayerPlan {
+    if !SMALL_MODEL {
+        return ENGINE_LAYER_PLAN;
+    }
+    let layers: [usize; 5] = std::array::from_fn(|module_id| {
+        (0..MODULE_LAYERS[module_id])
+            .take_while(|layer_id| {
+                let prefix = format!("rwkv_modules.{module_id}.blocks.{layer_id}.");
+                weights.tensors.keys().any(|name| name.starts_with(&prefix))
+            })
+            .count()
+    });
+    SMALL_LAYER_PLANS
+        .into_iter()
+        .find(|plan| plan.module_layers == layers)
+        .unwrap_or(ENGINE_LAYER_PLAN)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl SrsModel {
@@ -4253,18 +4635,30 @@ impl SrsModel {
         &self,
         items: &[ReviewPredictionQueryRef<'_>],
     ) -> io::Result<Vec<f32>> {
+<<<<<<< HEAD
         #[cfg(all(any(target_os = "macos", target_arch = "aarch64"), not(test)))]
+=======
+        #[cfg(all(target_os = "macos", not(test)))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         {
             self.review_retrievability_query_refs_batched(items)
         }
 
+<<<<<<< HEAD
         #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+        #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         {
             self.review_retrievability_query_refs_scalar(items)
         }
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_retrievability_query_refs_scalar(
         &self,
         items: &[ReviewPredictionQueryRef<'_>],
@@ -4281,7 +4675,11 @@ impl SrsModel {
             .collect()
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_retrievability_query_refs_batched(
         &self,
         items: &[ReviewPredictionQueryRef<'_>],
@@ -4299,7 +4697,11 @@ impl SrsModel {
         Ok(retrievabilities)
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_retrievability_query_batch(
         &self,
         items: &[ReviewPredictionQueryRef<'_>],
@@ -4368,7 +4770,11 @@ impl SrsModel {
             .apply_batch(&scratch.head, rows, &mut scratch.logits);
         for (retrievability, logits) in retrievabilities
             .iter_mut()
+<<<<<<< HEAD
             .zip(scratch.logits.as_chunks::<4>().0)
+=======
+            .zip(scratch.logits.chunks_exact(4))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         {
             let mut probabilities = [0.0; 4];
             softmax_into(logits, &mut probabilities);
@@ -4457,7 +4863,11 @@ impl SrsModel {
         ];
         let decoded: Vec<_> = states
             .iter()
+<<<<<<< HEAD
             .map(|state| state.map(ModuleState::decoded))
+=======
+            .map(|state| state.and_then(ModuleState::decoded_or_fresh))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .collect();
         let mut x = x;
         let mut v0 = [const { Vec::new() }; 5];
@@ -4466,8 +4876,17 @@ impl SrsModel {
             let previous = decoded[module_id]
                 .as_ref()
                 .and_then(|state| state.layers.get(layer_id));
+<<<<<<< HEAD
             let (out, value, layer_state) =
                 self.modules[module_id].layers[layer_id].run(&x, &v0[module_id], previous);
+=======
+            let (out, value, layer_state) = self.modules[module_id].layers[layer_id].run(
+                &x,
+                &v0[module_id],
+                previous,
+                self.modules[module_id].precision,
+            );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             x = out;
             v0[module_id] = value;
             next[module_id].push(layer_state);
@@ -4511,9 +4930,16 @@ impl SrsModel {
 
     /// The answer-time head's frozen inputs at a query and the instant head's
     /// grade probabilities. Runs the same trunk as [`Self::review_features`]
+<<<<<<< HEAD
     /// and keeps the residual after the input encoder and after each layer
     /// round, layer-normalised without affine parameters, then the instant
     /// head's hidden layer.
+=======
+    /// and keeps the residual after the input encoder and after each schedule
+    /// unit (a layer round of the small models' interleaved schedule, a
+    /// stream of the big models' sequential one), layer-normalised without
+    /// affine parameters, then the instant head's hidden layer.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn answer_time_inputs(&self, features: &[f32], state: SrsStateRef<'_>) -> (Vec<f32>, [f32; 4]) {
         let unit = Norm {
             groups: 1,
@@ -4522,7 +4948,11 @@ impl SrsModel {
             weight: vec![1.0; D_MODEL],
             bias: vec![0.0; D_MODEL],
         };
+<<<<<<< HEAD
         let mut out = Vec::with_capacity(AnswerTimeHead::FROZEN);
+=======
+        let mut out = Vec::with_capacity(answer_time_frozen(self.layer_plan));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut x = self.feature_mlp(features);
         out.extend(unit.apply(&x));
         let states = [
@@ -4534,7 +4964,11 @@ impl SrsModel {
         ];
         let decoded: Vec<_> = states
             .iter()
+<<<<<<< HEAD
             .map(|state| state.map(ModuleState::decoded))
+=======
+            .map(|state| state.and_then(ModuleState::decoded_or_fresh))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .collect();
         let mut v0 = [const { Vec::new() }; 5];
         let steps = self.layer_plan.steps;
@@ -4542,11 +4976,24 @@ impl SrsModel {
             let previous = decoded[module_id]
                 .as_ref()
                 .and_then(|state| state.layers.get(layer_id));
+<<<<<<< HEAD
             let (next, value, _) =
                 self.modules[module_id].layers[layer_id].run(&x, &v0[module_id], previous);
             x = next;
             v0[module_id] = value;
             if index + 1 == steps.len() || steps[index + 1].1 != layer_id {
+=======
+            // The stored state is discarded: no state rounding.
+            let (next, value, _) = self.modules[module_id].layers[layer_id].run(
+                &x,
+                &v0[module_id],
+                previous,
+                StatePrecision::F32,
+            );
+            x = next;
+            v0[module_id] = value;
+            if answer_time_unit_ends(steps, index) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 out.extend(unit.apply(&x));
             }
         }
@@ -4560,7 +5007,11 @@ impl SrsModel {
         (out, button_probabilities)
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_retrievability_features(
         &self,
         features: &[f32],
@@ -4611,6 +5062,7 @@ impl SrsModel {
 /// affine parameters), the instant head's hidden layer, and the history
 /// features.
 struct AnswerTimeHead {
+<<<<<<< HEAD
     hidden: Linear,
     out: Linear,
 }
@@ -4639,21 +5091,91 @@ impl AnswerTimeHead {
             return Ok(None);
         }
         Self::load(&path).map(Some)
+=======
+    /// Frozen inputs plus history features: 474 for the small and tiny
+    /// plans, 346 for the six-layer Tiny (SM130), 1,306 for the big engine
+    /// (see [`answer_time_inputs`]).
+    inputs: usize,
+    hidden: Linear,
+    out: Linear,
+    /// Format 2 heads (trained on show-time inputs with same-day reviews
+    /// included) answer every query but a card's first review; format 1
+    /// heads only queries on a later day than the card's previous review.
+    same_day: bool,
+}
+
+impl AnswerTimeHead {
+    /// The frozen inputs and the input count of the engine's own plan (the
+    /// tests' reference widths; each engine compiles only some of the tests).
+    #[cfg(test)]
+    #[allow(dead_code)]
+    const FROZEN: usize = answer_time_frozen(ENGINE_LAYER_PLAN);
+    #[cfg(test)]
+    #[allow(dead_code)]
+    const INPUTS: usize = answer_time_inputs(ENGINE_LAYER_PLAN);
+
+    /// Loads the head beside the weights: `<weights file name without
+    /// .bin>.time_head.f32.bin` (the show-time big model (SM91s2)'s weights
+    /// file has no folder of its own), else `time_head.f32.bin` in the folder
+    /// of the weights; `.int8.bin` instead beside INT8 weights. `None` when
+    /// neither exists. A head must take `inputs` values, the count of the
+    /// model it sits beside (a head of another layer plan is refused).
+    fn load_beside(weights: &Path, inputs: usize) -> io::Result<Option<Self>> {
+        let Some(name) = weights.file_name().and_then(|name| name.to_str()) else {
+            return Ok(None);
+        };
+        let format = if name.contains("int8") { "int8" } else { "f32" };
+        let stem = name.strip_suffix(".bin").unwrap_or(name);
+        for candidate in [
+            format!("{stem}.time_head.{format}.bin"),
+            format!("time_head.{format}.bin"),
+        ] {
+            let path = weights.with_file_name(candidate);
+            if path.is_file() {
+                let head = Self::load(&path)?;
+                if head.inputs != inputs {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!(
+                            "RWKV answer-time head takes {} inputs, its model gives {inputs}",
+                            head.inputs
+                        ),
+                    ));
+                }
+                return Ok(Some(head));
+            }
+        }
+        Ok(None)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     fn load(path: &PathBuf) -> io::Result<Self> {
         let weights = WeightMap::load(path)?;
         let version = weights.tensor("time_head.format_version", &[1])?.values[0];
+<<<<<<< HEAD
         if version != ANSWER_TIME_FORMAT_VERSION {
+=======
+        if !ANSWER_TIME_FORMAT_VERSIONS.contains(&version) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("unsupported RWKV answer-time head format {version}"),
             ));
         }
+<<<<<<< HEAD
         let hidden = weights
             .tensors
             .get("time_mlps.0.hidden.weight")
             .map(|tensor| tensor.shape[0])
+=======
+        let (hidden, inputs) = weights
+            .tensors
+            .get("time_mlps.0.hidden.weight")
+            .and_then(|tensor| match tensor.shape[..] {
+                [hidden, inputs] => Some((hidden, inputs)),
+                _ => None,
+            })
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -4661,18 +5183,41 @@ impl AnswerTimeHead {
                 )
             })?;
         Ok(Self {
+<<<<<<< HEAD
             hidden: weights.linear("time_mlps.0.hidden", Self::INPUTS, hidden, true)?,
+=======
+            inputs,
+            hidden: weights.linear("time_mlps.0.hidden", inputs, hidden, true)?,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             out: weights.linear(
                 "time_mlps.0.out",
                 hidden,
                 4 * answer_time_items::ANSWER_TIME_BINS,
                 true,
             )?,
+<<<<<<< HEAD
         })
     }
 
     fn logits(&self, frozen: &[f32], explicit: &[f32]) -> Vec<f32> {
         let mut inputs = Vec::with_capacity(Self::INPUTS);
+=======
+            same_day: version >= 2.0,
+        })
+    }
+
+    /// The smallest elapsed days of a query this head predicts.
+    fn min_elapsed_days(&self) -> i64 {
+        if self.same_day {
+            0
+        } else {
+            1
+        }
+    }
+
+    fn logits(&self, frozen: &[f32], explicit: &[f32]) -> Vec<f32> {
+        let mut inputs = Vec::with_capacity(self.inputs);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         inputs.extend_from_slice(frozen);
         inputs.extend_from_slice(explicit);
         let mut hidden = self.hidden.apply(&inputs);
@@ -4690,6 +5235,7 @@ impl AnswerTimeHead {
     }
 }
 
+<<<<<<< HEAD
 /// Layer rounds of the interleaved schedule (the small model: 4). A round
 /// ends where the next step starts another layer index.
 const ANSWER_TIME_ROUNDS: usize = layer_rounds(LAYER_STEPS);
@@ -4707,6 +5253,60 @@ const fn layer_rounds(steps: &[(usize, usize)]) -> usize {
         index += 1;
     }
     rounds
+=======
+/// Whether step `index` ends a unit of the schedule, where the answer-time
+/// head reads the residual: a layer round of the small models' interleaved
+/// schedule (the next step starts another layer index), a stream of the big
+/// models' sequential one (the next step starts another module).
+const fn answer_time_unit_ends(steps: &[(usize, usize)], index: usize) -> bool {
+    if index + 1 == steps.len() {
+        return true;
+    }
+    if SMALL_MODEL {
+        steps[index + 1].1 != steps[index].1
+    } else {
+        steps[index + 1].0 != steps[index].0
+    }
+}
+
+const fn answer_time_units(steps: &[(usize, usize)]) -> usize {
+    let mut units = 0;
+    let mut index = 0;
+    while index < steps.len() {
+        if answer_time_unit_ends(steps, index) {
+            units += 1;
+        }
+        index += 1;
+    }
+    units
+}
+
+/// Schedule units the answer-time head reads after: 4 layer rounds in the
+/// small model, 5 streams in the big one.
+const ANSWER_TIME_UNITS: usize = answer_time_units(LAYER_STEPS);
+// The tiny model drops one step of round 2, not a round: an answer-time head
+// beside it reads the same number of residuals.
+const _: () = assert!(!SMALL_MODEL || answer_time_units(TINY_LAYER_STEPS) == ANSWER_TIME_UNITS);
+const _: () = assert!(ANSWER_TIME_UNITS == if SMALL_MODEL { 4 } else { 5 });
+// The six-layer Tiny (SM130) keeps 2 layer rounds: its heads take 346
+// inputs (3 x 64 residuals, the 128-wide instant hidden layer, 26 history
+// features) instead of 474.
+const _: () = assert!(!SMALL_MODEL || answer_time_units(SIX_LAYER_STEPS) == 2);
+const _: () = assert!(!SMALL_MODEL || answer_time_inputs(SIX_LAYER_PLAN) == 346);
+const _: () = assert!(!SMALL_MODEL || answer_time_inputs(TINY_LAYER_PLAN) == 474);
+
+/// The answer-time head's frozen inputs on a plan: the residual after the
+/// input encoder and after each schedule unit, then the instant head's
+/// hidden layer.
+const fn answer_time_frozen(plan: LayerPlan) -> usize {
+    (answer_time_units(plan.steps) + 1) * D_MODEL + HEAD_DIM
+}
+
+/// The answer-time head's input count on a plan: the frozen inputs and the
+/// history features.
+const fn answer_time_inputs(plan: LayerPlan) -> usize {
+    answer_time_frozen(plan) + answer_time_items::ANSWER_TIME_FEATURES
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 struct ReviewHeads {
@@ -4800,7 +5400,11 @@ impl<'a> SrsStateRef<'a> {
         Ok(decoded)
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn module(self, module_id: usize) -> Option<&'a ModuleState> {
         match module_id {
             0 => self.card,
@@ -4813,6 +5417,7 @@ impl<'a> SrsStateRef<'a> {
     }
 }
 
+<<<<<<< HEAD
 /// [SrsStateRef] for states that may have been decoded for the query.
 struct SrsStateView<'a> {
     card: Option<Cow<'a, ModuleState>>,
@@ -4834,6 +5439,8 @@ impl SrsStateView<'_> {
     }
 }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 struct SrsStateOwned {
     card: Option<ModuleState>,
     deck: Option<ModuleState>,
@@ -4862,6 +5469,7 @@ struct SrsState {
     global: ModuleState,
 }
 
+<<<<<<< HEAD
 /// See [RwkvInference::state_snapshot].
 pub struct RwkvStateSnapshot {
     states: ReviewStateMaps,
@@ -4905,6 +5513,12 @@ impl RwkvStateSnapshot {
 struct ReviewStateMaps {
     card: SharedStateMap,
     note: SharedStateMap,
+=======
+#[derive(Default)]
+struct ReviewStateMaps {
+    card: HashMap<i64, ModuleState>,
+    note: HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     deck: HashMap<i64, ModuleState>,
     preset: HashMap<i64, ModuleState>,
     global: Option<ModuleState>,
@@ -4956,16 +5570,29 @@ impl ReviewStateMaps {
 
     /// Approximate memory used by the states of `ids`, plus the global state.
     fn state_len_for(&self, ids: &StreamIds) -> usize {
+<<<<<<< HEAD
         let maps: [(&dyn StateMap, _); 4] = [
+=======
+        [
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             (&self.card, &ids.card),
             (&self.note, &ids.note),
             (&self.deck, &ids.deck),
             (&self.preset, &ids.preset),
+<<<<<<< HEAD
         ];
         maps.into_iter()
             .flat_map(|(states, ids)| ids.iter().filter_map(|id| states.serialized_len(id)))
             .chain(self.global.iter().map(serialized_module_state_len))
             .sum()
+=======
+        ]
+        .into_iter()
+        .flat_map(|(states, ids)| ids.iter().filter_map(|id| states.get(id)))
+        .chain(&self.global)
+        .map(serialized_module_state_len)
+        .sum()
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     /// Copies the states without their checkpoint dirty-tracking.
@@ -4981,6 +5608,7 @@ impl ReviewStateMaps {
         }
     }
 
+<<<<<<< HEAD
     /// The states `input` reads; card and note states are converted to f32.
     fn state_view(&self, input: &ReviewInput) -> SrsStateView<'_> {
         SrsStateView {
@@ -5003,6 +5631,13 @@ impl ReviewStateMaps {
                 .note_id
                 .and_then(|id| self.note.0.get(&id))
                 .map(|state| &**state),
+=======
+    fn state_ref(&self, input: &ReviewInput) -> SrsStateRef<'_> {
+        SrsStateRef {
+            card: self.card.get(&input.card_id),
+            note: input.note_id.and_then(|id| self.note.get(&id)),
+            deck: input.deck_id.and_then(|id| self.deck.get(&id)),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             preset: input.preset_id.and_then(|id| self.preset.get(&id)),
             global: self.global.as_ref(),
         }
@@ -5010,10 +5645,15 @@ impl ReviewStateMaps {
 
     fn state_owned(&self, input: &ReviewInput) -> SrsStateOwned {
         SrsStateOwned {
+<<<<<<< HEAD
             card: self.card.state(&input.card_id).map(Cow::into_owned),
             note: input
                 .note_id
                 .and_then(|id| self.note.state(&id).map(Cow::into_owned)),
+=======
+            card: self.card.get(&input.card_id).cloned(),
+            note: input.note_id.and_then(|id| self.note.get(&id).cloned()),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             deck: input.deck_id.and_then(|id| self.deck.get(&id).cloned()),
             preset: input.preset_id.and_then(|id| self.preset.get(&id).cloned()),
             global: self.global.clone(),
@@ -5022,6 +5662,7 @@ impl ReviewStateMaps {
 
     fn serialized_state(&self, input: &ReviewInput) -> ReviewStateOwned {
         ReviewStateOwned {
+<<<<<<< HEAD
             card: self
                 .card
                 .state(&input.card_id)
@@ -5030,6 +5671,13 @@ impl ReviewStateMaps {
                 .note_id
                 .and_then(|id| self.note.state(&id))
                 .map(|s| serialize_module_state(&s)),
+=======
+            card: self.card.get(&input.card_id).map(serialize_module_state),
+            note: input
+                .note_id
+                .and_then(|id| self.note.get(&id))
+                .map(serialize_module_state),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             deck: input
                 .deck_id
                 .and_then(|id| self.deck.get(&id))
@@ -5052,7 +5700,11 @@ impl ReviewStateMaps {
             card: if query.card_id == answer.card_id {
                 Some(next_state.card.clone())
             } else {
+<<<<<<< HEAD
                 self.card.state(&query.card_id).map(Cow::into_owned)
+=======
+                self.card.get(&query.card_id).cloned()
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             },
             note: branched_optional_module_state(
                 &self.note,
@@ -5077,10 +5729,17 @@ impl ReviewStateMaps {
     }
 
     fn store(&mut self, input: &ReviewInput, state: SrsState) {
+<<<<<<< HEAD
         self.card.put(input.card_id, state.card);
         self.mark_dirty(input);
         if let Some(note_id) = input.note_id {
             self.note.put(note_id, state.note);
+=======
+        self.card.insert(input.card_id, state.card);
+        self.mark_dirty(input);
+        if let Some(note_id) = input.note_id {
+            self.note.insert(note_id, state.note);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         if let Some(deck_id) = input.deck_id {
             self.deck.insert(deck_id, state.deck);
@@ -5136,13 +5795,21 @@ impl ReviewStateMaps {
 
     fn checkpoint_delta_len(&self, full: bool) -> io::Result<usize> {
         let mut len = STATE_CACHE_DELTA_MAGIC.len();
+<<<<<<< HEAD
         let maps: [(&dyn StateMap, _); 4] = [
+=======
+        for (states, dirty) in [
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             (&self.card, &self.dirty_card),
             (&self.note, &self.dirty_note),
             (&self.deck, &self.dirty_deck),
             (&self.preset, &self.dirty_preset),
+<<<<<<< HEAD
         ];
         for (states, dirty) in maps {
+=======
+        ] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             len = len
                 .checked_add(state_cache_map_delta_len(states, dirty, full)?)
                 .ok_or_else(state_cache_delta_too_large)?;
@@ -5160,13 +5827,21 @@ impl ReviewStateMaps {
 
     fn write_checkpoint_delta(&self, out: &mut impl io::Write, full: bool) -> io::Result<()> {
         out.write_all(STATE_CACHE_DELTA_MAGIC)?;
+<<<<<<< HEAD
         let maps: [(&dyn StateMap, _); 4] = [
+=======
+        for (states, dirty) in [
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             (&self.card, &self.dirty_card),
             (&self.note, &self.dirty_note),
             (&self.deck, &self.dirty_deck),
             (&self.preset, &self.dirty_preset),
+<<<<<<< HEAD
         ];
         for (states, dirty) in maps {
+=======
+        ] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             write_state_cache_map_delta(out, states, dirty, full)?;
         }
         if !full && !self.global_dirty {
@@ -5182,12 +5857,20 @@ impl ReviewStateMaps {
 }
 
 fn state_cache_delta_identities(
+<<<<<<< HEAD
     states: &dyn StateMap,
+=======
+    states: &HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     dirty: &HashSet<i64>,
     full: bool,
 ) -> Vec<i64> {
     let mut identities = if full {
+<<<<<<< HEAD
         states.ids()
+=======
+        states.keys().copied().collect::<Vec<_>>()
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     } else {
         dirty.iter().copied().collect::<Vec<_>>()
     };
@@ -5196,7 +5879,11 @@ fn state_cache_delta_identities(
 }
 
 fn state_cache_map_delta_len(
+<<<<<<< HEAD
     states: &dyn StateMap,
+=======
+    states: &HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     dirty: &HashSet<i64>,
     full: bool,
 ) -> io::Result<usize> {
@@ -5204,9 +5891,15 @@ fn state_cache_map_delta_len(
     let mut len = 4_usize;
     for identity in identities {
         len = len.checked_add(9).ok_or_else(state_cache_delta_too_large)?;
+<<<<<<< HEAD
         if let Some(state_len) = states.serialized_len(&identity) {
             len = len
                 .checked_add(4 + state_len)
+=======
+        if let Some(state) = states.get(&identity) {
+            len = len
+                .checked_add(4 + serialized_module_state_len(state))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .ok_or_else(state_cache_delta_too_large)?;
         }
     }
@@ -5215,7 +5908,11 @@ fn state_cache_map_delta_len(
 
 fn write_state_cache_map_delta(
     out: &mut impl io::Write,
+<<<<<<< HEAD
     states: &dyn StateMap,
+=======
+    states: &HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     dirty: &HashSet<i64>,
     full: bool,
 ) -> io::Result<()> {
@@ -5223,9 +5920,15 @@ fn write_state_cache_map_delta(
     write_snapshot_u32(out, identities.len())?;
     for identity in identities {
         out.write_all(&identity.to_le_bytes())?;
+<<<<<<< HEAD
         if let Some(state) = states.state(&identity) {
             out.write_all(&[1])?;
             write_snapshot_module_state(out, &state)?;
+=======
+        if let Some(state) = states.get(&identity) {
+            out.write_all(&[1])?;
+            write_snapshot_module_state(out, state)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         } else {
             out.write_all(&[0])?;
         }
@@ -5238,20 +5941,34 @@ fn state_cache_delta_too_large() -> io::Error {
 }
 
 fn restore_serialized_state(
+<<<<<<< HEAD
     states: &mut dyn StateMap,
+=======
+    states: &mut HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     id: i64,
     state: Option<&[u8]>,
 ) -> io::Result<()> {
     if let Some(state) = deserialize_module_state(state)? {
+<<<<<<< HEAD
         states.put(id, state);
     } else {
         states.take(&id);
+=======
+        states.insert(id, state);
+    } else {
+        states.remove(&id);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
     Ok(())
 }
 
 fn restore_optional_serialized_state(
+<<<<<<< HEAD
     states: &mut dyn StateMap,
+=======
+    states: &mut HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     id: Option<i64>,
     state: Option<&[u8]>,
 ) -> io::Result<()> {
@@ -5262,14 +5979,22 @@ fn restore_optional_serialized_state(
 }
 
 fn branched_optional_module_state(
+<<<<<<< HEAD
     map: &dyn StateMap,
+=======
+    map: &HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     query_id: Option<i64>,
     answer_id: Option<i64>,
     next_state: &ModuleState,
 ) -> Option<ModuleState> {
     match query_id {
         Some(id) if Some(id) == answer_id => Some(next_state.clone()),
+<<<<<<< HEAD
         Some(id) => map.state(&id).map(Cow::into_owned),
+=======
+        Some(id) => map.get(&id).cloned(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         None => None,
     }
 }
@@ -5309,7 +6034,11 @@ struct ForecastDecodedStates {
 impl ForecastDecodedStates {
     fn new(base: &ReviewStateMaps, ids: &StreamIds, budget: usize) -> io::Result<Self> {
         fn add(
+<<<<<<< HEAD
             source: &impl StateMap,
+=======
+            source: &HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ids: &HashSet<i64>,
             target: &mut HashMap<i64, ModuleState>,
             bytes: &mut usize,
@@ -5319,7 +6048,11 @@ impl ForecastDecodedStates {
                 if *bytes >= budget {
                     break;
                 }
+<<<<<<< HEAD
                 let Some(state) = source.state(id).filter(|state| state.packed.is_some()) else {
+=======
+                let Some(state) = source.get(id).filter(|state| state.packed.is_some()) else {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     continue;
                 };
                 let decoded = state.try_decoded()?.into_owned();
@@ -5400,7 +6133,11 @@ impl<'a> SimulationStates<'a> {
         states
     }
 
+<<<<<<< HEAD
     fn state_view(&self, input: &ReviewInput) -> SrsStateView<'_> {
+=======
+    fn state_ref(&self, input: &ReviewInput) -> SrsStateRef<'_> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         fn lookup<'s>(
             own: &'s HashMap<i64, ModuleState>,
             decoded: Option<&'s HashMap<i64, ModuleState>>,
@@ -5411,6 +6148,7 @@ impl<'a> SimulationStates<'a> {
                 .or_else(|| decoded.and_then(|states| states.get(&id)))
                 .or_else(|| base.get(&id))
         }
+<<<<<<< HEAD
         fn lookup_half<'s>(
             own: &'s HashMap<i64, ModuleState>,
             decoded: Option<&'s HashMap<i64, ModuleState>>,
@@ -5424,13 +6162,21 @@ impl<'a> SimulationStates<'a> {
         }
         SrsStateView {
             card: lookup_half(
+=======
+        SrsStateRef {
+            card: lookup(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 &self.card,
                 self.decoded.map(|cache| &cache.card),
                 &self.base.card,
                 input.card_id,
             ),
             note: input.note_id.and_then(|id| {
+<<<<<<< HEAD
                 lookup_half(
+=======
+                lookup(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     &self.note,
                     self.decoded.map(|cache| &cache.note),
                     &self.base.note,
@@ -5508,38 +6254,66 @@ impl<'a> SimulationStates<'a> {
     }
 }
 
+<<<<<<< HEAD
 fn deserialize_state_map_subset<M: StateMap + Default>(
     states: &[(i64, Vec<u8>)],
     ids: &HashSet<i64>,
 ) -> io::Result<M> {
     let mut map = M::default();
+=======
+fn deserialize_state_map_subset(
+    states: &[(i64, Vec<u8>)],
+    ids: &HashSet<i64>,
+) -> io::Result<HashMap<i64, ModuleState>> {
+    let mut map = HashMap::with_capacity(ids.len());
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     for (key, state) in states {
         if !ids.contains(key) {
             continue;
         }
         if let Some(state) = deserialize_module_state(Some(state.as_slice()))? {
+<<<<<<< HEAD
             map.put(*key, state);
+=======
+            map.insert(*key, state);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
     }
     Ok(map)
 }
 
+<<<<<<< HEAD
 fn deserialize_state_map<M: StateMap + Default>(states: &[(i64, Vec<u8>)]) -> io::Result<M> {
     let mut map = M::default();
+=======
+fn deserialize_state_map(states: &[(i64, Vec<u8>)]) -> io::Result<HashMap<i64, ModuleState>> {
+    let mut map = HashMap::with_capacity(states.len());
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     for (key, state) in states {
         let Some(state) = deserialize_module_state(Some(state.as_slice()))? else {
             continue;
         };
+<<<<<<< HEAD
         map.put(*key, state);
+=======
+        map.insert(*key, state);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
     Ok(map)
 }
 
+<<<<<<< HEAD
 fn serialize_state_map(states: &dyn StateMap) -> Vec<(i64, Vec<u8>)> {
     let mut states: Vec<_> = states
         .ids()
         .into_iter()
         .map(|key| (key, serialize_module_state(&states.state(&key).unwrap())))
+=======
+fn serialize_state_map(states: &HashMap<i64, ModuleState>) -> Vec<(i64, Vec<u8>)> {
+    let mut states: Vec<_> = states
+        .iter()
+        .map(|(key, state)| (*key, serialize_module_state(state)))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         .collect();
     states.sort_by_key(|(key, _)| *key);
     states
@@ -5628,6 +6402,7 @@ fn write_serialized_module_state(out: &mut impl io::Write, state: &ModuleState) 
     Ok(())
 }
 
+<<<<<<< HEAD
 /// u32 layer count, then per layer its time-mix shift, time-mix matrix and
 /// channel-mix shift, each as u32 length + IEEE half floats (little endian).
 /// The values are small (|x| < 10 in big collections) and a half keeps them to
@@ -5756,11 +6531,14 @@ fn read_half_module_state(
     })
 }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn write_snapshot_module_state(out: &mut impl io::Write, state: &ModuleState) -> io::Result<()> {
     write_snapshot_u32(out, serialized_module_state_len(state))?;
     write_serialized_module_state(out, state)
 }
 
+<<<<<<< HEAD
 fn write_snapshot_state_map(out: &mut impl io::Write, states: &dyn StateMap) -> io::Result<()> {
     write_snapshot_u32(out, states.count())?;
     let mut identities = states.ids();
@@ -5768,6 +6546,18 @@ fn write_snapshot_state_map(out: &mut impl io::Write, states: &dyn StateMap) -> 
     for identity in identities {
         out.write_all(&identity.to_le_bytes())?;
         write_snapshot_module_state(out, &states.state(&identity).unwrap())?;
+=======
+fn write_snapshot_state_map(
+    out: &mut impl io::Write,
+    states: &HashMap<i64, ModuleState>,
+) -> io::Result<()> {
+    write_snapshot_u32(out, states.len())?;
+    let mut states = states.iter().collect::<Vec<_>>();
+    states.sort_unstable_by_key(|(identity, _)| **identity);
+    for (identity, state) in states {
+        out.write_all(&identity.to_le_bytes())?;
+        write_snapshot_module_state(out, state)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
     Ok(())
 }
@@ -5781,6 +6571,7 @@ fn paired_streams_differ() -> io::Error {
 
 fn write_paired_snapshot_state_map(
     out: &mut impl io::Write,
+<<<<<<< HEAD
     release: &impl StateMap,
     instant: &impl StateMap,
 ) -> io::Result<()> {
@@ -5795,6 +6586,19 @@ fn write_paired_snapshot_state_map(
         let state = &*state;
         let paired = instant.state(identity).ok_or_else(paired_streams_differ)?;
         let paired = &*paired;
+=======
+    release: &HashMap<i64, ModuleState>,
+    instant: &HashMap<i64, ModuleState>,
+) -> io::Result<()> {
+    if release.len() != instant.len() {
+        return Err(paired_streams_differ());
+    }
+    write_snapshot_u32(out, release.len())?;
+    let mut states = release.iter().collect::<Vec<_>>();
+    states.sort_unstable_by_key(|(identity, _)| **identity);
+    for (identity, state) in states {
+        let paired = instant.get(identity).ok_or_else(paired_streams_differ)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let release_len = serialized_module_state_len(state);
         let instant_len = serialized_module_state_len(paired);
         out.write_all(&identity.to_le_bytes())?;
@@ -6266,13 +7070,21 @@ fn read_state_cache_maps(
                 "invalid RWKV state-cache delta header",
             ));
         }
+<<<<<<< HEAD
         let maps: [(&mut dyn StateMap, _); 4] = [
+=======
+        for (states, seen) in [
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             (&mut result.card, &mut seen_card),
             (&mut result.note, &mut seen_note),
             (&mut result.deck, &mut seen_deck),
             (&mut result.preset, &mut seen_preset),
+<<<<<<< HEAD
         ];
         for (states, seen) in maps {
+=======
+        ] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             read_state_cache_map_delta(&mut state_delta, states, seen, &mut state_bytes)?;
         }
         match read_state_cache_u8(&mut state_delta)? {
@@ -6308,7 +7120,11 @@ fn read_state_cache_maps(
 
 fn read_state_cache_map_delta(
     input: &mut (impl io::Read + io::Seek),
+<<<<<<< HEAD
     states: &mut dyn StateMap,
+=======
+    states: &mut HashMap<i64, ModuleState>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     seen: &mut HashSet<i64>,
     state_bytes: &mut Vec<u8>,
 ) -> io::Result<()> {
@@ -6322,7 +7138,11 @@ fn read_state_cache_map_delta(
                 let size = read_state_cache_u32(input)?;
                 if seen.insert(identity) {
                     if let Some(state) = read_state_cache_module_state(input, size, state_bytes)? {
+<<<<<<< HEAD
                         states.put(identity, state);
+=======
+                        states.insert(identity, state);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     }
                 } else {
                     // A newer segment already provided this state.
@@ -6471,7 +7291,11 @@ fn write_state_cache_i64_set(
 }
 
 fn read_i64_set(cursor: &mut Cursor<'_>) -> io::Result<HashMap<i64, ()>> {
+<<<<<<< HEAD
     let count = cursor.count(8)?;
+=======
+    let count = cursor.u32()? as usize;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut values = HashMap::with_capacity(count);
     for _ in 0..count {
         values.insert(cursor.i64()?, ());
@@ -6494,7 +7318,11 @@ fn write_state_cache_i64_map(
 }
 
 fn read_i64_map(cursor: &mut Cursor<'_>) -> io::Result<HashMap<i64, i64>> {
+<<<<<<< HEAD
     let count = cursor.count(16)?;
+=======
+    let count = cursor.u32()? as usize;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut values = HashMap::with_capacity(count);
     for _ in 0..count {
         values.insert(cursor.i64()?, cursor.i64()?);
@@ -6507,9 +7335,13 @@ fn write_f32_slice(out: &mut Vec<u8>, values: &[f32]) {
     let start = out.len();
     out.resize(start + std::mem::size_of_val(values), 0);
     for (bytes, value) in out[start..]
+<<<<<<< HEAD
         .as_chunks_mut::<{ std::mem::size_of::<f32>() }>()
         .0
         .iter_mut()
+=======
+        .chunks_exact_mut(std::mem::size_of::<f32>())
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         .zip(values)
     {
         bytes.copy_from_slice(&value.to_le_bytes());
@@ -6520,7 +7352,11 @@ fn write_state_cache_f32_slice(out: &mut impl io::Write, values: &[f32]) -> io::
     write_state_cache_u32(out, values.len())?;
     let mut buffer = [0_u8; 8192];
     for values in values.chunks(buffer.len() / 4) {
+<<<<<<< HEAD
         for (destination, value) in buffer.as_chunks_mut::<4>().0.iter_mut().zip(values) {
+=======
+        for (destination, value) in buffer.chunks_exact_mut(4).zip(values) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             destination.copy_from_slice(&value.to_le_bytes());
         }
         out.write_all(&buffer[..values.len() * 4])?;
@@ -6823,21 +7659,33 @@ struct RwkvModule {
     precision: StatePrecision,
 }
 
+<<<<<<< HEAD
 /// Scratch of the one-at-a-time query path: one value residual per module.
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 struct ModuleQueryScratch {
     next: [f32; D_MODEL],
     layer: LayerQueryScratch,
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Default)]
 struct ModuleQueryBatchScratch {
     next: Vec<f32>,
     layer: LayerQueryBatchScratch,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl Default for ModuleQueryScratch {
     fn default() -> Self {
         Self {
@@ -6872,14 +7720,22 @@ struct RwkvLayer {
     channel_mixer: Option<ChannelMixer>,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 struct LayerQueryScratch {
     time_output: [f32; D_MODEL],
     time: TimeMixerQueryScratch,
     channel: ChannelMixerQueryScratch,
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Default)]
 struct LayerQueryBatchScratch {
     time_output: Vec<f32>,
@@ -6887,7 +7743,11 @@ struct LayerQueryBatchScratch {
     channel: ChannelMixerQueryBatchScratch,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl Default for LayerQueryScratch {
     fn default() -> Self {
         Self {
@@ -6915,10 +7775,21 @@ impl RwkvLayer {
         input: &[f32],
         v0: &[f32],
         state: Option<&LayerState>,
+<<<<<<< HEAD
     ) -> (Vec<f32>, Vec<f32>, LayerState) {
         let (x, v0, time_state) =
             self.time_mixer
                 .run(input, v0, state.and_then(|state| state.time.as_ref()));
+=======
+        precision: StatePrecision,
+    ) -> (Vec<f32>, Vec<f32>, LayerState) {
+        let (x, v0, time_state) = self.time_mixer.run(
+            input,
+            v0,
+            state.and_then(|state| state.time.as_ref()),
+            precision,
+        );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let (x, channel_shift) = match &self.channel_mixer {
             Some(mixer) => {
                 let (x, shift) =
@@ -6937,7 +7808,11 @@ impl RwkvLayer {
         )
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn run_query_into(
         &self,
         input: &[f32],
@@ -6965,7 +7840,11 @@ impl RwkvLayer {
         );
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[allow(clippy::too_many_arguments)]
     fn run_query_batch(
         &self,
@@ -7001,6 +7880,7 @@ impl RwkvLayer {
     }
 }
 
+<<<<<<< HEAD
 /// Card and note states: one per card and note, so they are most of the RWKV
 /// memory (3 GB for a 101k-card collection in f32 on a Pixel 8a). They are
 /// kept as the model makes them: compact (int8 by default, [StatePrecision])
@@ -7130,6 +8010,8 @@ impl FromIterator<(i64, ModuleState)> for SharedStateMap {
     }
 }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Clone)]
 struct LayerState {
     time: Option<TimeState>,
@@ -7149,7 +8031,10 @@ struct TimeMixer {
     w_o: Linear,
     k_scale_linear: Linear,
     v_scale_linear: Linear,
+<<<<<<< HEAD
     /// None in layer 0, which takes v as it is
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     v_lora: LoraSimple,
     a_lora: LoraSimple,
     d_lora: LoraSimple,
@@ -7158,7 +8043,11 @@ struct TimeMixer {
     out_group_norm: Norm,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 struct TimeMixerQueryScratch {
     x: [f32; D_MODEL],
     mixed: [[f32; D_MODEL]; 8],
@@ -7177,7 +8066,11 @@ struct TimeMixerQueryScratch {
     next_row: [f32; HEAD_SIZE],
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Default)]
 struct TimeMixerQueryBatchScratch {
     x: Vec<f32>,
@@ -7196,7 +8089,11 @@ struct TimeMixerQueryBatchScratch {
     lora_hidden: Vec<f32>,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl Default for TimeMixerQueryScratch {
     fn default() -> Self {
         Self {
@@ -7290,6 +8187,10 @@ impl TimeMixer {
         input: &[f32],
         v0: &[f32],
         state: Option<&TimeState>,
+<<<<<<< HEAD
+=======
+        precision: StatePrecision,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     ) -> (Vec<f32>, Vec<f32>, TimeState) {
         #[cfg(test)]
         let profile_started = rwkv_warmup_profile_start();
@@ -7314,7 +8215,11 @@ impl TimeMixer {
             &parts.k_deformed,
         );
 
+<<<<<<< HEAD
         let (out, next_matrix) = single_timestep(
+=======
+        let (out, mut next_matrix) = single_timestep(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             &parts.r,
             &parts.k,
             &parts.v,
@@ -7324,6 +8229,22 @@ impl TimeMixer {
             state_matrix,
         );
         let out = self.mix_output(&parts, out, input);
+<<<<<<< HEAD
+=======
+        // The answer's output used the float update; a low-rank state is
+        // factored here, where the previous factors and the value vector are
+        // at hand (other formats round when the module state is compacted).
+        let mut packed_matrix = None;
+        if precision.is_lowrank() {
+            packed_matrix = state.and_then(|state| state.packed_matrix.clone());
+            precision.round_written_matrix(
+                &mut next_matrix,
+                &mut packed_matrix,
+                state_matrix,
+                &parts.v,
+            );
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         let output = (
             out,
@@ -7331,7 +8252,11 @@ impl TimeMixer {
             TimeState {
                 x_shift: x,
                 matrix: next_matrix,
+<<<<<<< HEAD
                 packed_matrix: None,
+=======
+                packed_matrix,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             },
         );
         #[cfg(test)]
@@ -7461,7 +8386,11 @@ impl TimeMixer {
         out
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn run_query_into(
         &self,
         input: &[f32],
@@ -7581,7 +8510,11 @@ impl TimeMixer {
         }
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[allow(clippy::too_many_arguments)]
     fn run_query_batch(
         &self,
@@ -7761,7 +8694,11 @@ struct ChannelMixer {
     w_v: Linear,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 struct ChannelMixerQueryScratch {
     x: [f32; D_MODEL],
     mixed: [f32; D_MODEL],
@@ -7769,7 +8706,11 @@ struct ChannelMixerQueryScratch {
     projected: [f32; D_MODEL],
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Default)]
 struct ChannelMixerQueryBatchScratch {
     x: Vec<f32>,
@@ -7778,7 +8719,11 @@ struct ChannelMixerQueryBatchScratch {
     projected: Vec<f32>,
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl Default for ChannelMixerQueryScratch {
     fn default() -> Self {
         Self {
@@ -7837,7 +8782,11 @@ impl ChannelMixer {
         out
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn run_query_into(
         &self,
         input: &[f32],
@@ -7862,7 +8811,11 @@ impl ChannelMixer {
         }
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn run_query_batch(
         &self,
         input: &[f32],
@@ -7940,7 +8893,11 @@ impl LoraSimple {
         out
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn apply_sigmoid_into(&self, input: &[f32], hidden: &mut [f32], out: &mut [f32]) {
         let hidden = &mut hidden[..self.a.output];
         self.a.apply_into(input, hidden);
@@ -7948,7 +8905,11 @@ impl LoraSimple {
         sigmoid_in_place(out);
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn apply_sigmoid_batch(
         &self,
         input: &[f32],
@@ -7995,7 +8956,11 @@ impl LoraSimple {
         self.b.apply_block_into(hidden, outs, rows);
     }
 
+<<<<<<< HEAD
     #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+    #[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn apply_tanh_into(&self, input: &[f32], hidden: &mut [f32], out: &mut [f32]) {
         let hidden = &mut hidden[..self.a.output];
         self.a.apply_into(input, hidden);
@@ -8005,7 +8970,11 @@ impl LoraSimple {
         self.b.apply_into(hidden, out);
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn apply_tanh_batch(
         &self,
         input: &[f32],
@@ -8090,7 +9059,11 @@ impl Linear {
         rwkv_warmup_profile_record(RwkvWarmupProfileBucket::Linear, profile_started);
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn apply_batch(&self, input: &[f32], rows: usize, out: &mut Vec<f32>) {
         let input_len = rows
             .checked_mul(self.input)
@@ -8118,12 +9091,19 @@ impl Linear {
         #[cfg(target_os = "macos")]
         matmul::matrix_times_matrix(input, &weight_by_input, rows, self.output, self.input, out);
 
+<<<<<<< HEAD
         // kuma3: phones (aarch64) take the batched query path too; the block
         // kernel streams each weight column once per block of rows (NEON),
         // bit-identical to `apply_into` per row. Callers already run batches
         // in parallel.
         #[cfg(not(target_os = "macos"))]
         self.apply_block_into(input, out, rows);
+=======
+        #[cfg(not(target_os = "macos"))]
+        out.par_chunks_mut(self.output)
+            .zip(input.par_chunks(self.input))
+            .for_each(|(output, input)| self.apply_into(input, output));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         #[cfg(target_os = "macos")]
         if let Some(bias) = &self.bias {
@@ -9070,7 +10050,11 @@ impl Norm {
         rwkv_warmup_profile_record(RwkvWarmupProfileBucket::Norm, profile_started);
     }
 
+<<<<<<< HEAD
     #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+    #[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn apply_batch(&self, input: &[f32], rows: usize, out: &mut Vec<f32>) {
         assert_eq!(input.len(), rows * self.dim);
         out.resize(rows * self.dim, 0.0);
@@ -9336,7 +10320,11 @@ unsafe fn update_recurrence_head_avx2(
     }
 }
 
+<<<<<<< HEAD
 #[cfg(any(not(any(target_os = "macos", target_arch = "aarch64")), test))]
+=======
+#[cfg(any(not(target_os = "macos"), test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[allow(clippy::too_many_arguments)]
 fn single_timestep_query_into(
     r: &[f32],
@@ -9480,7 +10468,11 @@ fn normalize_heads_in_place(values: &mut [f32]) {
 /// Writes row `row` of all eight time-mix inputs,
 /// `mixed[mix] = lerp(x, x_shift, lerp_weights[mix])`, in one pass. Sharing
 /// `x_shift - x` between the mixes keeps `lerp()`'s exact arithmetic.
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn time_shift_mix_row(
     x: &[f32],
     x_shift: &[f32],
@@ -9494,7 +10486,11 @@ fn time_shift_mix_row(
     for channel in 0..D_MODEL {
         shift_delta[channel] = x_shift[channel] - x[channel];
     }
+<<<<<<< HEAD
     for (mixed, weights) in mixed.iter_mut().zip(lerp_weights.as_chunks::<D_MODEL>().0) {
+=======
+    for (mixed, weights) in mixed.iter_mut().zip(lerp_weights.chunks_exact(D_MODEL)) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mixed = &mut mixed[row * D_MODEL..(row + 1) * D_MODEL];
         for channel in 0..D_MODEL {
             mixed[channel] = x[channel] + weights[channel] * shift_delta[channel];
@@ -9503,7 +10499,11 @@ fn time_shift_mix_row(
 }
 
 /// `normalize_heads_in_place()` followed by `scale_heads_in_place()`.
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn normalize_scale_heads_in_place(values: &mut [f32], scales: &[f32]) {
     assert!(values.len() == D_MODEL && scales.len() == HEADS);
 
@@ -9523,7 +10523,11 @@ fn normalize_scale_heads_in_place(values: &mut [f32], scales: &[f32]) {
 
 /// Adds the per-head bonus to the group-normed recurrence output and applies
 /// the output gate: `output = g * (output + sum_head(r * bonus * k) * v)`.
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn bonus_gate_in_place(
     output: &mut [f32],
     r: &[f32],
@@ -9627,12 +10631,20 @@ fn sigmoid(value: f32) -> f32 {
 }
 
 // exp(-0.5), rounded to f32.
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
 const QUERY_DECAY_SCALE: f32 = 0.606_530_67;
 
 /// Scalar reference for `query_decay_batch_in_place()`, which also uses it off
 /// macOS (phones).
 #[cfg(any(all(target_arch = "aarch64", not(target_os = "macos")), test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+const QUERY_DECAY_SCALE: f32 = 0.606_530_67;
+
+/// Scalar reference for `query_decay_batch_in_place()`.
+#[cfg(test)]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn query_decay(value: f32) -> f32 {
     // exp(-exp(-0.5 - softplus(-x))) = exp(-exp(-0.5) * sigmoid(x)).
     // Query-only: recurrent state updates keep their original arithmetic.
@@ -9643,7 +10655,11 @@ fn query_decay(value: f32) -> f32 {
 // transcendental functions, which may differ from the scalar ones in the last
 // bit; answer rows and warm-up state updates keep the scalar functions.
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn query_sigmoid_batch_in_place(values: &mut [f32]) {
     #[cfg(target_os = "macos")]
     matmul::sigmoid_in_place(values);
@@ -9651,7 +10667,11 @@ fn query_sigmoid_batch_in_place(values: &mut [f32]) {
     sigmoid_in_place(values);
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn query_silu_batch_in_place(values: &mut [f32]) {
     #[cfg(target_os = "macos")]
     matmul::silu_in_place(values);
@@ -9659,7 +10679,11 @@ fn query_silu_batch_in_place(values: &mut [f32]) {
     silu_in_place(values);
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn query_tanh_batch_in_place(values: &mut [f32]) {
     #[cfg(target_os = "macos")]
     matmul::tanh_in_place(values);
@@ -9667,7 +10691,11 @@ fn query_tanh_batch_in_place(values: &mut [f32]) {
     values.iter_mut().for_each(|value| *value = value.tanh());
 }
 
+<<<<<<< HEAD
 #[cfg(any(target_os = "macos", target_arch = "aarch64", test))]
+=======
+#[cfg(any(target_os = "macos", test))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn query_decay_batch_in_place(values: &mut [f32]) {
     #[cfg(target_os = "macos")]
     matmul::scaled_sigmoid_decay_in_place(values, QUERY_DECAY_SCALE);
@@ -11542,6 +12570,7 @@ order by e.id, e.cid
         );
     }
 
+<<<<<<< HEAD
     /// Bulk and per-review replays may round compact card and note states at
     /// different points (after each chunk vs after each review), so they are
     /// compared to about that precision.
@@ -11607,6 +12636,8 @@ order by e.id, e.cid
     const STATE_TOLERANCE: f32 = 0.01;
     const PREDICTION_TOLERANCE: f32 = 1e-3;
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn assert_prediction_parity(sequential: &[(usize, f32)], bulk: &[(usize, f32)]) {
         assert_eq!(sequential.len(), bulk.len(), "prediction counts diverged");
         for ((sequential_index, sequential_value), (bulk_index, bulk_value)) in
@@ -11670,7 +12701,15 @@ order by e.id, e.cid
                     review.current_elapsed_seconds.map(|seconds| seconds.max(0));
             }
         }
+<<<<<<< HEAD
         for precision in [StatePrecision::F32, StatePrecision::Int4CardsInt8Notes] {
+=======
+        for precision in [
+            StatePrecision::F32,
+            StatePrecision::Int4CardsInt8Notes,
+            StatePrecision::CompactCardsInt8,
+        ] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             for after in [false, true] {
                 let queries: Vec<_> = reviews
                     .iter()
@@ -11798,6 +12837,11 @@ order by e.id, e.cid
             StatePrecision::F32,
             StatePrecision::Int8,
             StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+            StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             let mut sequential =
                 RwkvInference::load_with_precision(weights.clone(), 0.9, 36_500, precision)
@@ -11864,21 +12908,33 @@ order by e.id, e.cid
             let bulk_predictions =
                 bulk::warm_up_reviews_bulk(&mut bulk, reviews.clone(), record_predictions).unwrap();
 
+<<<<<<< HEAD
             assert_prediction_close(
                 &sequential_predictions,
                 &bulk_predictions,
                 PREDICTION_TOLERANCE,
             );
+=======
+            assert_prediction_close(&sequential_predictions, &bulk_predictions, 1e-5);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             if record_predictions {
                 let sequential_log_loss = prediction_log_loss(&sequential_predictions, &reviews);
                 let bulk_log_loss = prediction_log_loss(&bulk_predictions, &reviews);
                 let log_loss_delta = (bulk_log_loss - sequential_log_loss).abs();
                 assert!(
+<<<<<<< HEAD
                     log_loss_delta <= 1e-4,
                     "logloss changed: before={sequential_log_loss:.15}, after={bulk_log_loss:.15}, delta={log_loss_delta:.15}"
                 );
             }
             assert_warm_up_close(&sequential, &bulk);
+=======
+                    log_loss_delta <= 1e-7,
+                    "logloss changed: before={sequential_log_loss:.15}, after={bulk_log_loss:.15}, delta={log_loss_delta:.15}"
+                );
+            }
+            assert_warm_up_parity(&sequential, &bulk);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             assert_eq!(
                 sequential.cache_state().len(),
                 bulk.cache_state().len(),
@@ -12047,7 +13103,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn spill_stash_restores_empty_resident_state() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12067,7 +13126,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn spill_restore_keeps_stash_for_retry_when_file_is_missing_truncated_or_corrupt() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12136,7 +13198,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn discard_stashed_warm_up_state_allows_another_stash() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12171,7 +13236,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn discard_stashed_warm_up_state_ignores_spill_delete_errors() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12189,7 +13257,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn spill_write_failure_keeps_resident_state_and_allows_in_memory_stash() {
         let weights = embedded_weights_path().expect("embedded RWKV weights");
         let mut inference = RwkvInference::load(weights, 0.9, 36_500).unwrap();
@@ -12368,7 +13439,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn full_state_checkpoint_bounds_sqlite_memory() {
         // SQLite's memory high-water counter is process-wide. Isolate this
         // measurement from other tests, including when the suite runs in parallel.
@@ -12501,7 +13575,11 @@ order by e.id, e.cid
                 .restore_warm_up_state_checkpoint(path, "generation", 3)
                 .unwrap();
             assert_eq!(inference.warm_up_states.card.len(), 800);
+<<<<<<< HEAD
             for (id, state) in inference.warm_up_states.card.iter() {
+=======
+            for (id, state) in &inference.warm_up_states.card {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 assert_eq!(state.layers.len(), 1);
                 let time = state.layers[0].time.as_ref().unwrap();
                 assert!(time.x_shift.is_empty());
@@ -12657,12 +13735,17 @@ order by e.id, e.cid
             offset += call;
         }
 
+<<<<<<< HEAD
         assert_prediction_close(
             &sequential_predictions,
             &bulk_predictions,
             PREDICTION_TOLERANCE,
         );
         assert_warm_up_close(&sequential, &bulk);
+=======
+        assert_prediction_parity(&sequential_predictions, &bulk_predictions);
+        assert_warm_up_parity(&sequential, &bulk);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     #[test]
@@ -12692,7 +13775,12 @@ order by e.id, e.cid
             offset += call;
         }
 
+<<<<<<< HEAD
         assert_warm_up_close(&sequential, &wavefront);
+=======
+        assert_warm_up_parity(&sequential, &wavefront);
+        assert_eq!(sequential.cache_state(), wavefront.cache_state());
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     #[test]
@@ -12734,9 +13822,12 @@ order by e.id, e.cid
 
     #[test]
     fn interval_for_curve_returns_max_when_target_not_reached() {
+<<<<<<< HEAD
         if SMALL_MODEL {
             return; // the big model's 128-curve head
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let curve = ReviewCurve {
             power: None,
             ahead_logits: vec![20.0],
@@ -12758,9 +13849,12 @@ order by e.id, e.cid
 
     #[test]
     fn rwkv_crossings_are_fractional_and_lie_on_the_curve() {
+<<<<<<< HEAD
         if SMALL_MODEL {
             return; // the big model's 128-curve head
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         for basis in [32, 60, 90] {
             let curve = basis_curve(basis);
             let crossing = unrounded_interval_for_curve(&curve, 0.9, 36_500).unwrap();
@@ -12817,9 +13911,12 @@ order by e.id, e.cid
 
     #[test]
     fn predict_curve_ignores_ahead_logits_and_is_monotonic() {
+<<<<<<< HEAD
         if SMALL_MODEL {
             return; // the big model's 128-curve head
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let curve = ReviewCurve {
             power: None,
             ahead_logits: vec![-20.0, 20.0, -20.0, 20.0],
@@ -12878,9 +13975,12 @@ order by e.id, e.cid
 
     #[test]
     fn answer_curve_grade_order_enforcement_can_be_disabled() {
+<<<<<<< HEAD
         if SMALL_MODEL {
             return; // the big model's 128-curve head
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let curve_for_basis_index = |basis_index: usize| {
             let mut weights = vec![0.0; basis_index + 1];
             weights[basis_index] = 1.0;
@@ -12965,9 +14065,12 @@ order by e.id, e.cid
 
     #[test]
     fn current_curve_retrievability_uses_elapsed_seconds_then_days() {
+<<<<<<< HEAD
         if SMALL_MODEL {
             return; // the big model's 128-curve head
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut input = ReviewInput {
             card_id: 123,
             note_id: None,
@@ -13064,7 +14167,10 @@ order by e.id, e.cid
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn batched_retrievability_matches_scalar_query_path() {
         let model_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(MODEL_PATH);
         assert!(model_path.exists(), "RWKV parity model is missing");
@@ -13098,6 +14204,7 @@ order by e.id, e.cid
             .iter()
             .map(|input| inference.features.features_for(input))
             .collect::<Vec<_>>();
+<<<<<<< HEAD
         let views = inputs
             .iter()
             .map(|input| inference.warm_up_states.state_view(input))
@@ -13108,6 +14215,14 @@ order by e.id, e.cid
             .map(|(view, features)| ReviewPredictionQueryRef {
                 features,
                 state: view.as_ref(),
+=======
+        let items = inputs
+            .iter()
+            .zip(&features)
+            .map(|(input, features)| ReviewPredictionQueryRef {
+                features,
+                state: inference.warm_up_states.state_ref(input),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             })
             .collect::<Vec<_>>();
 
@@ -13354,11 +14469,19 @@ order by e.id, e.cid
             .unwrap();
 
         assert_eq!(
+<<<<<<< HEAD
             serialize_module_state(&states.card.state(&1).unwrap()),
             serialized
         );
         assert_eq!(
             serialize_module_state(&states.note.state(&2).unwrap()),
+=======
+            serialize_module_state(states.card.get(&1).unwrap()),
+            serialized
+        );
+        assert_eq!(
+            serialize_module_state(states.note.get(&2).unwrap()),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             serialized
         );
         assert_eq!(
@@ -13420,7 +14543,11 @@ order by e.id, e.cid
             worker
                 .review_heads_for_state(
                     &simulated_answer_input(&query, ease),
+<<<<<<< HEAD
                     states.state_view(&query).as_ref(),
+=======
+                    states.state_ref(&query),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 )
                 .unwrap()
         });
@@ -13442,7 +14569,15 @@ order by e.id, e.cid
             eprintln!("skipping: embedded RWKV weights not found");
             return;
         };
+<<<<<<< HEAD
         for precision in [StatePrecision::F32, StatePrecision::Int4CardsInt8Notes] {
+=======
+        for precision in [
+            StatePrecision::F32,
+            StatePrecision::Int4CardsInt8Notes,
+            StatePrecision::CompactCardsInt8,
+        ] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let mut inference =
                 RwkvInference::load_with_precision(weights.clone(), 0.9, 36_500, precision)
                     .unwrap();
@@ -13481,10 +14616,17 @@ order by e.id, e.cid
                 for answer in reviews.iter().take(12) {
                     for query in reviews.iter().take(8) {
                         let left = reference_worker
+<<<<<<< HEAD
                             .review_heads_for_state(query, reference.state_view(query).as_ref())
                             .unwrap();
                         let right = cached_worker
                             .review_heads_for_state(query, cached.state_view(query).as_ref())
+=======
+                            .review_heads_for_state(query, reference.state_ref(query))
+                            .unwrap();
+                        let right = cached_worker
+                            .review_heads_for_state(query, cached.state_ref(query))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                             .unwrap();
                         assert_eq!(
                             left.retrievability.to_bits(),
@@ -13510,7 +14652,11 @@ order by e.id, e.cid
                 let mut worker =
                     inference.workload_worker(inference.features.clone(), HashMap::new());
                 let mut state = worker
+<<<<<<< HEAD
                     .review_heads_for_state(input, cached.state_view(input).as_ref())
+=======
+                    .review_heads_for_state(input, cached.state_ref(input))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     .unwrap()
                     .next_state;
                 state.card.packed = Some(b"invalid state".to_vec());
@@ -14098,6 +15244,7 @@ order by e.id, e.cid
         assert_eq!(features.today_new_cards, 0);
     }
 
+<<<<<<< HEAD
     /// kuma3's state file: a state with another shape than the model's, or a
     /// count that can't fit in the data, is refused (it would panic or abort
     /// later); a state of the right shape reads back.
@@ -14164,6 +15311,8 @@ order by e.id, e.cid
         assert_eq!(Cursor::new(&small).count(8).unwrap(), 2);
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[test]
     #[ignore]
     fn rwkv_state_compression_metrics() {

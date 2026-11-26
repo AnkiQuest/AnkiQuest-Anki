@@ -1,3 +1,23 @@
 * text=auto eol=lf
 *.ftl -linguist-detectable
 cargo/remote/* linguist-vendored
+
+# Preserve the upstream model metadata bytes and their published hashes.
+qt/aqt/rwkv_inference/sm40v2/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm36/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm55/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm72/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm72e20/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm72e25/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm92/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm57/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm98/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm101/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm99/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm106/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm113/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm115/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm118/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm130th/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/sm130io/* -text whitespace=cr-at-eol linguist-vendored
+qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.time_head.* -text whitespace=cr-at-eol linguist-vendored

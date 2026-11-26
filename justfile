@@ -30,9 +30,37 @@ rebuild-web:
 wheels:
     {{ ninja }} wheels
 
+# Build a local unsigned macOS installer (.dmg)
+macos-installer:
+    @if [ "{{ os() }}" != "macos" ]; then echo "macos-installer must be run on macOS" >&2; exit 1; fi
+    ./tools/build-installer
+    @echo "Installer written under out/installer/dist/"
+
+# Build a local isolated portable app archive for the current platform
+portable:
+    {{ if os() == "windows" { "$env:RELEASE='2'; " } else { "RELEASE=2 " } }}{{ ninja }} portable_package
+    @echo "Portable app written under out/portable/dist/"
+
+# Build the portable app without packaging it (used when signing precedes packaging)
+portable-build:
+    {{ if os() == "windows" { "$env:RELEASE='2'; " } else { "RELEASE=2 " } }}{{ ninja }} portable_build
+
+# Package an existing portable build without rebuilding it and invalidating signatures
+portable-archive version:
+    {{ python }} qt/tools/build_installer.py --version {{ version }} --portable package
+
+# Backwards-compatible name for building a local macOS portable app (.zip)
+macos-portable:
+    @if [ "{{ os() }}" != "macos" ]; then echo "macos-portable must be run on macOS" >&2; exit 1; fi
+    just portable
+
 # Build and run all checks (lint + test) - lets ninja handle dependencies
 check:
     {{ ninja }} pylib qt check
+
+# Run development checks without installer tests, with two Cargo jobs and Rust test workers
+check-local:
+    {{ if os() == "windows" { "$env:CARGO_BUILD_JOBS='2'; $env:NEXTEST_TEST_THREADS='2'; " } else { "CARGO_BUILD_JOBS=2 NEXTEST_TEST_THREADS=2 " } }}{{ ninja }} pylib qt check-local
 
 # Run all tests (Rust, Python, TypeScript). Pass --coverage to enforce coverage, and --html to include HTML reports.
 [arg("coverage", long="coverage", value="--coverage")]
@@ -172,12 +200,164 @@ docs-rust:
     cargo doc --open
 
 # Dispatch CI workflow on a given branch or tag
+[arg("branch", long)]
 ci branch:
     gh workflow run ci.yml --ref {{ branch }}
 
 # Run Complexipy in regression-only mode
 complexipy-diff:
     {{ ninja }} complexipy-diff
+
+# Audit or repair RWKV synthetic revlog kinds in a copied collection.
+rwkv-review-type-repair *args:
+    {{ ninja }} pyenv
+    {{ python }} qt/tools/rwkv_review_type_repair.py {{ args }}
+
+# Compare Python and Rust RWKV history fingerprints on a copied collection.
+rwkv-history-fingerprint-bench *args:
+    {{ ninja }} pylib qt
+    {{ if os() == "windows" { "$env:PYTHONPATH='pylib;out/pylib;out/qt;out/qt/tools'; " } else { "PYTHONPATH=pylib:out/pylib:out/qt:out/qt/tools " } }}{{ python }} qt/tools/rwkv_history_fingerprint_bench.py {{ args }}
+
+# Compare resident RWKV bridges, prediction memo costs, and history preparation on a collection copy.
+rwkv-review-performance-bench *args:
+    {{ ninja }} pylib qt
+    {{ if os() == "windows" { "$env:PYTHONPATH='pylib;out/pylib;out/qt;out/qt/tools'; " } else { "PYTHONPATH=pylib:out/pylib:out/qt:out/qt/tools " } }}{{ python }} qt/tools/rwkv_review_performance_bench.py {{ args }}
+
+# Measure model-size build, load and scoring on a copied collection (Windows).
+[arg("allow_busy", long="allow-busy", value="--allow-busy")]
+rwkv-app-speed-bench $speed_collection $speed_output allow_busy='':
+    {{ if os() == "windows" { "powershell -NoProfile -ExecutionPolicy Bypass -File qt/tools/rwkv_speed_test.ps1 -Collection \"$env:speed_collection\" -OutDir \"$env:speed_output\"" + if allow_busy == "--allow-busy" { " -AllowBusy" } else { "" } } else { "echo 'This benchmark runner requires Windows.'; exit 1" } }}
+
+# Measure native RWKV speed on the copy in ANKI_SPEED_COLLECTION.
+rwkv-app-speed-native:
+    cargo test --release -p anki --lib rwkv_app_speed_benchmark -- --ignored --nocapture --test-threads 1
+
+# Summarize recorded RWKV model-size speed measurements.
+rwkv-app-speed-summary *args:
+    {{ python }} qt/tools/rwkv_speed_summary.py {{ args }}
+
+# Measure RWKV review-type metrics on selected current deck ids in a copied collection.
+rwkv-review-type-metrics collection target-deck-ids:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_STATE_COMPRESSION_COLLECTION='" + collection + "'; $env:ANKI_RWKV_STATE_COMPRESSION_TARGET_DECK_IDS='" + target-deck-ids + "'; $env:ANKI_RWKV_STATE_COMPRESSION_MODEL='" + justfile_directory() + "/qt/aqt/rwkv_inference/sm40v2/weights.f32.bin'; $env:ANKI_RWKV_STATE_COMPRESSION_LIMIT='0'; $env:ANKI_RWKV_STATE_COMPRESSION_CONFIGS='raw'; cargo test -p anki rwkv_state_compression_metrics --release -- --ignored --nocapture" } else { "ANKI_RWKV_STATE_COMPRESSION_COLLECTION='" + collection + "' ANKI_RWKV_STATE_COMPRESSION_TARGET_DECK_IDS='" + target-deck-ids + "' ANKI_RWKV_STATE_COMPRESSION_MODEL='" + justfile_directory() + "/qt/aqt/rwkv_inference/sm40v2/weights.f32.bin' ANKI_RWKV_STATE_COMPRESSION_LIMIT=0 ANKI_RWKV_STATE_COMPRESSION_CONFIGS=raw cargo test -p anki rwkv_state_compression_metrics --release -- --ignored --nocapture" } }}
+
+# Prepare canonical replay inputs from an explicit copied backup.
+rwkv-history-ablation-prepare *args:
+    {{ ninja }} pylib qt
+    {{ if os() == "windows" { "$env:PYTHONPATH='pylib;out/pylib;out/qt;out/qt/tools'; " } else { "PYTHONPATH=pylib:out/pylib:out/qt:out/qt/tools " } }}{{ python }} qt/tools/rwkv_history_ablation_prepare.py {{ args }}
+
+# Prepare history rows and review-card simulation inputs for the review-order experiment.
+rwkv-review-order-prepare *args:
+    {{ ninja }} pylib qt
+    {{ if os() == "windows" { "$env:PYTHONPATH='pylib;out/pylib;out/qt;out/qt/tools'; " } else { "PYTHONPATH=pylib:out/pylib:out/qt:out/qt/tools " } }}{{ python }} qt/tools/rwkv_review_order_prepare.py {{ args }}
+
+# Compare review-ordering strategies under a backlog with the RWKV workload simulator.
+rwkv-review-order-bench input output:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_REVIEW_ORDER_INPUT='" + input + "'; $env:ANKI_RWKV_REVIEW_ORDER_OUTPUT='" + output + "'; cargo test -p anki --release --lib rwkv_review_order_metrics -- --ignored --nocapture" } else { "ANKI_RWKV_REVIEW_ORDER_INPUT='" + input + "' ANKI_RWKV_REVIEW_ORDER_OUTPUT='" + output + "' cargo test -p anki --release --lib rwkv_review_order_metrics -- --ignored --nocapture" } }}
+
+# Measure how far card retrievability drops between days without a review, on the real history.
+rwkv-review-order-real-drops input output:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_REVIEW_ORDER_INPUT='" + input + "'; $env:ANKI_RWKV_REVIEW_ORDER_OUTPUT='" + output + "'; cargo test -p anki --release --lib rwkv_review_order_real_drops -- --ignored --nocapture" } else { "ANKI_RWKV_REVIEW_ORDER_INPUT='" + input + "' ANKI_RWKV_REVIEW_ORDER_OUTPUT='" + output + "' cargo test -p anki --release --lib rwkv_review_order_real_drops -- --ignored --nocapture" } }}
+
+# Compare review orderings when the model mispredicts a deck or a scattered subset of cards.
+rwkv-review-order-shock input output:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_REVIEW_ORDER_INPUT='" + input + "'; $env:ANKI_RWKV_REVIEW_ORDER_OUTPUT='" + output + "'; cargo test -p anki --release --lib rwkv_review_order_shock -- --ignored --nocapture" } else { "ANKI_RWKV_REVIEW_ORDER_INPUT='" + input + "' ANKI_RWKV_REVIEW_ORDER_OUTPUT='" + output + "' cargo test -p anki --release --lib rwkv_review_order_shock -- --ignored --nocapture" } }}
+
+# Measure accuracy after omitting whole cards or individual historical answers.
+rwkv-history-ablation-bench input output seeds='3':
+    {{ if os() == "windows" { "$env:ANKI_RWKV_ABLATION_INPUT='" + input + "'; $env:ANKI_RWKV_ABLATION_OUTPUT='" + output + "'; $env:ANKI_RWKV_ABLATION_SEEDS='" + seeds + "'; cargo test -p anki --release --lib rwkv_history_ablation_metrics -- --ignored --nocapture" } else { "ANKI_RWKV_ABLATION_INPUT='" + input + "' ANKI_RWKV_ABLATION_OUTPUT='" + output + "' ANKI_RWKV_ABLATION_SEEDS='" + seeds + "' cargo test -p anki --release --lib rwkv_history_ablation_metrics -- --ignored --nocapture" } }}
+
+# Prepare complete and post-reset replay histories from an explicit copied backup.
+rwkv-reset-history-prepare *args:
+    just rwkv-history-ablation-prepare --reset-comparison --deck-match= {{ args }}
+
+# Compare post-reset prediction accuracy with and without pre-reset history.
+rwkv-reset-history-bench input output:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_ABLATION_INPUT='" + input + "'; $env:ANKI_RWKV_ABLATION_OUTPUT='" + output + "'; cargo test -p anki --release --lib rwkv_reset_history_metrics -- --ignored --nocapture" } else { "ANKI_RWKV_ABLATION_INPUT='" + input + "' ANKI_RWKV_ABLATION_OUTPUT='" + output + "' cargo test -p anki --release --lib rwkv_reset_history_metrics -- --ignored --nocapture" } }}
+
+# Verify compact RWKV storage, normal queries, undo and checkpoint continuity.
+rwkv-state-precision-tests *args:
+    cargo test -p anki --lib rwkv_state_precision {{ args }}
+
+# Compare card/note-only int8 with int8 shared state using prepared backup inputs.
+rwkv-state-scope-bench input output:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_STATE_SCOPE_INPUT='" + input + "'; $env:ANKI_RWKV_STATE_SCOPE_OUTPUT='" + output + "'; cargo test -p anki --release --lib rwkv_state_scope_metrics -- --ignored --nocapture" } else { "ANKI_RWKV_STATE_SCOPE_INPUT='" + input + "' ANKI_RWKV_STATE_SCOPE_OUTPUT='" + output + "' cargo test -p anki --release --lib rwkv_state_scope_metrics -- --ignored --nocapture" } }}
+
+# Verify the offline int4 weight codec and native decoded-model loading.
+rwkv-weight-precision-tests *args:
+    cargo test -p anki --lib rwkv_weight_precision {{ args }}
+
+# Pack int4 projection weights and compare accuracy with f32/int8 state.
+rwkv-weight-precision-bench input output packed-model:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_WEIGHT_PRECISION_INPUT='" + input + "'; $env:ANKI_RWKV_WEIGHT_PRECISION_OUTPUT='" + output + "'; $env:ANKI_RWKV_WEIGHT_PRECISION_MODEL='" + packed-model + "'; cargo test -p anki --release --lib rwkv_weight_precision_metrics -- --ignored --nocapture" } else { "ANKI_RWKV_WEIGHT_PRECISION_INPUT='" + input + "' ANKI_RWKV_WEIGHT_PRECISION_OUTPUT='" + output + "' ANKI_RWKV_WEIGHT_PRECISION_MODEL='" + packed-model + "' cargo test -p anki --release --lib rwkv_weight_precision_metrics -- --ignored --nocapture" } }}
+
+# Fresh-process native CPU/time/RSS measurements and matched RWKV UM+ comparisons.
+rwkv-runtime-precision-bench input output rounds='3':
+    {{ if os() == "windows" { "$env:PYTHONPATH='qt'; " } else { "PYTHONPATH=qt " } }}{{ python }} qt/tools/rwkv_runtime_precision_bench.py --input '{{ input }}' --output '{{ output }}' --rounds {{ rounds }}
+
+# Compare hybrid card/note precision with INT8 and configured FSRS7 on a copied backup.
+rwkv-hybrid-precision-bench input output:
+    {{ if os() == "windows" { "$env:PYTHONPATH='pylib;out/pylib;out/qt;qt'; " } else { "PYTHONPATH=pylib:out/pylib:out/qt:qt " } }}{{ python }} qt/tools/rwkv_hybrid_precision_bench.py --input '{{ input }}' --output '{{ output }}'
+
+# Verify hybrid recurrence across sequential and chunked replay.
+rwkv-hybrid-precision-tests *args:
+    cargo test -p anki --lib rwkv_hybrid_precision_preserves_replay {{ args }}
+
+# Plot an existing comparison with the local Python plotting environment.
+rwkv-runtime-precision-plot result output:
+    {{ if os() == "windows" { "$env:PYTHONPATH='qt'; " } else { "PYTHONPATH=qt " } }}python3 qt/tools/rwkv_runtime_precision_bench.py --plot-only '{{ result }}' --output '{{ output }}'
+
+# Compare fused int4 compute with current and on-demand decoded kernels.
+rwkv-runtime-fused-bench input output reference rounds='3':
+    {{ if os() == "windows" { "$env:PYTHONPATH='qt'; " } else { "PYTHONPATH=qt " } }}{{ python }} qt/tools/rwkv_runtime_precision_bench.py --input '{{ input }}' --output '{{ output }}' --reference '{{ reference }}' --rounds {{ rounds }} --modes state_int8 weights_int4_resident weights_int4_fused
+
+# Measure native RAM/CPU after restoring a saved cache in a fresh process.
+rwkv-runtime-cold-cache-bench input output reference rounds='3':
+    {{ if os() == "windows" { "$env:PYTHONPATH='qt'; " } else { "PYTHONPATH=qt " } }}{{ python }} qt/tools/rwkv_runtime_cold_cache_bench.py --input '{{ input }}' --output '{{ output }}' --reference '{{ reference }}' --rounds {{ rounds }}
+
+# Build and run the standalone RWKV predictor benchmark.
+rwkv-predict-bench *args:
+    cargo run -p anki --release --bin rwkv_predict_bench -- {{ args }}
+
+# Compare original and optimized native query math in alternating order.
+rwkv-query-math-bench:
+    cargo test -p anki --release --lib rwkv_query_math_benchmark -- --ignored --nocapture
+
+# Measure exact FSRS queue sorting and review transitions on synthetic collections.
+fsrs-queue-bench:
+    cargo test -p anki --release --lib fsrs_queue_benchmark -- --ignored --nocapture
+
+# Profile the stages of exact FSRS queue builds with daily limits of 200 and 9,999.
+fsrs-queue-profile:
+    cargo test -p anki --release --lib fsrs_queue_profile -- --ignored --nocapture
+
+# Rebuild a 100,000-card queue repeatedly and print its PID for a native CPU sampler.
+fsrs-queue-sample:
+    cargo test -p anki --release --lib fsrs_queue_sampling -- --ignored --nocapture
+
+# Benchmark Browser operations in an explicitly selected built checkout.
+clanki-gui-bench *args:
+    {{ python }} qt/tools/clanki_gui_bench.py {{ args }}
+
+# Benchmark backend operations on an explicitly supplied backup copy.
+clanki-collection-bench *args:
+    {{ python }} qt/tools/clanki_collection_bench.py {{ args }}
+
+# Measure SSE calibration stalls using an explicit build and a copied backup.
+sse-calibration-bench *args:
+    {{ python }} qt/tools/sse_calibration_bench.py {{ args }}
+
+# Compare FSRS optimization, evaluation, and calibration using a copied collection.
+fsrs-compact-bench *args:
+    {{ python }} qt/tools/fsrs_compact_bench.py {{ args }}
+
+# Check web caching and simulate the Windows mpv transport.
+clanki-asset-audio-bench *args:
+    {{ python }} qt/tools/clanki_asset_audio_bench.py {{ args }}
+
+# Run selected Python tests against the current generated backend and Qt files.
+test-py-target *args:
+    {{ ninja }} pylib qt
+    {{ if os() == "windows" { "$env:PYTHONPATH='pylib;out/pylib;qt;out/qt'; $env:QT_QPA_PLATFORM='offscreen'; " } else { "PYTHONPATH=pylib:out/pylib:qt:out/qt QT_QPA_PLATFORM=offscreen " } }}{{ python }} -m pytest {{ args }}
 
 # Remove build outputs from out/ (pass keep-env to keep node_modules/pyenv); macOS/Linux
 clean *args:
@@ -194,4 +374,37 @@ run_script := if os() == "windows" { ".\\run.bat" } else { "./run" }
 playwright_env := if os() == "windows" { "set PLAYWRIGHT_BROWSERS_PATH=out\\playwright-browsers&&" } else { "PLAYWRIGHT_BROWSERS_PATH=out/playwright-browsers" }
 yarn := if os() == "windows" { "out\\extracted\\node\\yarn.cmd" } else { "out/extracted/node/bin/yarn" }
 uv := env("UV_BINARY", if os() == "windows" { "out\\extracted\\uv\\uv" } else { "out/extracted/uv/uv" })
+python := if os() == "windows" { ".\\out\\pyenv\\Scripts\\python.exe" } else { "out/pyenv/bin/python" }
 export UV_PROJECT_ENVIRONMENT := if os() == "windows" { "out\\pyenv" } else { "out/pyenv" }
+
+# Compare the bundled legacy model and SM40 on the exact same copied history.
+rwkv-model-bench *args:
+    PYTHONPATH=qt {{ python }} qt/tools/rwkv_model_bench.py {{ args }}
+
+# Compare lossless block compression of native checkpoints using copied backup inputs.
+rwkv-checkpoint-compression-bench *args:
+    {{ python }} qt/tools/rwkv_checkpoint_compression_bench.py {{ args }}
+
+# Build or test the offline checkpoint compression experiment.
+rwkv-checkpoint-compression-native *args:
+    cargo test -p anki --release --lib rwkv_checkpoint_compression {{ args }}
+
+# Verify SM40 against the published recurrent test vectors.
+rwkv-sm40-tests *args:
+    cargo test -p anki --lib rwkv_sm40 {{ args }}
+
+# Convert the published NumPy vectors into portable native test fixtures.
+rwkv-sm40-vectors package output limit='500' python='python3':
+    {{ python }} qt/tools/rwkv_sm40_vectors.py '{{ package }}' '{{ output }}' --limit {{ limit }}
+
+# Export exact production features and Curve components for an explicit offline probe.
+rwkv-sm40-curve-trace request:
+    {{ if os() == "windows" { "$env:ANKI_RWKV_CURVE_PROBE_REQUEST='" + request + "'; " } else { "ANKI_RWKV_CURVE_PROBE_REQUEST='" + request + "' " } }}cargo test -p anki --lib --release rwkv_sm40_curve_reference_trace -- --ignored --nocapture
+
+# Independently replay an exported trace with the release package's NumPy reference.
+rwkv-sm40-curve-reference package trace output python='python3':
+    {{ python }} qt/tools/rwkv_curve_reference_probe.py --package '{{ package }}' --trace '{{ trace }}' --output '{{ output }}'
+
+# Run native RWKV regressions for both bundled architectures.
+rwkv-model-tests *args:
+    cargo test -p anki --lib rwkv:: {{ args }}

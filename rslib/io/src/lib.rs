@@ -277,6 +277,7 @@ fn persist_tempfile(
     if overwrite {
         file.persist(target)?;
     } else {
+<<<<<<< HEAD
         match file.persist_noclobber(target) {
             Ok(_) => {}
             // Android shared storage (/storage/emulated/0, FUSE) refuses both
@@ -292,6 +293,9 @@ fn persist_tempfile(
             }
             Err(err) => return Err(err.into()),
         }
+=======
+        file.persist_noclobber(target)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
     #[cfg(not(windows))]
     if fsync {

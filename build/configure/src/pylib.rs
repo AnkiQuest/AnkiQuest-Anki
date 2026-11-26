@@ -87,6 +87,11 @@ pub fn check_pylib(build: &mut Build) -> Result<()> {
         "check:pytest:pylib",
         PythonTest {
             folder: "pylib/tests",
+<<<<<<< HEAD
+=======
+            ignore: None,
+            python_path: &["$builddir/pylib"],
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             deps: inputs![":pylib:anki", glob!["pylib/{anki,tests}/**"]],
         },
     )?;
@@ -108,6 +113,7 @@ impl BuildAction for GenBuildInfo {
         build.add_inputs("script", inputs!["pylib/tools/genbuildinfo.py"]);
         build.add_inputs("version_file", inputs![".version"]);
         build.add_inputs("buildhash_file", inputs!["$builddir/buildhash"]);
+        build.add_inputs("", inputs!["$builddir/env"]);
         build.add_outputs("out", vec!["pylib/anki/buildinfo.py"]);
     }
 }

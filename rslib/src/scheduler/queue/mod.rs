@@ -25,10 +25,14 @@ pub(crate) use main::MainQueueEntry;
 pub(crate) use main::MainQueueEntryKind;
 
 use self::rwkv::RwkvLearningRepeatGuards;
+<<<<<<< HEAD
 use self::undo::CutoffSnapshot;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use self::undo::QueueUpdate;
 use super::states::SchedulingStates;
 use super::timing::SchedTimingToday;
+use crate::card::CardQueue;
 use crate::prelude::*;
 use crate::scheduler::rwkv::RwkvReviewScoreEligibility;
 use crate::scheduler::states::load_balancer::LoadBalancer;
@@ -48,7 +52,17 @@ pub(crate) struct CardQueues {
     current_learning_cutoff: TimestampSecs,
     shown_top_card: Option<CardId>,
     non_news_sorted_by_retrievability: bool,
+<<<<<<< HEAD
     deferred_rwkv_reviews: HashMap<CardId, DeferredRwkvReview>,
+=======
+    new_cards_gathered_by_field: bool,
+    deferred_rwkv_reviews: HashMap<CardId, DeferredRwkvReview>,
+    /// Reviews the selected deck's daily limit still allowed when the queue
+    /// was built, beyond the queued cards. Only set for RWKV-Instant queues
+    /// whose daily review limit is not effectively unlimited (>= 9999).
+    rwkv_review_headroom: Option<u32>,
+    next_review_step_due: Option<TimestampSecs>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     rwkv_learning_repeat_guards: Option<RwkvLearningRepeatGuards>,
     blocked_rwkv_learning_cards: HashSet<CardId>,
     new_review_mix_progress: NewReviewMixProgress,
@@ -116,6 +130,16 @@ impl Counts {
     }
 }
 
+/// How many more reviews an RWKV-Instant queue could still show today.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RwkvReviewPotential {
+    /// Reviews the selected deck's daily limit still allows beyond the
+    /// review count.
+    pub headroom: u32,
+    /// Eligible reviews held back for spacing, capped at the headroom.
+    pub waiting: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct QueuedCard {
     pub card: Card,
@@ -130,6 +154,7 @@ pub struct QueuedCards {
     pub new_count: usize,
     pub learning_count: usize,
     pub review_count: usize,
+    pub rwkv_review_potential: Option<RwkvReviewPotential>,
 }
 
 /// When we encounter a card with new or review burying enabled, all future
@@ -155,7 +180,15 @@ impl Collection {
     ) -> Result<QueuedCards> {
         let queues = self.get_queues()?;
         let counts = queues.counts();
-        let entries: Vec<_> = if intraday_learning_only {
+        let rwkv_review_potential = queues.rwkv_review_potential();
+        let entries: Vec<_> = if intraday_learning_only && queues.non_news_sorted_by_retrievability
+        {
+            // Due intraday cards are mixed into the main queue in this mode.
+            queues
+                .iter()
+                .filter(|entry| entry.kind() == QueueEntryKind::Learning)
+                .collect()
+        } else if intraday_learning_only {
             queues
                 .intraday_now_iter()
                 .chain(queues.intraday_ahead_iter())
@@ -165,6 +198,7 @@ impl Collection {
             queues.iter().take(fetch_limit).collect()
         };
         if fetch_limit == 1 && !intraday_learning_only {
+<<<<<<< HEAD
             let shown = entries
                 .first()
                 .map(|entry| (entry.card_id(), entry.mtime()));
@@ -201,11 +235,46 @@ impl Collection {
                 })
             })
             .collect::<Result<_>>()?;
+=======
+            queues.mark_top_card_shown(entries.first().map(QueueEntry::card_id));
+        }
+        let mut cards = Vec::with_capacity(entries.len());
+        for entry in entries {
+            let card = self
+                .storage
+                .get_card(entry.card_id())?
+                .or_not_found(entry.card_id())?;
+            require!(
+                card.mtime == entry.mtime(),
+                "bug: card modified without updating queue: id:{} card:{} entry:{}",
+                card.id,
+                card.mtime,
+                entry.mtime()
+            );
+            // Main-queue learning entries can also represent interday learning.
+            if intraday_learning_only && !card.is_intraday_learning() {
+                continue;
+            }
+            let (next_states, card) = if skip_scheduling_states {
+                (None, card)
+            } else {
+                let (states, card) = self.get_scheduling_states_inner(card, None)?;
+                (Some(states), card)
+            };
+            cards.push(QueuedCard {
+                context: new_scheduling_context(self, &card)?,
+                card,
+                states: next_states,
+                kind: entry.kind(),
+            });
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(QueuedCards {
             cards,
             new_count: counts.new,
             learning_count: counts.learning,
             review_count: counts.review,
+            rwkv_review_potential,
         })
     }
 }
@@ -223,6 +292,26 @@ fn new_scheduling_context(col: &mut Collection, card: &Card) -> Result<Schedulin
 }
 
 impl CardQueues {
+<<<<<<< HEAD
+=======
+    fn track_review_step_due(&mut self, due: Option<TimestampSecs>) {
+        if let Some(due) = due {
+            self.next_review_step_due = Some(
+                self.next_review_step_due
+                    .map_or(due, |current| current.min(due)),
+            );
+        }
+    }
+
+    pub(crate) fn rwkv_review_potential(&self) -> Option<RwkvReviewPotential> {
+        self.rwkv_review_headroom
+            .map(|headroom| RwkvReviewPotential {
+                headroom,
+                waiting: (self.deferred_rwkv_reviews.len() as u32).min(headroom),
+            })
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) fn main_contains(&self, card_id: CardId) -> bool {
         self.main.iter().any(|entry| entry.id == card_id)
     }
@@ -339,12 +428,15 @@ impl CardQueues {
             // we discard the returned undo information in this case
             self.update_learning_cutoff_and_count();
         }
+<<<<<<< HEAD
         self.counts_snapshot()
     }
 
     /// Inspect the current visible counts without advancing the learning
     /// cutoff.
     pub(crate) fn counts_snapshot(&self) -> Counts {
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Counts {
             learning: if self.blocked_rwkv_learning_cards.is_empty() {
                 self.counts.learning
@@ -386,12 +478,21 @@ impl Collection {
         self.state.card_queues = Some(queues);
         self.state.pending_new_review_mix = None;
         self.refresh_rwkv_learning_repeat_guards(&deck)?;
+<<<<<<< HEAD
         let counts = self.state.card_queues.as_mut().unwrap().counts();
+=======
+        let queues = self.state.card_queues.as_mut().unwrap();
+        let counts = queues.counts();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(QueuedCards {
             cards: vec![],
             new_count: counts.new,
             learning_count: counts.learning,
             review_count: counts.review,
+<<<<<<< HEAD
+=======
+            rwkv_review_potential: queues.rwkv_review_potential(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         })
     }
 
@@ -401,6 +502,15 @@ impl Collection {
     pub(crate) fn clear_study_queues(&mut self) {
         self.state.card_queues = None;
         self.state.pending_new_review_mix = None;
+<<<<<<< HEAD
+    }
+
+    pub(crate) fn invalidate_rwkv_review_queue(&mut self) {
+        if let Some(queues) = self.state.card_queues.take() {
+            self.state.pending_new_review_mix = Some(queues.new_review_mix_progress);
+        }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     pub(crate) fn invalidate_rwkv_review_queue(&mut self) {
@@ -409,7 +519,14 @@ impl Collection {
         }
     }
 
-    pub(crate) fn maybe_clear_study_queues_after_op(&mut self, op: &OpChanges) {
+    pub(crate) fn maybe_clear_study_queues_after_op(&mut self, op: &mut OpChanges) {
+        if op.op != Op::AnswerCard && (op.changes.note || op.changes.notetype) {
+            op.changes.study_queue_order = self
+                .state
+                .card_queues
+                .as_ref()
+                .is_some_and(|queues| queues.new_cards_gathered_by_field);
+        }
         if op.op != Op::AnswerCard && op.requires_study_queue_rebuild() {
             self.clear_study_queues();
         }
@@ -444,9 +561,16 @@ impl Collection {
             };
             let cutoff_snapshot = queues.update_learning_cutoff_and_count();
             let queue_build_time = queues.build_time;
+            let review_step_due = if card.queue == CardQueue::Review && !card.is_filtered() {
+                card.review_step_due_at()
+            } else {
+                None
+            };
+            queues.track_review_step_due(review_step_due);
             self.save_queue_update_undo(Box::new(QueueUpdate {
                 entry,
                 learning_requeue: requeued_learning,
+                review_step_due,
                 queue_build_time,
                 cutoff_snapshot,
             }));
@@ -489,6 +613,7 @@ impl Collection {
                 .map(|queues| {
                     queues.due_intraday_needs_retrievability_resort()
                         || queues.deferred_rwkv_review_is_ready()
+<<<<<<< HEAD
                 })
                 .unwrap_or(false)
         {
@@ -496,10 +621,20 @@ impl Collection {
             // A card the fork pinned (rebuild_queued_cards_preserving_current_card)
             // stays first; else kuma3's shown card, if unchanged since shown.
             let pinned = self
+=======
+                        || queues
+                            .next_review_step_due
+                            .is_some_and(|due| due <= TimestampSecs::now())
+                })
+                .unwrap_or(false)
+        {
+            let shown_card_id = self
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .state
                 .card_queues
                 .as_ref()
                 .and_then(|queues| queues.shown_top_card);
+<<<<<<< HEAD
             let shown = match (pinned, self.state.shown_card) {
                 (Some(pinned), shown) if shown.is_none_or(|(id, _)| id != pinned) => {
                     self.storage.get_card(pinned)?
@@ -514,6 +649,26 @@ impl Collection {
                         self.build_queues(deck.id)
                     })?,
                 None => self.build_queues(deck.id)?,
+=======
+            let queues = if let Some(card_id) = shown_card_id {
+                let card = self.storage.get_card(card_id)?;
+                match card
+                    .or_not_found(card_id)
+                    .and_then(|card| self.build_queues_with_current_card(deck.id, Some(&card)))
+                {
+                    Ok(queues) => queues,
+                    Err(error) => {
+                        tracing::debug!(
+                            %card_id,
+                            %error,
+                            "failed to preserve shown card during queue rebuild"
+                        );
+                        self.build_queues(deck.id)?
+                    }
+                }
+            } else {
+                self.build_queues(deck.id)?
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             };
             self.state.card_queues = Some(queues);
             self.state.pending_new_review_mix = None;
@@ -650,6 +805,7 @@ mod tests {
         deferred.eligible_at = Some(now);
         assert!(deferred.is_ready(now));
     }
+<<<<<<< HEAD
 
     // kuma3: kumapie answers a word's own cards wherever they are in the queue (not
     // only its top).
@@ -820,4 +976,6 @@ mod tests {
         );
         Ok(())
     }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }

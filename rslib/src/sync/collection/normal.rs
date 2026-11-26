@@ -162,7 +162,11 @@ impl NormalSyncer<'_> {
         self.process_unchunked_changes(&state).await?;
         debug!("begin stream from server");
         self.process_chunks_from_server(&state).await?;
+<<<<<<< HEAD
         let foreign_cards = self.col.storage.card_ids_with_foreign_fsrs_state()?;
+=======
+        let foreign_cards = self.col.foreign_fsrs_repair_candidates()?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         match self
             .col
             .repair_foreign_fsrs_memory_states_inner(foreign_cards)

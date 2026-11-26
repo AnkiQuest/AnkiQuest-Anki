@@ -11,6 +11,14 @@ use crate::scheduler::fsrs::memory_state::fsrs_memory_state_for_params;
 use crate::scheduler::timing::is_unix_epoch_timestamp;
 
 impl Collection {
+    pub(super) fn last_review_time_for_stats(&self, card: &Card) -> Result<Option<TimestampSecs>> {
+        // Older Card Info versions cached zero when there was no rated review.
+        match card.last_review_time {
+            Some(time) if time.0 != 0 => Ok(Some(time)),
+            _ => self.storage.time_of_last_review(card.id),
+        }
+    }
+
     pub fn card_stats(&mut self, cid: CardId) -> Result<anki_proto::stats::CardStatsResponse> {
         let mut card = self.storage.get_card(cid)?.or_not_found(cid)?;
         let note = self
@@ -30,6 +38,7 @@ impl Collection {
         let timing = self.timing_today()?;
         let fsrs_enabled = self.fsrs_enabled();
 
+<<<<<<< HEAD
         let last_review_time = if let Some(last_review_time) = card.last_review_time {
             last_review_time
         } else {
@@ -46,6 +55,13 @@ impl Collection {
         };
 
         let seconds_elapsed = timing.now.elapsed_secs_since_clamped(last_review_time);
+=======
+        let last_review_time = self.last_review_time_for_stats(&card)?;
+        if card.last_review_time != last_review_time {
+            card.last_review_time = last_review_time;
+            self.storage.update_card(&card)?;
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         let original_deck = if card.original_deck_id == DeckId(0) {
             deck.clone()
@@ -63,6 +79,7 @@ impl Collection {
 
         let fsrs_preset = self.fsrs_preset_for_card(&card)?;
 
+<<<<<<< HEAD
         let fsrs_retrievability =
             card.memory_state
                 .zip(Some(seconds_elapsed))
@@ -73,6 +90,15 @@ impl Collection {
                         seconds as f32 / 86_400.0,
                     )
                 });
+=======
+        let fsrs_retrievability = card.memory_state.map(|state| {
+            fsrs_current_retrievability_for_state(
+                &fsrs_preset.params,
+                state,
+                card.days_since_last_review(&timing),
+            )
+        });
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(anki_proto::stats::CardStatsResponse {
             card_id: card.id.into(),
             note_id: card.note_id.into(),
@@ -97,7 +123,11 @@ impl Collection {
             total_secs,
             card_type: nt.get_template(card.template_idx)?.name.clone(),
             notetype: nt.name.clone(),
+<<<<<<< HEAD
             revlog: self.stats_revlog_entries_with_memory_state(&card, last_review_time, revlog)?,
+=======
+            revlog: self.stats_revlog_entries_with_memory_state(&card, revlog)?,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             memory_state: card.memory_state.map(Into::into),
             fsrs_retrievability: fsrs_retrievability.transpose()?,
             custom_data: card.custom_data,
@@ -109,9 +139,15 @@ impl Collection {
                 None
             },
             desired_retention: card.desired_retention,
+<<<<<<< HEAD
             fsrs_enabled,
             extra_rows: vec![],
             rwkv_retry_pending: false,
+=======
+            extra_rows: vec![],
+            rwkv_retry_pending: false,
+            rwkv_answer_time_recall: vec![],
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         })
     }
 
@@ -123,6 +159,9 @@ impl Collection {
     }
 
     fn due_date(&mut self, card: &Card) -> Result<Option<i64>> {
+        if let Some(due) = card.review_step_due_at() {
+            return Ok(Some(due.0));
+        }
         Ok(match card.ctype {
             CardType::New => None,
             CardType::Review | CardType::Learn | CardType::Relearn => {
@@ -209,13 +248,21 @@ impl Collection {
             }
             Ok(with_current_memory_state_on_latest_review(
                 card.memory_state,
+<<<<<<< HEAD
                 last_review_time,
+=======
+                card.last_review_time,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 result.into_iter().rev().collect(),
             ))
         } else {
             Ok(with_current_memory_state_on_latest_review(
                 card.memory_state,
+<<<<<<< HEAD
                 last_review_time,
+=======
+                card.last_review_time,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 revlog.iter().rev().map(stats_revlog_entry).collect(),
             ))
         }
@@ -224,10 +271,17 @@ impl Collection {
 
 fn with_current_memory_state_on_latest_review(
     memory_state: Option<FsrsMemoryState>,
+<<<<<<< HEAD
     last_review_time: TimestampSecs,
     mut entries: Vec<anki_proto::stats::card_stats_response::StatsRevlogEntry>,
 ) -> Vec<anki_proto::stats::card_stats_response::StatsRevlogEntry> {
     if let Some(memory_state) = memory_state {
+=======
+    last_review_time: Option<TimestampSecs>,
+    mut entries: Vec<anki_proto::stats::card_stats_response::StatsRevlogEntry>,
+) -> Vec<anki_proto::stats::card_stats_response::StatsRevlogEntry> {
+    if let (Some(memory_state), Some(last_review_time)) = (memory_state, last_review_time) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if let Some(entry) = entries
             .iter_mut()
             .find(|entry| entry.button_chosen > 0 && entry.time == last_review_time.0)
@@ -330,6 +384,85 @@ mod test {
         col.add_note(&mut note, DeckId(1))?;
         let cid = col.search_cards("", SortMode::NoOrder)?[0];
         Ok((col, cid))
+    }
+
+    #[test]
+    fn recall_uses_the_due_date_without_inventing_a_review_time() -> Result<()> {
+        let (mut col, cid) = test_collection()?;
+        let mut card = col.storage.get_card(cid)?.unwrap();
+        let state = FsrsMemoryState {
+            stability: 20.0,
+            stability_internal: 30.0,
+            stability_fast: Some(3.0),
+            difficulty: 5.0,
+        };
+        card.ctype = CardType::Review;
+        card.queue = crate::card::CardQueue::Review;
+        card.memory_state = Some(state);
+        card.due = col.timing_today()?.days_elapsed as i32 + 12;
+        card.interval = 20;
+        for stored in [None, Some(TimestampSecs(0))] {
+            card.last_review_time = stored;
+            col.storage.update_card(&card)?;
+            let batch_r = col.card_memory_metrics(&[cid], true)?[0]
+                .fsrs_retrievability
+                .unwrap();
+            assert_eq!(col.storage.get_card(cid)?.unwrap().last_review_time, stored);
+            let report = col.card_stats(cid)?;
+            let expected = fsrs_current_retrievability_for_state(&report.fsrs_params, state, 8.0)?;
+            assert!((report.fsrs_retrievability.unwrap() - expected).abs() < 1e-6);
+            assert!((batch_r - expected).abs() < 1e-6);
+            assert_eq!(col.storage.get_card(cid)?.unwrap().last_review_time, None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_rated_review_takes_precedence_over_the_due_date_estimate() -> Result<()> {
+        let (mut col, cid) = test_collection()?;
+        let timing = col.timing_today()?;
+        let reviewed = timing.now.adding_secs(-86_400);
+        let mut card = col.storage.get_card(cid)?.unwrap();
+        let state = FsrsMemoryState {
+            stability: 20.0,
+            stability_internal: 30.0,
+            stability_fast: Some(3.0),
+            difficulty: 5.0,
+        };
+        card.ctype = CardType::Review;
+        card.queue = crate::card::CardQueue::Review;
+        card.memory_state = Some(state);
+        card.last_review_time = Some(TimestampSecs(0));
+        card.due = timing.days_elapsed as i32;
+        card.interval = 20;
+        col.storage.update_card(&card)?;
+        col.storage.add_revlog_entry(
+            &RevlogEntry {
+                id: RevlogId(reviewed.0 * 1000),
+                cid,
+                button_chosen: 3,
+                interval: 20,
+                review_kind: crate::revlog::RevlogReviewKind::Review,
+                ..Default::default()
+            },
+            false,
+        )?;
+        let batch_r = col.card_memory_metrics(&[cid], true)?[0]
+            .fsrs_retrievability
+            .unwrap();
+        assert_eq!(
+            col.storage.get_card(cid)?.unwrap().last_review_time,
+            Some(TimestampSecs(0))
+        );
+        let report = col.card_stats(cid)?;
+        let expected = fsrs_current_retrievability_for_state(&report.fsrs_params, state, 1.0)?;
+        assert!((report.fsrs_retrievability.unwrap() - expected).abs() < 1e-4);
+        assert!((batch_r - expected).abs() < 1e-4);
+        assert_eq!(
+            col.storage.get_card(cid)?.unwrap().last_review_time,
+            Some(reviewed)
+        );
+        Ok(())
     }
 
     #[test]

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Manual speed test of the RWKV model sizes on a real collection, along
@@ -47,10 +51,17 @@
 //!   note state bytes (it serializes a snapshot, so keep it out of RAM runs).
 //! - `ANKI_SPEED_ITERATIONS` (default 1): runs of each op in this process;
 //!   iteration 0 of a fresh process is the cold run, later ones are warm.
+<<<<<<< HEAD
 //! - `ANKI_SPEED_PRECISION` (default `cards_int4_notes_int8`, the app's
 //!   default), `ANKI_SPEED_CHUNK` (default 16384), `ANKI_SPEED_WORK_DIR`
 //!   (default `<collection folder>/speed-work`), `ANKI_SPEED_OUT` (JSON lines
 //!   appended per run).
+=======
+//! - `ANKI_SPEED_PRECISION` (default `compact_cards_int8`, the app's default),
+//!   `ANKI_SPEED_CHUNK` (default 16384), `ANKI_SPEED_WORK_DIR` (default
+//!   `<collection folder>/speed-work`), `ANKI_SPEED_OUT` (JSON lines appended
+//!   per run).
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 //! - `ANKI_SPEED_DUMP_HISTORY`: write the native history response there
 //!   (collection data; scratch folder only).
 //! - `RAYON_NUM_THREADS`: leave unset to match the app (Rayon's default pool,
@@ -82,13 +93,18 @@ const SCORE_BATCH: usize = 2_048;
 /// `(name, main model, RWKV-Instant model beside it)` as
 /// `qt/aqt/rwkv_model.py::runtime_models` picks them since the family wiring
 /// (SM114, 2026-11-13): each size runs only its own models.
+<<<<<<< HEAD
 const NAMED: [(&str, &str, Option<&str>); 12] = [
+=======
+const NAMED: [(&str, &str, Option<&str>); 13] = [
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     // Big: the show-time big model (SM91s2, "legacy") with the show-time
     // instant-only big model (SM99); the one-model choice / RWKV-Curve only;
     // RWKV-Instant alone.
     ("big-pair", "legacy", Some("sm99")),
     ("big-one", "legacy", None),
     ("big-instant", "sm99", None),
+<<<<<<< HEAD
     // Small: the show-time retrain (SM92) with the Small Instant-Only model
     // (SM98); the one-model choice / RWKV-Curve only (SM92); RWKV-Instant
     // alone (SM98).
@@ -103,6 +119,26 @@ const NAMED: [(&str, &str, Option<&str>); 12] = [
     ("tiny-one", "sm106", None),
     ("tiny-curve", "sm106", None),
     ("tiny-instant", "sm101", None),
+=======
+    // Small: the show-time two-head cool-down for Small (SM118) with the
+    // longer Small Instant-Only model (SM113) (SM92 and SM98 earlier); the
+    // one-model choice / RWKV-Curve only (SM118); RWKV-Instant alone
+    // (SM113).
+    ("small-pair", "sm118", Some("sm113")),
+    ("small-one", "sm118", None),
+    ("small-curve", "sm118", None),
+    ("small-instant", "sm113", None),
+    // Tiny: the six-layer Tiny two-head model (SM130) with the six-layer Tiny
+    // Instant-Only model (SM130) since the 2026-11 release candidate (the Tiny
+    // two-head model (SM106) with the longer cool-down for Tiny (SM115) until
+    // then, kept as "tiny4-pair" for comparison); the one-model choice /
+    // RWKV-Curve only; RWKV-Instant alone.
+    ("tiny-pair", "sm130th", Some("sm130io")),
+    ("tiny-one", "sm130th", None),
+    ("tiny-curve", "sm130th", None),
+    ("tiny-instant", "sm130io", None),
+    ("tiny4-pair", "sm106", Some("sm115")),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     // The default small model (SM63) alone, for comparison with the old Small.
     ("sm63-alone", "sm72e25", None),
 ];
@@ -811,7 +847,11 @@ fn rwkv_app_speed_benchmark() {
         .unwrap_or(1)
         .max(1);
     let precision = StatePrecision::parse(
+<<<<<<< HEAD
         &std::env::var("ANKI_SPEED_PRECISION").unwrap_or("cards_int4_notes_int8".into()),
+=======
+        &std::env::var("ANKI_SPEED_PRECISION").unwrap_or("compact_cards_int8".into()),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     )
     .unwrap();
     let chunk = std::env::var("ANKI_SPEED_CHUNK")

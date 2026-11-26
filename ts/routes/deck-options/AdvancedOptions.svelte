@@ -18,13 +18,15 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import CardStateCustomizer from "./CardStateCustomizer.svelte";
     import type { DeckOptionsState } from "./lib";
     import SpinBoxFloatRow from "./SpinBoxFloatRow.svelte";
-    import SpinBoxRow from "./SpinBoxRow.svelte";
+    import MinimumIntervalInputRow from "./MinimumIntervalInputRow.svelte";
+    import MaximumIntervalInputRow from "./MaximumIntervalInputRow.svelte";
     import DateInput from "./DateInput.svelte";
     import Warning from "./Warning.svelte";
     import { getIgnoredBeforeCount } from "@generated/backend";
     import type { GetIgnoredBeforeCountResponse } from "@generated/anki/deck_config_pb";
 
     export let state: DeckOptionsState;
+    export let study = false;
     export let api: Record<string, never>;
 
     const config = state.currentConfig;
@@ -37,6 +39,11 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             title: tr.schedulingMaximumInterval(),
             help: tr.deckConfigMaximumIntervalTooltip(),
             url: HelpPage.DeckOptions.maximumInterval,
+        },
+        fsrsMinimumInterval: {
+            title: tr.schedulingMinimumInterval(),
+            help: tr.deckConfigFsrsMinimumIntervalTooltip(),
+            sched: HelpItemScheduler.FSRS,
         },
         historicalRetention: {
             title: tr.deckConfigHistoricalRetention(),
@@ -178,31 +185,55 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         }}
     />
     <DynamicallySlottable slotHost={Item} {api}>
-        <Item>
-            <SpinBoxRow
-                bind:value={$config.maximumReviewInterval}
-                defaultValue={defaults.maximumReviewInterval}
-                min={1}
-                max={365 * 100}
-            >
-                <SettingTitle
-                    on:click={() =>
-                        openHelpModal(Object.keys(settings).indexOf("maximumInterval"))}
+        {#if !study}
+            <Item>
+                <MaximumIntervalInputRow
+                    bind:value={$config.maximumReviewInterval}
+                    defaultValue={defaults.maximumReviewInterval}
                 >
-                    {settings.maximumInterval.title}
-                </SettingTitle>
-            </SpinBoxRow>
-        </Item>
+                    <SettingTitle
+                        on:click={() =>
+                            openHelpModal(
+                                Object.keys(settings).indexOf("maximumInterval"),
+                            )}
+                    >
+                        {settings.maximumInterval.title}
+                    </SettingTitle>
+                </MaximumIntervalInputRow>
+            </Item>
+        {/if}
 
-        <Item>
-            <Warning warning={maxIntervalWarning} className={maxIntervalWarningClass}
-            ></Warning>
-        </Item>
+        {#if $fsrs}
+            <Item>
+                <MinimumIntervalInputRow
+                    bind:value={$config.fsrsMinimumIntervalSecs}
+                    inlineLabel={study ? settings.fsrsMinimumInterval.title : undefined}
+                    defaultValue={defaults.fsrsMinimumIntervalSecs}
+                >
+                    <SettingTitle
+                        on:click={() =>
+                            openHelpModal(
+                                Object.keys(settings).indexOf("fsrsMinimumInterval"),
+                            )}
+                    >
+                        {settings.fsrsMinimumInterval.title}
+                    </SettingTitle>
+                </MinimumIntervalInputRow>
+            </Item>
+        {/if}
+
+        {#if !study}<Item>
+                <Warning
+                    warning={maxIntervalWarning}
+                    className={maxIntervalWarningClass}
+                />
+            </Item>{/if}
 
         {#if !$fsrs}
             <Item>
                 <SpinBoxFloatRow
                     bind:value={$config.initialEase}
+                    inlineLabel={study ? settings.startingEase.title : undefined}
                     defaultValue={defaults.initialEase}
                     min={1.31}
                     max={5}
@@ -221,6 +252,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             <Item>
                 <SpinBoxFloatRow
                     bind:value={$config.easyMultiplier}
+                    inlineLabel={study ? settings.easyBonus.title : undefined}
                     defaultValue={defaults.easyMultiplier}
                     min={1}
                     max={5}
@@ -237,6 +269,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             <Item>
                 <SpinBoxFloatRow
                     bind:value={$config.intervalMultiplier}
+                    inlineLabel={study ? settings.intervalModifier.title : undefined}
                     defaultValue={defaults.intervalMultiplier}
                     min={0.5}
                     max={2}
@@ -255,6 +288,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             <Item>
                 <SpinBoxFloatRow
                     bind:value={$config.hardMultiplier}
+                    inlineLabel={study ? settings.hardInterval.title : undefined}
                     defaultValue={defaults.hardMultiplier}
                     min={0.5}
                     max={1.3}
@@ -273,6 +307,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             <Item>
                 <SpinBoxFloatRow
                     bind:value={$config.lapseMultiplier}
+                    inlineLabel={study ? settings.newInterval.title : undefined}
                     defaultValue={defaults.lapseMultiplier}
                     max={1}
                 >
@@ -287,6 +322,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         {:else}
             <SpinBoxFloatRow
                 bind:value={$config.historicalRetention}
+                inlineLabel={study ? tr.deckConfigHistoricalRetention() : undefined}
                 defaultValue={defaults.historicalRetention}
                 min={0.5}
                 max={1.0}
@@ -328,6 +364,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
         <Item>
             <CardStateCustomizer
+                expanded={study}
                 title={settings.customScheduling.title}
                 on:click={() =>
                     openHelpModal(Object.keys(settings).indexOf("customScheduling"))}

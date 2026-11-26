@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Day-by-day workload forecast with confidence bands.
@@ -480,7 +484,11 @@ impl RwkvInference {
                         Some(
                             self.review_heads_for_state(
                                 &interval_input,
+<<<<<<< HEAD
                                 states.state_view(&interval_input).as_ref(),
+=======
+                                states.state_ref(&interval_input),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                             )?
                             .curve,
                         )

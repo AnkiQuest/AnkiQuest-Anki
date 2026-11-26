@@ -48,6 +48,7 @@ impl super::SqliteStorage {
             .collect()
     }
 
+<<<<<<< HEAD
     /// Read only the requested field for matching notes, without copying all
     /// fields of every note during a bulk retention-rule or percentile scan.
     pub(crate) fn get_note_field_by_ids(
@@ -70,6 +71,8 @@ impl super::SqliteStorage {
             .collect()
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub fn get_note_without_fields(&self, nid: NoteId) -> Result<Option<Note>> {
         self.db
             .prepare_cached(concat!(

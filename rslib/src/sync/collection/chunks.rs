@@ -130,6 +130,7 @@ impl NormalSyncer<'_> {
             self.mark_remote_collection_changed(
                 !chunk.cards.is_empty() || !chunk.notes.is_empty() || !chunk.revlog.is_empty(),
             );
+<<<<<<< HEAD
             if (!chunk.cards.is_empty() || !chunk.notes.is_empty())
                 && crate::scheduler::addon_desired_retention::AddonRetentionRules::from_collection(
                     self.col,
@@ -138,6 +139,8 @@ impl NormalSyncer<'_> {
             {
                 self.col.invalidate_rwkv_offline_targets();
             }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             for entry in &chunk.revlog {
                 self.record_remote_review(entry.id);
             }
@@ -458,6 +461,10 @@ impl From<CardEntry> for Card {
             desired_retention: data.fsrs_desired_retention,
             decay: data.decay,
             last_review_time: data.last_review_time,
+<<<<<<< HEAD
+=======
+            review_step_secs: data.review_step_secs,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_history_reset_after: data.rwkv_history_reset_after,
             custom_data: data.custom_data,
         }
@@ -833,7 +840,11 @@ mod test {
                     },
                     Usn(-1),
                 )?;
+<<<<<<< HEAD
                 let candidates = col.storage.card_ids_with_foreign_fsrs_state()?;
+=======
+                let candidates = col.foreign_fsrs_repair_candidates()?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 assert_eq!(col.repair_foreign_fsrs_memory_states_inner(candidates)?, 1);
 
                 let repaired = col.storage.get_card(card.id)?.unwrap();

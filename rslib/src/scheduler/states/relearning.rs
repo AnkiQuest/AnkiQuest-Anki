@@ -4,6 +4,10 @@
 use super::button_intervals::button_intervals;
 use super::button_intervals::ButtonInterval;
 use super::button_intervals::DayRule;
+<<<<<<< HEAD
+=======
+use super::button_intervals::FuzzedDays;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use super::interval_kind::IntervalKind;
 use super::CardState;
 use super::LearnState;
@@ -44,11 +48,18 @@ impl RelearnState {
         let Some(states) = &ctx.fsrs_next_states else {
             return [None; 4];
         };
+<<<<<<< HEAD
         let steps = ctx.fsrs_uses_learning_queues();
         let remaining = self.learning.remaining_steps;
         let again_step = steps && ctx.relearn_steps.again_delay_secs_learn().is_some();
         let hard_step = steps && ctx.relearn_steps.hard_delay_secs(remaining).is_some();
         let good_step = steps && ctx.relearn_steps.good_delay_secs(remaining).is_some();
+=======
+        let remaining = self.learning.remaining_steps;
+        let again_step = ctx.relearn_steps.again_delay_secs_learn().is_some();
+        let hard_step = ctx.relearn_steps.hard_delay_secs(remaining).is_some();
+        let good_step = ctx.relearn_steps.good_delay_secs(remaining).is_some();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         button_intervals(
             ctx,
             [
@@ -63,15 +74,24 @@ impl RelearnState {
 
     fn graduate(
         self,
+<<<<<<< HEAD
         remaining_steps: u32,
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         elapsed_secs: u32,
         interval: ButtonInterval,
         review: ReviewState,
     ) -> CardState {
         match interval {
+<<<<<<< HEAD
             ButtonInterval::Secs(scheduled_secs) => RelearnState {
                 learning: LearnState {
                     remaining_steps,
+=======
+            ButtonInterval::InSecs(scheduled_secs) => RelearnState {
+                learning: LearnState {
+                    remaining_steps: 0,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     scheduled_secs,
                     elapsed_secs,
                     memory_state: review.memory_state,
@@ -83,10 +103,17 @@ impl RelearnState {
                 },
             }
             .into(),
+<<<<<<< HEAD
             ButtonInterval::Days {
                 days,
                 fuzz_delta_days,
             } => ReviewState {
+=======
+            ButtonInterval::InDays(FuzzedDays {
+                days,
+                fuzz_delta_days,
+            }) => ReviewState {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 scheduled_days: days,
                 fuzz_delta_days,
                 ..review
@@ -98,12 +125,16 @@ impl RelearnState {
     fn answer_again(self, ctx: &StateContext, interval: Option<ButtonInterval>) -> CardState {
         let (scheduled_days, fuzz_delta_days, memory_state) =
             self.review.failing_review_interval(ctx);
+<<<<<<< HEAD
         let again_delay = if ctx.fsrs_uses_learning_queues() {
             ctx.relearn_steps.again_delay_secs_learn()
         } else {
             None
         };
         if let Some(again_delay) = again_delay {
+=======
+        if let Some(again_delay) = ctx.relearn_steps.again_delay_secs_learn() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             RelearnState {
                 learning: LearnState {
                     remaining_steps: ctx.relearn_steps.remaining_for_failed(),
@@ -122,7 +153,10 @@ impl RelearnState {
             .into()
         } else if let Some(interval) = interval {
             self.graduate(
+<<<<<<< HEAD
                 ctx.relearn_steps.remaining_for_failed(),
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 0,
                 interval,
                 ReviewState {
@@ -159,7 +193,10 @@ impl RelearnState {
             .into()
         } else if let Some(interval) = interval {
             self.graduate(
+<<<<<<< HEAD
                 0,
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 self.learning.elapsed_secs,
                 interval,
                 ReviewState {
@@ -199,7 +236,10 @@ impl RelearnState {
             .into()
         } else if let Some(interval) = interval {
             self.graduate(
+<<<<<<< HEAD
                 0,
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 self.learning.elapsed_secs,
                 interval,
                 ReviewState {
@@ -217,7 +257,10 @@ impl RelearnState {
         match interval {
             Some(interval) => self.graduate(
                 0,
+<<<<<<< HEAD
                 0,
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 interval,
                 ReviewState {
                     elapsed_days: 0,

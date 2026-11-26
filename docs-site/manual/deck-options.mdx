@@ -20,6 +20,14 @@ Here are some community posts about deck options that have been contributed in t
 - [Deck Options Explained](https://forums.ankiweb.net/t/deck-options-explained/213)
 - [Deck Options in a Mental Map](https://forums.ankiweb.net/t/deck-options-in-a-mental-map/15757)
 
+## Study layout
+
+The **Session Preview** at the top shows the current queue for the deck you opened, including its subdecks. Edit a daily limit or an ordering rule to see its effect before saving. Numbered positions refer to the whole queue. Gaps stand for the intervening cards. Select a card to highlight its explanation. Previewing a suspended card leaves it suspended.
+
+Use the deck name in the preview to switch to a 120-card example or an example with learning steps. The examples use your draft settings. Your answers, elapsed time, and newly available RWKV scores can change the order during a real session.
+
+**Learning** controls which new and suspended cards are selected, how they are sorted, and where they appear among reviews. **Reviews** controls review priority, learning steps that are due again, and study behavior such as sibling burying. Click a blue dotted value to change it. The **Classic view** switch at the top changes the layout for every deck in this profile.
+
 ## Presets
 
 Anki allows you to share options between different decks, to make
@@ -116,6 +124,27 @@ When studying a deck that has subdecks inside it, the review limit behaves simil
 Anki includes any learning cards that have [crossed the day boundary](./preferences#scheduler) (interday learning cards) in the review count,
 so those learning cards will be subject to the review limit.
 
+### Include Suspended Cards in the Learnable Pool
+
+Turn this on to let suspended cards from decks using this preset fill **New cards/day** slots. It is off by default. A card stays suspended until you answer it. That answer uses one new-card slot and resumes the card from its existing scheduling state. Undoing the answer restores its suspension and the slot.
+
+**Suspended card order** controls which group gets the available slots when you study the selected deck, including its subdecks.
+
+- **Suspended before New** draws from suspended cards first.
+- **New before Suspended** draws from ordinary new cards first.
+- **Mixed** ranks both groups together when gathering by a note field. With other gather orders, it alternates groups while both have eligible cards, then fills the remaining slots from the other group. The starting group rotates by scheduler day.
+
+With either **before** option, the gather order applies within each group. When gathering by position, a suspended new card uses its new-card position. A previously studied card uses its saved original position. Cards without a saved position come last, in note creation and template order.
+
+### Same-Day Reviews Ignore Review Limit
+
+When enabled, a card already answered during the current scheduler day may be
+shown again after the maximum reviews/day limit has been reached. The repeated
+answer does not use another review from that day's limit. This applies whether
+FSRS uses its learning/relearning queues or skips them, and also applies to
+RWKV-selected same-day reviews. Intraday learning and relearning cards already
+bypass the review limit without this option.
+
 ### Per-Deck Daily Limits
 
 It is possible to use the same preset for different decks, with customized limits for each of them. This eliminates the need to create cloned presets just for that purpose, and makes it easier to set custom limits on subdecks.
@@ -129,6 +158,8 @@ Anki provides three options for daily limits:
 ### New Cards Ignore Review Limit
 
 By default, the review limit also applies to new cards, and no new cards will be shown when the review limit has been reached. If this option is enabled, new cards will be shown regardless of the review limit.
+
+With **Show after reviews**, new cards follow the reviews that fit today’s limit. For example, with 100 reviews and two new-card slots remaining, the two new cards appear at positions 101 and 102. Once you have finished those reviews, any unused new-card slots are available even if more reviews are overdue. Suspended cards selected for learning use the same new-card slots.
 
 If you have a backlog of overdue review cards, it is recommended that you stop introducing new cards until you
 catch up with that backlog. Continuing to introduce new cards when you're already behind can
@@ -259,6 +290,8 @@ Controls how Anki gathers new cards from a deck. The options are:
 
 - **Descending position**: Gathers cards by descending position (due #), which is typically the latest-added first.
 
+- **Note field (ascending)** and **Note field (descending)** gather and show cards by the current value of a field. Select its name, such as _Frequency_, or use each note type’s sort field. Numbers sort by magnitude, so ascending order puts `-1.5`, `2`, and `10` in that order. Text follows, ignoring case. Blank values and notes without the field come last in either direction. Ties use note creation and template order. Anki applies this ranking before the daily limit, using the field values at the time it builds the study queue.
+
 - **Random notes**: Gathers cards from randomly selected notes.
 
 - **Random cards**: Gathers cards in a random order.
@@ -289,6 +322,33 @@ Whether (re)learning cards that cross a day boundary should be mixed in with rev
 shown before them, or shown after them. Because learning cards tend to be harder than
 review cards, some users prefer to see them at the end (getting the easy stuff done
 first), or at the start (allowing more time to review forgotten ones).
+
+With FSRS **Ascending retrievability**, **Descending retrievability**, or
+**Relative overdueness** sorting, **Show before reviews** and **Show after
+reviews** place interday learning cards before or after the other due cards.
+The selected sort order is preserved within each group. **Mix with reviews**
+keeps all due cards in the shared sorted order. This setting moves only interday
+learning cards; by default, intraday learning cards retain their relative order with reviews,
+and new cards follow **New/Review Order**. Daily limits still determine which
+cards are available before these display priorities are applied.
+
+### Intraday Learning/Review Order
+
+With **Ascending retrievability**, **Descending retrievability**, or **Relative
+overdueness**, choose **Show before reviews**, **Mix with reviews**, or **Show
+after reviews** for due same-day learning and relearning cards. Before and After
+place those cards before or after the remaining queue, with each group keeping
+the selected sort order. Mix keeps them in the shared sorted ordering.
+Future learning steps still wait until their due time. Interday learning cards
+continue to follow **Interday Learning/Review Order**, and the remaining new and
+review cards follow **New/Review Order**. Daily-limit admission and sibling
+burying do not change.
+
+The option defaults to Mix and uses the preset of the deck you select to study. It
+syncs with that preset between supported builds. Clients that do not support the
+option carry it as extra preset data without applying it. With other review
+sort orders, due intraday learning cards already have priority. Presets with the
+earlier same-day priority toggle enabled use Show before reviews.
 
 ### Review Sort Order
 
@@ -379,7 +439,8 @@ study screen, use the Auto Advance action from the **More** button to start adva
 
 If you want to spend less time on Anki on some days of the week, such as Sundays, this feature can help you do that.
 After the interval is calculated, it will be adjusted by a small amount to change the due date.
-Note that setting all days to "Reduced" or "Minimum" will result in the same workload as setting all days to "Normal".
+Each weekday slider sets a target share of a normal day’s review load, from 0% to 100% in steps of 25%. Keep at least one day at 100%. At 0%, the scheduler favors other days whenever the card's interval allows it.
+Older clients that offer three Easy Days levels interpret both 25% and 75% as Reduced.
 This feature works with both FSRS and the legacy SM-2 algorithm.
 Changing your Easy Days configuration doesn't retroactively change existing intervals and will only affect future intervals. Simply put, you will not see immediate changes in the number of due cards.
 

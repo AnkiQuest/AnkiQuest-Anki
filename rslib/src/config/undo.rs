@@ -16,9 +16,12 @@ pub(crate) enum UndoableConfigChange {
 impl Collection {
     fn refresh_cached_scheduler_config(&mut self, key: &str) {
         self.invalidate_fsrs_preset_overlay_for_config_key(key);
+<<<<<<< HEAD
         if key == crate::scheduler::addon_desired_retention::CONFIG_KEY {
             self.invalidate_rwkv_offline_targets();
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if self.state.card_queues.is_none() {
             return;
         }

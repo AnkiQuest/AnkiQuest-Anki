@@ -145,9 +145,6 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            ~/.cargo/bin
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
@@ -164,6 +161,7 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
 
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
@@ -171,6 +169,10 @@ jobs:
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
+=======
+      - name: Install cargo-llvm-cov, cargo-nextest and cargo-deny
+        uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 #v2.85.7
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         with:
           tool: |
             cargo-llvm-cov@0.8.4
@@ -258,6 +260,26 @@ jobs:
           SKIP_RUN: "1"
         run: ./run
 
+<<<<<<< HEAD
+=======
+      # Release preflight waits for this workflow, so keep its security gate
+      # even though upstream also runs cargo-deny in a separate workflow.
+      - name: Check Rust dependencies
+        if: github.event_name == 'pull_request'
+        id: rust-deps
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 #v47.0.6
+        with:
+          files: |
+            Cargo.lock
+            **/Cargo.toml
+            .deny.toml
+
+      - name: Run cargo-deny check
+        if: github.event_name != 'pull_request' || steps.rust-deps.outputs.any_changed == 'true'
+        shell: bash
+        run: cargo deny check
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
       - name: Upload coverage for SonarCloud
         if: >-
           github.event_name == 'push'
@@ -331,11 +353,14 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
 
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
           just-version: "1.59.0"
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
         with:
@@ -409,11 +434,14 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
 
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
           just-version: "1.59.0"
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
         with:
@@ -452,7 +480,8 @@ jobs:
       github.event_name == 'push'
       || github.event_name == 'workflow_dispatch'
       || contains(github.event.pull_request.labels.*.name, 'check:macos')
-    runs-on: macos-latest
+    # Keep ARM checks on the same image used to build release installers.
+    runs-on: macos-15
     name: check (macos)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
@@ -486,11 +515,14 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
 
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
           just-version: "1.59.0"
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
         with:
@@ -554,9 +586,6 @@ jobs:
             D:\cargo-home\registry\index
             D:\cargo-home\registry\cache
             D:\cargo-home\git\db
-            D:\cargo-home\bin
-            D:\cargo-home\.crates.toml
-            D:\cargo-home\.crates2.json
           key: cargo-Windows-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-Windows-
 
@@ -573,11 +602,14 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
 
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
           just-version: "1.59.0"
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
         with:
@@ -617,10 +649,21 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'check:windows')
     runs-on: windows-11-vs2026-arm
     name: check (windows-arm)
-    # Unlike the x64 Windows runner, windows-11-arm has no D: drive, so we use
-    # the default C:-based CARGO_HOME and TEMP.
+    # Keep temporary paths short for Visual Studio and NuGet on ARM, which has
+    # no D: drive like the x64 runner.
+    env:
+      TEMP: C:\tmp
+      TMP: C:\tmp
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+=======
+      - name: Prepare temporary directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         with:
           persist-credentials: false
           submodules: true
@@ -651,11 +694,14 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
 
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
           just-version: "1.59.0"
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
         with:
