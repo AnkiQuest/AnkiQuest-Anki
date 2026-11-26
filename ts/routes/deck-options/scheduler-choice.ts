@@ -33,6 +33,11 @@ export function scheduler(config: DeckConfig_Config): Scheduler {
     return config.rwkvReviewInstantOrderEnabled ? "rwkv-instant" : dueDateScheduler(config);
 }
 
+/** Whether a preset schedules with RWKV, whose model optimizing leaves untrained. */
+export function usesRwkv(config: DeckConfig_Config): boolean {
+    return scheduler(config).startsWith("rwkv-");
+}
+
 export function withDueDateScheduler(config: DeckConfig_Config, choice: DueDateScheduler): DeckConfig_Config {
     const updated = new DeckConfig_Config(config);
     updated.rwkvReviewEnabled = choice === "rwkv-curve";

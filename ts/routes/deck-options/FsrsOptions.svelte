@@ -22,6 +22,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     import GlobalLabel from "./GlobalLabel.svelte";
     import { commitEditing, fsrsParams, type DeckOptionsState, ValueTab } from "./lib";
+    import { usesRwkv } from "./scheduler-choice";
     import SpinBoxFloatRow from "./SpinBoxFloatRow.svelte";
     import Warning from "./Warning.svelte";
     import ParamsInputRow from "./ParamsInputRow.svelte";
@@ -61,6 +62,13 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     $: lastOptimizationWarning =
         $daysSinceLastOptimization > 30 ? tr.deckConfigTimeToOptimize() : "";
+    // RWKV presets get only their FSRS fallback optimized; say so where optimizing starts.
+    $: rwkvOptimizeCurrent = usesRwkv($config)
+        ? tr.deckConfigRwkvOptimizeCurrent()
+        : "";
+    $: rwkvOptimizeAll = state.anyPresetUsesRwkv($config)
+        ? tr.deckConfigRwkvOptimizeAll()
+        : "";
     let desiredRetentionFocused = false;
     let desiredRetentionEverFocused = false;
     let optimized = false;
@@ -433,6 +441,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         </SettingTitle>
     </SwitchRow>
 
+    <Warning warning={rwkvOptimizeCurrent} className="alert-info" />
     <button
         class="btn {computingParams ? 'btn-warning' : 'btn-primary'}"
         disabled={!computingParams && computing}
@@ -468,6 +477,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 <div class="m-1">
     <Warning warning={lastOptimizationWarning} className="alert-warning" />
+    <Warning warning={rwkvOptimizeAll} className="alert-info" />
 
     <button class="btn btn-primary" on:click={() => computeAllParams()}>
         {tr.deckConfigSaveAndOptimize()}
