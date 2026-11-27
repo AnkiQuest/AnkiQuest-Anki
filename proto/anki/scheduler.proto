@@ -1255,6 +1255,8 @@ message RwkvOfflineInstantPassProgress {
   // total; total 0 when none is under way), for the app's progress bar.
   uint64 replay_done = 6;
   uint64 replay_total = 7;
+  // While not available: why the background build failed (empty if it did not).
+  string build_error = 8;
 }
 
 message RwkvOfflineCalibrationRequest {
@@ -1279,6 +1281,8 @@ message RwkvOfflineCalibrationResponse {
   bool started = 5;
   uint64 replay_done = 6;
   uint64 replay_total = 7;
+  // Why the background build failed (empty if it did not).
+  string build_error = 8;
 }
 
 message RwkvOfflineWorkloadResultResponse {
@@ -1322,6 +1326,8 @@ message RwkvOfflineForecastResponse {
   // cards plus what "minimum reviews per day" adds then, as the deck list
   // would count them if you stop reviewing now.
   optional uint32 rollover_with_minimum = 4;
+  // While not available: why the background build failed (empty if it did not).
+  string build_error = 5;
 }
 
 message RwkvReviewQueueScoresRequest {

@@ -127,7 +127,7 @@ impl Collection {
             RUNNING.store(false, Ordering::Release);
             Ok(runtime)
         });
-        *building = Some((self.col_path.clone(), handle));
+        *building = Some((self.col_path.clone(), false, handle));
         Ok(())
     }
 
