@@ -492,6 +492,14 @@ fn answer_check(
     )?;
     DecksService::deck_tree(&mut col, DeckTreeRequest { now })?;
     col.undo()?;
+    // The app's ready poll can be the first call to see the changed history:
+    // "not ready" while it rebuilds, not an error (it crashed the app, v36).
+    let status = replay_status(&mut col)?;
+    assert!(
+        !status.available,
+        "status after an undo reported a stale runtime"
+    );
+    println!("status right after undo: not ready (rebuilding), ok");
     let started = Instant::now();
     DecksService::deck_tree(&mut col, DeckTreeRequest { now })?;
     let undo_ms = started.elapsed().as_millis();
