@@ -169,12 +169,17 @@ fn maybe_restore_media_file(
 }
 
 fn restore_media_file(meta: &Meta, zip_file: &mut ZipFile<File>, path: &Path) -> Result<()> {
+    let name = zip_file.name()?.into_owned();
     let mut tempfile = new_tempfile_in_parent_of(path)?;
     let filename = PathBuf::from(zip_file.name()?.as_ref());
     meta.copy(zip_file, &mut tempfile)
         .with_context(|_| FileIoSnafu {
             path: tempfile.path(),
+<<<<<<< HEAD
             op: FileOp::copy(filename),
+=======
+            op: FileOp::copy(name),
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         })?;
     atomic_rename(tempfile, path, false)?;
     Ok(())

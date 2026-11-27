@@ -1,8 +1,12 @@
 // Copyright: Anki Software, LLC and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+<<<<<<< HEAD
 import { expect } from "@playwright/test";
 import type { Locator, Page, Request, Response } from "@playwright/test";
+=======
+import { expect, type Locator, type Page, type Request, type Response } from "@playwright/test";
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 
 // ---------------------------------------------------------------------------
 // RPC URL helpers
@@ -66,8 +70,20 @@ export async function openChooserAndSelect(
     itemName: string,
 ): Promise<void> {
     await chooserButton(page, kind).click();
-    const modal = page.locator(".modal.show");
+    // Keep the same modal locator while Bootstrap removes the .show class.
+    const modal = page.locator(".modal").filter({
+        has: page.getByRole("button", {
+            name: `Select ${itemName}`,
+            exact: true,
+            includeHidden: true,
+        }),
+    });
     await modal.waitFor({ state: "visible", timeout: 5_000 });
+<<<<<<< HEAD
+=======
+    // ItemChooser focuses search from shown.bs.modal. Selecting before that
+    // event can make Bootstrap ignore hide() during its opening transition.
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     await expect(modal.locator(".search-input")).toBeFocused({ timeout: 5_000 });
     await modal.getByRole("button", { name: `Select ${itemName}` }).click();
     await modal.waitFor({ state: "hidden", timeout: 5_000 });

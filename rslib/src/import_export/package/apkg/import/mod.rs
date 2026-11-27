@@ -168,7 +168,11 @@ fn collection_to_tempfile(meta: &Meta, archive: &mut ZipArchive<File>) -> Result
     meta.copy(&mut zip_file, &mut tempfile)
         .with_context(|_| FileIoSnafu {
             path: tempfile.path(),
+<<<<<<< HEAD
             op: FileOp::copy(filename),
+=======
+            op: FileOp::copy(meta.collection_filename()),
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         })?;
 
     Ok(tempfile)

@@ -116,6 +116,15 @@ When studying a deck that has subdecks inside it, the review limit behaves simil
 Anki includes any learning cards that have [crossed the day boundary](./preferences#scheduler) (interday learning cards) in the review count,
 so those learning cards will be subject to the review limit.
 
+### Same-Day Reviews Ignore Review Limit
+
+When enabled, a card already answered during the current scheduler day may be
+shown again after the maximum reviews/day limit has been reached. The repeated
+answer does not use another review from that day's limit. This applies whether
+FSRS uses its learning/relearning queues or skips them, and also applies to
+RWKV-selected same-day reviews. Intraday learning and relearning cards already
+bypass the review limit without this option.
+
 ### Per-Deck Daily Limits
 
 It is possible to use the same preset for different decks, with customized limits for each of them. This eliminates the need to create cloned presets just for that purpose, and makes it easier to set custom limits on subdecks.
@@ -289,6 +298,33 @@ Whether (re)learning cards that cross a day boundary should be mixed in with rev
 shown before them, or shown after them. Because learning cards tend to be harder than
 review cards, some users prefer to see them at the end (getting the easy stuff done
 first), or at the start (allowing more time to review forgotten ones).
+
+With FSRS **Ascending retrievability**, **Descending retrievability**, or
+**Relative overdueness** sorting, **Show before reviews** and **Show after
+reviews** place interday learning cards before or after the other due cards.
+The selected sort order is preserved within each group. **Mix with reviews**
+keeps all due cards in the shared sorted order. This setting moves only interday
+learning cards; by default, intraday learning cards retain their relative order with reviews,
+and new cards follow **New/Review Order**. Daily limits still determine which
+cards are available before these display priorities are applied.
+
+### Intraday Learning/Review Order
+
+With **Ascending retrievability**, **Descending retrievability**, or **Relative
+overdueness**, choose **Show before reviews**, **Mix with reviews**, or **Show
+after reviews** for due same-day learning and relearning cards. Before and After
+place those cards before or after the remaining queue, with each group keeping
+the selected sort order. Mix keeps them in the shared sorted ordering.
+Future learning steps still wait until their due time. Interday learning cards
+continue to follow **Interday Learning/Review Order**, and the remaining new and
+review cards follow **New/Review Order**. Daily-limit admission and sibling
+burying do not change.
+
+The option defaults to Mix and uses the preset of the deck you select to study. It
+syncs with that preset between supported builds. Clients that do not support the
+option carry it as extra preset data without applying it. With other review
+sort orders, due intraday learning cards already have priority. Presets with the
+earlier same-day priority toggle enabled use Show before reviews.
 
 ### Review Sort Order
 

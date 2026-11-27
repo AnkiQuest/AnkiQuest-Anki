@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Offline, fresh-process runtime measurements driven by the Python profiler.
@@ -122,7 +126,10 @@ fn hybrid_runtime() -> RwkvInference {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn rwkv_hybrid_precision_preserves_replay_across_chunks() {
     let reviews = super::precision_tests::reviews(51);
     let mut sequential = hybrid_runtime();

@@ -174,7 +174,17 @@ pub struct CollectionState {
     /// Last review time by card, valid while mtime, reps and reset boundary
     /// match: each queue build looked it up in the revlog for every due
     /// card.
+<<<<<<< HEAD
     pub(crate) rwkv_last_review_times: HashMap<CardId, RwkvLastReviewTime>,
+=======
+    pub(crate) rwkv_last_review_times: HashMap<
+        CardId,
+        (
+            (crate::timestamp::TimestampSecs, u32, Option<i64>),
+            Option<crate::timestamp::TimestampSecs>,
+        ),
+    >,
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     pub(crate) fsrs_preset_overlay_cache: Option<FsrsPresetOverlayCache>,
     /// Unfiltered per-note field populations used by add-on percentile rules.
     pub(crate) addon_retention_populations: HashMap<(NotetypeId, u16), Arc<Vec<f64>>>,

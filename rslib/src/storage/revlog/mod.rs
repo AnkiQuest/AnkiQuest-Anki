@@ -787,7 +787,11 @@ impl SqliteStorage {
         preserved_learning_start_cutoffs: &HashMap<i64, i64>,
         // Only this card's reviews (what is kept of a card depends only on its own).
         card_id: Option<CardId>,
+<<<<<<< HEAD
     ) -> Result<RwkvHistoricalReviewRows> {
+=======
+    ) -> Result<(Vec<RwkvHistoricalReviewRow>, Vec<i64>, (u64, i64))> {
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         let (ignored_clause, active_ignored_review_ids) = if ignored_review_ids.is_empty() {
             (String::new(), Vec::new())
         } else {
@@ -2081,6 +2085,7 @@ order by e.id, e.cid"
         Ok(())
     }
 }
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod test {
@@ -2427,3 +2432,5 @@ mod test {
         ));
     }
 }
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8

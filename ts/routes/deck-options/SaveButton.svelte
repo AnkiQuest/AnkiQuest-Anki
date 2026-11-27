@@ -53,9 +53,16 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         }
     }
 
-    async function save(mode: UpdateDeckConfigsMode): Promise<void> {
+    async function save(
+        mode: UpdateDeckConfigsMode,
+        closeOnSuccess = false,
+    ): Promise<void> {
         await commitEditing();
+<<<<<<< HEAD
         await state.save(mode);
+=======
+        await state.save(mode, closeOnSuccess);
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     }
 
     const saveKeyCombination = "Control+Enter";
@@ -66,7 +73,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 <div class="d-flex">
     <LabelButton
         primary
-        on:click={() => save(UpdateDeckConfigsMode.NORMAL)}
+        on:click={() => save(UpdateDeckConfigsMode.NORMAL, true)}
         tooltip={getPlatformString(saveKeyCombination)}
         --border-left-radius={!rtl ? "var(--border-radius)" : "0"}
         --border-right-radius={rtl ? "var(--border-radius)" : "0"}
@@ -75,7 +82,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     </LabelButton>
     <Shortcut
         keyCombination={saveKeyCombination}
-        on:action={() => save(UpdateDeckConfigsMode.NORMAL)}
+        on:action={() => save(UpdateDeckConfigsMode.NORMAL, true)}
     />
 
     <WithFloating

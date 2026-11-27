@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Offline int4/f32 projection kernel. Codes remain packed in RAM. NEON
@@ -257,7 +261,10 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(not(rwkv_models), ignore = "needs RWKV model files in qt/aqt/rwkv_inference")]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn rwkv_weight_precision_fused_preserves_complete_replay_states_and_bounds_query_error() {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(MODEL_PATH);
         let data = encode(&WeightMap::load(&path).unwrap());

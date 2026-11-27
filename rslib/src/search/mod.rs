@@ -1126,6 +1126,7 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     fn numeric_field_search_compares_each_operator() -> Result<()> {
         let mut col = Collection::new();
         let mut nt = col.get_notetype_by_name("Basic")?.unwrap().as_ref().clone();
@@ -1164,6 +1165,8 @@ mod test {
     }
 
     #[test]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn exact_retrievability_clamps_future_last_review_time() -> Result<()> {
         let mut col = Collection::new();
         let timing = col.timing_today()?;

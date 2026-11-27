@@ -1200,11 +1200,14 @@ impl crate::services::SchedulerService for Collection {
         Collection::rwkv_prepare_offline(self, input)
     }
 
+<<<<<<< HEAD
     fn rwkv_unload_offline(&mut self) -> Result<()> {
         Collection::rwkv_unload_offline(self);
         Ok(())
     }
 
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn rwkv_offline_instant_pass_step(
         &mut self,
         input: anki_proto::scheduler::RwkvOfflineInstantPassStepRequest,

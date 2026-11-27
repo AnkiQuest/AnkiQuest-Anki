@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! RWKV-Instant without the desktop's Python.
@@ -65,9 +69,12 @@ use crate::storage::RWKV_HISTORY_RESET_AFTER_SQL;
 #[cfg(test)]
 #[path = "offline_review_kind_tests.rs"]
 mod review_kind_tests;
+<<<<<<< HEAD
 #[cfg(test)]
 #[path = "offline_unload_tests.rs"]
 mod unload_tests;
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 #[path = "offline_workload.rs"]
 mod workload;
 
@@ -150,6 +157,70 @@ fn registered_model() -> Option<SelectedOfflineModel> {
     REGISTERED_MODEL.lock().unwrap().clone()
 }
 
+/// Why the background build failed (empty: it did not), and whether it was
+/// already retried. A failed build is retried once on its own; after that no
+/// build starts by itself (no loop draining memory and battery on every queue
+/// build) until `register_model` clears this.
+#[derive(Default)]
+struct BuildFailure {
+    error: String,
+    retried: bool,
+    /// Why a calibration build failed; kept when a later build succeeds (the
+    /// retry is a normal one), so the Compare page is not started again in a
+    /// loop. Only `register_model` clears it.
+    calibration_error: String,
+}
+
+impl BuildFailure {
+    /// Records a failed build; true if it should be retried now.
+    fn failed(&mut self, error: String, calibration: bool) -> bool {
+        if calibration {
+            self.calibration_error = error.clone();
+        }
+        if self.retried {
+            self.error = error;
+            false
+        } else {
+            self.retried = true;
+            true
+        }
+    }
+
+    /// A build succeeded: retries start over, a calibration failure stays.
+    fn succeeded(&mut self) {
+        *self = BuildFailure {
+            calibration_error: std::mem::take(&mut self.calibration_error),
+            ..Default::default()
+        };
+    }
+}
+
+static BUILD_FAILURE: Mutex<BuildFailure> = Mutex::new(BuildFailure {
+    error: String::new(),
+    retried: false,
+    calibration_error: String::new(),
+});
+
+fn build_error() -> String {
+    BUILD_FAILURE.lock().unwrap().error.clone()
+}
+
+/// The cause, for the page: `Display` of some errors is only the type name.
+fn error_detail(err: &AnkiError) -> String {
+    format!("{err:?}").chars().take(200).collect()
+}
+
+fn calibration_error() -> String {
+    BUILD_FAILURE.lock().unwrap().calibration_error.clone()
+}
+
+/// What `prepare` (the client asking for RWKV) does: the model to build, and a
+/// clean slate for the failure state.
+fn register_model(model: SelectedOfflineModel) {
+    *REGISTERED_MODEL.lock().unwrap() = Some(model);
+    *BUILD_FAILURE.lock().unwrap() = BuildFailure::default();
+}
+
 /// The replay under way (reviews done, of total; total 0: none), for the
 /// app's progress bar through the status call.
 static REPLAY_DONE: AtomicU64 = AtomicU64::new(0);
@@ -158,7 +229,7 @@ static REPLAY_TOTAL: AtomicU64 = AtomicU64::new(0);
 /// The runtime being built off the collection lock, and the collection path
 /// it is for (see `rwkv_offline_start_build`).
 #[allow(clippy::type_complexity)]
-static BUILDING: Mutex<Option<(PathBuf, JoinHandle<Result<Box<RwkvOfflineRuntime>>>)>> =
+static BUILDING: Mutex<Option<(PathBuf, bool, JoinHandle<Result<Box<RwkvOfflineRuntime>>>)>> =
     Mutex::new(None);
 
 /// Reviews to replay to bring a model state in line with the revlog.
@@ -748,6 +819,7 @@ impl Collection {
         input: RwkvPrepareOfflineRequest,
     ) -> Result<RwkvPrepareOfflineResponse> {
         require!(!input.model_path.is_empty(), "missing RWKV model path");
+<<<<<<< HEAD
 
         // The model files come from the user, not from the app's assets: say
         // which one is missing now, instead of failing later on the build
@@ -758,6 +830,8 @@ impl Collection {
                 "RWKV model file not found: {model_path}"
             );
         }
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         require!(
             input.model_kind.is_empty() || input.model_kind == "sm72",
             "unsupported RWKV offline model kind"
@@ -808,7 +882,7 @@ impl Collection {
                 // Built on its own thread; `reviews_replayed` is then what it
                 // is replaying, and the next queue build or deck count
                 // installs it once done.
-                *REGISTERED_MODEL.lock().unwrap() = Some(model.clone());
+                register_model(model.clone());
                 let reviews_replayed = self.rwkv_offline_start_build(model, None)?;
                 return Ok(RwkvPrepareOfflineResponse { reviews_replayed });
             }
@@ -819,11 +893,12 @@ impl Collection {
         if reviews_replayed > 0 {
             self.invalidate_rwkv_review_queue();
         }
-        *REGISTERED_MODEL.lock().unwrap() = Some(runtime.model.clone());
+        register_model(runtime.model.clone());
         self.state.rwkv_offline = Some(runtime);
         Ok(RwkvPrepareOfflineResponse { reviews_replayed })
     }
 
+<<<<<<< HEAD
     /// Turns the offline RWKV layer off without a restart: forgets the model
     /// `RwkvPrepareOffline` registered, drops the runtime and every score it
     /// installed, so the next queue build and deck count use the preset's
@@ -858,6 +933,8 @@ impl Collection {
         self.state.rwkv_last_review_times.clear();
     }
 
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     /// Scores every Instant-enabled deck now and installs the deck count
     /// scores, in one call.
     ///
@@ -873,9 +950,12 @@ impl Collection {
             self.state.rwkv_offline = self.rwkv_offline_take_built();
         }
         let Some(mut runtime) = self.state.rwkv_offline.take() else {
+            // the app polls this: it is what starts a build that was lost
+            self.rwkv_offline_ensure_build();
             return Ok(RwkvOfflineInstantPassProgress {
                 replay_done: REPLAY_DONE.load(Ordering::Relaxed),
                 replay_total: REPLAY_TOTAL.load(Ordering::Relaxed),
+                build_error: build_error(),
                 ..Default::default()
             });
         };
@@ -914,6 +994,20 @@ impl Collection {
             // the retained queue was ordered with the old state's scores
             self.invalidate_rwkv_review_queue();
         }
+        if self.state.rwkv_offline.is_none() {
+            // The history changed under the state (an undo, a sync) and it is
+            // being rebuilt on its own thread: not ready yet, as with no
+            // runtime above. An error here crashed the app's ready poll.
+            if let Err(err) = &result {
+                tracing::info!(?err, "RWKV runtime dropped; rebuilding");
+            }
+            return Ok(RwkvOfflineInstantPassProgress {
+                replay_done: REPLAY_DONE.load(Ordering::Relaxed),
+                replay_total: REPLAY_TOTAL.load(Ordering::Relaxed),
+                build_error: build_error(),
+                ..Default::default()
+            });
+        }
         let scored = result? as u32;
         Ok(RwkvOfflineInstantPassProgress {
             available: true,
@@ -947,7 +1041,15 @@ impl Collection {
         let Some(mut runtime) = self.state.rwkv_offline.take() else {
             out.replay_done = REPLAY_DONE.load(Ordering::Relaxed);
             out.replay_total = REPLAY_TOTAL.load(Ordering::Relaxed);
-            out.computing = registered_model().is_some();
+            let calibration_error = calibration_error();
+            out.computing = registered_model().is_some()
+                && build_error().is_empty()
+                && calibration_error.is_empty();
+            out.build_error = if calibration_error.is_empty() {
+                build_error()
+            } else {
+                calibration_error
+            };
             return Ok(out);
         };
         if runtime
@@ -955,7 +1057,9 @@ impl Collection {
             .as_ref()
             .is_none_or(|calibration| all && !calibration.all)
         {
-            if check_only {
+            out.build_error = calibration_error();
+            if check_only || !out.build_error.is_empty() {
+                // (a failed calibration build is not started again)
                 self.state.rwkv_offline = Some(runtime);
                 return Ok(out);
             }
@@ -1008,6 +1112,7 @@ impl Collection {
         });
         require!(ok, "RWKV forecast failed");
         out.available = self.state.rwkv_offline.is_some();
+        out.build_error = build_error();
         // Outside the runtime closure: the deck counts score with the runtime.
         self.rwkv_offline_forecast_minimums(&input, &mut out)?;
         Ok(out)
@@ -1413,7 +1518,11 @@ impl Collection {
         const FILTERED: u32 = 3;
         Ok(match (previous_kind, previous_ease) {
             (1, 1) | (2, 1 | 2) => Some(RELEARNING),
+<<<<<<< HEAD
             (0..=2, _) => Some(FILTERED),
+=======
+            (0 | 1 | 2, _) => Some(FILTERED),
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             // Only a synthetic repeat chains; a real filtered-deck answer
             // returns to Review when the card is answered normally.
             (3, _)
@@ -1620,15 +1729,13 @@ impl Collection {
             None => {
                 // Not built yet, or the collection was reopened (e.g. after a
                 // full sync) since the client's prepare call.
-                let Some(model) = registered_model() else {
+                if registered_model().is_none() {
                     return true;
-                };
+                }
                 match self.rwkv_offline_take_built() {
                     Some(runtime) => runtime,
                     None => {
-                        if let Err(err) = self.rwkv_offline_start_build(model, None) {
-                            tracing::warn!(?err, "RWKV offline build not started");
-                        }
+                        self.rwkv_offline_ensure_build();
                         return true;
                     }
                 }
@@ -1869,7 +1976,7 @@ impl Collection {
         let mut building = BUILDING.lock().unwrap();
         if building
             .as_ref()
-            .is_some_and(|(path, _)| *path == self.col_path)
+            .is_some_and(|(path, ..)| *path == self.col_path)
         {
             return Ok(0);
         }
@@ -1938,7 +2045,7 @@ impl Collection {
         });
         // ponytail: a build for another collection is dropped, not stopped: it
         // runs on (memory) until done; join it first if profiles get switched a lot.
-        *building = Some((self.col_path.clone(), handle));
+        *building = Some((self.col_path.clone(), calibrate.is_some(), handle));
         Ok(replaying)
     }
 
@@ -1947,20 +2054,22 @@ impl Collection {
         let mut building = BUILDING.lock().unwrap();
         if !building
             .as_ref()
-            .is_some_and(|(path, handle)| *path == self.col_path && handle.is_finished())
+            .is_some_and(|(path, _, handle)| *path == self.col_path && handle.is_finished())
         {
             return None;
         }
-        let (_, handle) = building.take()?;
+        let (_, calibration, handle) = building.take()?;
         drop(building);
         match handle.join() {
             Ok(Ok(runtime)) => {
+                BUILD_FAILURE.lock().unwrap().succeeded();
                 // The precision was changed while it was built: build again.
                 // ponytail: the old build runs to its end first; cancel it if
                 // changes during long replays matter
                 if let Some(model) = registered_model().filter(|model| *model != runtime.model) {
                     if let Err(err) = self.rwkv_offline_start_build(model, None) {
                         tracing::warn!(?err, "RWKV offline build not started");
+                        self.rwkv_offline_build_failed(error_detail(&err), false);
                     }
                     return None;
                 }
@@ -1969,15 +2078,44 @@ impl Collection {
                 Some(runtime)
             }
             Ok(Err(err)) => {
-                tracing::warn!(?err, "RWKV offline model failed to load; disabled");
-                *REGISTERED_MODEL.lock().unwrap() = None;
+                tracing::warn!(?err, "RWKV offline build failed");
+                self.rwkv_offline_build_failed(error_detail(&err), calibration);
                 None
             }
             Err(_) => {
-                tracing::warn!("RWKV offline build panicked; disabled");
-                *REGISTERED_MODEL.lock().unwrap() = None;
+                tracing::warn!("RWKV offline build panicked");
+                self.rwkv_offline_build_failed(
+                    "the build crashed (low memory?)".into(),
+                    calibration,
+                );
                 None
             }
+        }
+    }
+
+    /// A build failed: the model stays registered; it is built once more, and
+    /// if that fails too, `build_error` is set and nothing starts by itself
+    /// until the next prepare.
+    fn rwkv_offline_build_failed(&mut self, error: String, calibration: bool) {
+        let retry = BUILD_FAILURE.lock().unwrap().failed(error, calibration);
+        if retry {
+            self.rwkv_offline_ensure_build();
+        }
+    }
+
+    /// Starts a build for the registered model unless one is under way (the
+    /// start itself checks that) or it failed twice.
+    fn rwkv_offline_ensure_build(&mut self) {
+        let Some(model) = registered_model() else {
+            return;
+        };
+        if !build_error().is_empty() {
+            return;
+        }
+        if let Err(err) = self.rwkv_offline_start_build(model, None) {
+            tracing::warn!(?err, "RWKV offline build not started");
+            // counts as a failed build: else every poll re-reads the revlog
+            self.rwkv_offline_build_failed(error_detail(&err), false);
         }
     }
 
@@ -2373,10 +2511,13 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn same_day_review_kind_ignores_reviews_before_reset() -> Result<()> {
         let (mut col, _dir) = open_fs_test_collection("rwkv-same-day-reset");
         let card_id = CardAdder::new().add(&mut col)[0].id;
@@ -2447,10 +2588,13 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn first_answer_after_unlogged_reset_updates_the_resident_model() -> Result<()> {
         let (mut col, _dir) = open_fs_test_collection("rwkv-new-reset-model");
         let first = CardAdder::new().add(&mut col)[0].id;
@@ -2619,5 +2763,33 @@ mod test {
         )?;
         assert_eq!(col.rwkv_offline_replay_stamp()?, None);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod build_failure_tests {
+    use super::*;
+
+    #[test]
+    fn retried_once_then_failed_until_registered_again() {
+        let mut state = BuildFailure::default();
+        // first failure: retry, no error shown yet
+        assert!(state.failed("a".into(), true));
+        assert_eq!(state.calibration_error, "a");
+        state.succeeded();
+        assert_eq!(state.calibration_error, "a");
+        assert!(!state.retried);
+        assert!(state.failed("a".into(), false));
+        assert!(state.error.is_empty());
+        // second failure: no retry, the error is kept
+        assert!(!state.failed("b".into(), false));
+        assert_eq!(state.error, "b");
+        // registering again clears both (the static, as `register_model` does)
+        *BUILD_FAILURE.lock().unwrap() = state;
+        assert_eq!(build_error(), "b");
+        *BUILD_FAILURE.lock().unwrap() = BuildFailure::default();
+        assert!(build_error().is_empty());
+        assert!(BUILD_FAILURE.lock().unwrap().failed("c".into(), false));
+        *BUILD_FAILURE.lock().unwrap() = BuildFailure::default();
     }
 }

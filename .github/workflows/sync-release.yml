@@ -1,7 +1,11 @@
 name: Sync release to main
 
+<<<<<<< HEAD
 # Once a stable release is published:
 # - points the mintlify-docs branch (deployed by Mintlify) at the release
+=======
+# In ankitects/anki, once a stable release is published:
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 # - builds a patch that moves flathub/net.ankiweb.Anki to the new release, and
 #   uploads it as an artifact
 # - opens a PR that merges the release branch (translations, version bump)
@@ -16,6 +20,7 @@ permissions:
   contents: read
 
 jobs:
+<<<<<<< HEAD
   deploy-docs:
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
@@ -46,6 +51,10 @@ jobs:
 
   flathub:
     if: ${{ !github.event.release.prerelease }}
+=======
+  flathub:
+    if: ${{ github.repository == 'ankitects/anki' && !github.event.release.prerelease }}
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,14 +63,23 @@ jobs:
     env:
       TAG_NAME: ${{ github.event.release.tag_name }}
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+=======
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         with:
           repository: flathub/net.ankiweb.Anki
           persist-credentials: false
 
+<<<<<<< HEAD
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 #v10.3.3
         with:
           version-file: ".tool-versions"
+=======
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 #v9.0.0
+        with:
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
           enable-cache: false
 
       # flatpak-pip-generator runs pip inside the SDK to pick wheels.
@@ -102,7 +120,11 @@ jobs:
           cat "$RUNNER_TEMP/flathub/report.md" >> "$GITHUB_STEP_SUMMARY"
           echo "has-patch=true" >> "$GITHUB_OUTPUT"
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         if: ${{ steps.patch.outputs.has-patch }}
         with:
           name: flathub-${{ github.event.release.tag_name }}
@@ -111,7 +133,11 @@ jobs:
   create-pr:
     needs: flathub
     # Open the sync PR even if the Flathub job failed.
+<<<<<<< HEAD
     if: ${{ !cancelled() && !github.event.release.prerelease }}
+=======
+    if: ${{ github.repository == 'ankitects/anki' && !cancelled() && !github.event.release.prerelease }}
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -120,7 +146,11 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TAG_NAME: ${{ github.event.release.tag_name }}
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+=======
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -155,7 +185,11 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
           RELEASE_URL: ${{ github.event.release.html_url }}
 
+<<<<<<< HEAD
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8.0.2
+=======
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c #v8.0.1
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         if: ${{ needs.flathub.outputs.has-patch }}
         with:
           name: flathub-${{ github.event.release.tag_name }}
@@ -202,14 +236,22 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   update-website:
+<<<<<<< HEAD
     if: ${{ !github.event.release.prerelease }}
+=======
+    if: ${{ github.repository == 'ankitects/anki' && !github.event.release.prerelease }}
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     runs-on: ubuntu-latest
     permissions: {}
     environment: release
     env:
       TAG_NAME: ${{ github.event.release.tag_name }}
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+=======
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v4
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         with:
           repository: ankitects/anki-landing-page
           ssh-key: ${{ secrets.LANDING_PAGE_DEPLOY_KEY }}

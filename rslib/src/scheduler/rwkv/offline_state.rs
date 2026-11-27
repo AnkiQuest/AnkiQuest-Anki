@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! The file that keeps the offline RWKV state between app starts
@@ -31,7 +35,10 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
+<<<<<<< HEAD
 use std::time::SystemTime;
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 
 use super::offline::SelectedOfflineModel;
 use super::offline_engine::Engine;
@@ -76,6 +83,7 @@ pub(super) fn header(model: &SelectedOfflineModel) -> io::Result<String> {
     ))
 }
 
+<<<<<<< HEAD
 /// What a model file looked like when it was hashed: its size and
 /// modification time.
 #[derive(Clone, Copy, PartialEq)]
@@ -116,10 +124,21 @@ fn hash_model(path: &Path) -> io::Result<String> {
         return Ok(hashed.clone());
     }
 
+=======
+/// A model file's size and FNV-1a hash, read once per file (they don't change
+/// while the app runs).
+fn hash_model(path: &Path) -> io::Result<String> {
+    static HASHED: Mutex<Vec<(PathBuf, String)>> = Mutex::new(Vec::new());
+    let mut cached = HASHED.lock().unwrap();
+    if let Some((_, hashed)) = cached.iter().find(|(known, _)| known == path) {
+        return Ok(hashed.clone());
+    }
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     let bytes = fs::read(path)?;
     let mut hash = fnv::FnvHasher::default();
     hash.write(&bytes);
     let hashed = format!("{} {:016x}", bytes.len(), hash.finish());
+<<<<<<< HEAD
     cached.push((path.to_path_buf(), stamp, hashed.clone()));
     Ok(hashed)
 }
@@ -152,6 +171,14 @@ fn model_replaced_in_place_is_refused() -> io::Result<()> {
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+    cached.push((path.to_path_buf(), hashed.clone()));
+    Ok(hashed)
+}
+
+#[cfg(test)]
+#[test]
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn sm72_input_rule_changes_the_saved_state_header() -> io::Result<()> {
     let mut model = SelectedOfflineModel {
         model: super::offline::OfflineModel {

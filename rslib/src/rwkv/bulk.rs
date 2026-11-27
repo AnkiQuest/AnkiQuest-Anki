@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Bulk sequence-mode historical replay.
@@ -27,6 +31,11 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+<<<<<<< HEAD
+=======
+use rayon::prelude::*;
+
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 use super::*;
 
 /// Rows per bulk replay chunk (the fork: 8,192). kuma3: a chunk holds the f32

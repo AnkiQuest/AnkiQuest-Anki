@@ -104,6 +104,41 @@ fn build_generated_sources(build: &mut Build) -> Result<()> {
             output: "qt/_aqt/py.typed",
         },
     )?;
+    build.add_action(
+        "qt:aqt:rwkv_legacy",
+        CopyFile {
+            input: "qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin".into(),
+            output: "qt/_aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin",
+        },
+    )?;
+    for model in [
+        "sm40v2", "sm36", "sm55", "sm56", "sm72", "sm72e20", "sm72e25", "sm92", "sm57", "sm98",
+        "sm101", "sm99", "sm106",
+    ] {
+        for name in ["weights.f32.bin", "architecture.json", "manifest.json"] {
+            let output = format!("qt/_aqt/rwkv_inference/{model}/{name}");
+            build.add_action(
+                format!("qt:aqt:rwkv_{model}_{name}"),
+                CopyFile {
+                    input: format!("qt/aqt/rwkv_inference/{model}/{name}").into(),
+                    output: &output,
+                },
+            )?;
+        }
+    }
+    // The optional answer-time head is read from the folder of the weights.
+    for model in ["sm72e25", "sm92"] {
+        for name in ["time_head.f32.bin", "time_head.json"] {
+            let output = format!("qt/_aqt/rwkv_inference/{model}/{name}");
+            build.add_action(
+                format!("qt:aqt:rwkv_{model}_{name}"),
+                CopyFile {
+                    input: format!("qt/aqt/rwkv_inference/{model}/{name}").into(),
+                    output: &output,
+                },
+            )?;
+        }
+    }
     Ok(())
 }
 

@@ -1,12 +1,21 @@
 <!--
+<<<<<<< HEAD
 Copyright: Anki Software, LLC and contributors
+=======
+Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script lang="ts">
     import * as tr from "@generated/ftl";
 
+<<<<<<< HEAD
     import type { Choice } from "#lib/components/EnumSelector.svelte";
     import Item from "#lib/components/Item.svelte";
+=======
+    import type { Choice } from "$lib/components/EnumSelector.svelte";
+    import Item from "$lib/components/Item.svelte";
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 
     import type { DeckOptionsState } from "./lib";
     import {
@@ -50,6 +59,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         <SchedulerSelect
             id="review-scheduler"
             title={tr.deckConfigSchedulerReview()}
+<<<<<<< HEAD
+=======
+            recommended="RWKV-Instant"
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
             value={scheduler($config)}
             choices={schedulerChoices}
             onChange={selectScheduler}

@@ -1,18 +1,32 @@
 <!--
+<<<<<<< HEAD
 Copyright: Anki Software, LLC and contributors
+=======
+Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script lang="ts">
     import * as tr from "@generated/ftl";
 
+<<<<<<< HEAD
     import ConfigInput from "#lib/components/ConfigInput.svelte";
     import type { Choice } from "#lib/components/EnumSelector.svelte";
     import SettingTitle from "#lib/components/SettingTitle.svelte";
+=======
+    import ConfigInput from "$lib/components/ConfigInput.svelte";
+    import type { Choice } from "$lib/components/EnumSelector.svelte";
+    import SchedulerHelpButton from "./SchedulerHelpButton.svelte";
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 
     type T = $$Generic;
     export let id: string;
     export let title: string;
+<<<<<<< HEAD
     export let recommended: string | null = null;
+=======
+    export let recommended: string;
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     export let value: T;
     export let choices: Choice<T>[];
     export let onChange: (value: T) => void;
@@ -21,6 +35,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 <div class="scheduler-select">
     <div>
+<<<<<<< HEAD
         <SettingTitle on:click={onHelp}>
             <span id={`${id}-label`}>{title}</span>
         </SettingTitle>
@@ -30,13 +45,27 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 {tr.deckConfigSchedulerRecommended({ scheduler: recommended })}
             </p>
         {/if}
+=======
+        <div class="scheduler-label">
+            <span id={`${id}-label`}>{title}</span>
+            <SchedulerHelpButton {title} on:click={onHelp} />
+        </div>
+        <p class="scheduler-recommendation" id={`${id}-recommendation`}>
+            <span class="recommendation-star" aria-hidden="true">★</span>
+            {tr.deckConfigSchedulerRecommended({ scheduler: recommended })}
+        </p>
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     </div>
     <ConfigInput>
         <div
             class="scheduler-choices"
             role="radiogroup"
             aria-labelledby={`${id}-label`}
+<<<<<<< HEAD
             aria-describedby={recommended ? `${id}-recommendation` : undefined}
+=======
+            aria-describedby={`${id}-recommendation`}
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
         >
             {#each choices as choice}
                 <label class:active={choice.value === value}>
@@ -70,6 +99,15 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         }
     }
 
+<<<<<<< HEAD
+=======
+    .scheduler-label {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     .scheduler-recommendation {
         margin: 0.125rem 0 0;
         color: var(--fg-subtle);

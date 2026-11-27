@@ -120,6 +120,13 @@ finds notes that have a Front field, empty or not.
 `fr*:text`\
 finds notes in a field starting with "fr". Requires Anki 2.1.24+, AnkiMobile 2.1.60+, or AnkiDroid 2.17+.
 
+<<<<<<< HEAD
+=======
+Unlike standard searches, field searches ignore case for all letters, so
+`front:école` also finds "École". This fork behavior differs from upstream
+Anki, where only a-z match regardless of case.
+
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 ### Numeric field comparisons
 
 `frequency>500`\
@@ -361,7 +368,16 @@ cards with stability greater than 21 days.
 cards with difficulty greater than 0.3.
 
 `prop:r<0.9`\
-cards with retrievability less than 0.9.
+cards with FSRS retrievability less than 0.9.
+
+The following searches are available on desktop. When entered in the Browser,
+Anki prepares current RWKV scores before returning the matching cards:
+
+`prop:rwkv:r<0.9`\
+cards with RWKV-Instant retrievability less than 0.9.
+
+`prop:rwkv-curve:r<0.9`\
+cards with current RWKV-Curve retrievability less than 0.9.
 
 ## Recent Events
 

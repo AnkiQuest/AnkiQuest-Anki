@@ -484,6 +484,7 @@ fn ensure_u32_valid(val: &mut u32, default: u32, min: u32, max: u32) {
 
 #[cfg(test)]
 mod tests {
+<<<<<<< HEAD
 
     use std::assert_matches;
 
@@ -681,6 +682,11 @@ mod tests {
     }
 
     #[test]
+=======
+    use super::*;
+
+    #[test]
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
     fn intraday_learning_mix_reads_modes_and_legacy_toggle() -> Result<()> {
         for (metadata, expected) in [
             (serde_json::json!({}), ReviewMix::MixWithReviews),

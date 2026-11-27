@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Both verified RWKV architectures, with one specialized engine selected per
@@ -29,12 +33,20 @@ include!("engine.rs");
 mod app_speed_bench;
 #[cfg(test)]
 mod checkpoint_compression_bench;
+<<<<<<< HEAD
 #[cfg(all(test, rwkv_vectors, not(feature = "rwkv-sm40")))]
+=======
+#[cfg(all(test, not(feature = "rwkv-sm40")))]
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 #[path = "legacy_tests.rs"]
 mod legacy_tests;
 #[cfg(test)]
 mod model_size_bench;
+<<<<<<< HEAD
 #[cfg(all(test, rwkv_vectors, feature = "rwkv-sm40"))]
+=======
+#[cfg(all(test, feature = "rwkv-sm40"))]
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 #[path = "sm40_tests.rs"]
 mod sm40_tests;
 

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use anki_proto::scheduler::card_answer::Rating;
@@ -88,10 +92,13 @@ fn answer_queued_review(
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn synced_retention_rules_refresh_live_offline_scores() -> Result<()> {
     let (_dir, mut col) = offline_review_collection(
         "../qt/aqt/rwkv_inference/sm56/weights.f32.bin",
@@ -122,10 +129,13 @@ fn synced_retention_rules_refresh_live_offline_scores() -> Result<()> {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn synced_retention_rules_keep_the_configured_queue_refresh_interval() -> Result<()> {
     let (_dir, mut col) = offline_review_collection(
         "../qt/aqt/rwkv_inference/sm56/weights.f32.bin",
@@ -154,10 +164,13 @@ fn synced_retention_rules_keep_the_configured_queue_refresh_interval() -> Result
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn synced_retention_search_refreshes_after_a_note_changes() -> Result<()> {
     let (_dir, mut col) = offline_review_collection(
         "../qt/aqt/rwkv_inference/sm56/weights.f32.bin",
@@ -204,10 +217,13 @@ fn synced_retention_search_refreshes_after_a_note_changes() -> Result<()> {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn offline_review_queue_refreshes_at_the_configured_interval() -> Result<()> {
     for model in [
         "../qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin",
@@ -259,10 +275,13 @@ fn offline_review_queue_refreshes_at_the_configured_interval() -> Result<()> {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn offline_deck_counts_do_not_reuse_a_partial_queue_refresh() -> Result<()> {
     for (interval, approximate) in [(1, true), (3, false)] {
         let (_dir, mut col) = offline_review_collection(
@@ -292,10 +311,13 @@ fn offline_deck_counts_do_not_reuse_a_partial_queue_refresh() -> Result<()> {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn offline_review_queue_refreshes_when_reviews_run_out_before_the_interval() -> Result<()> {
     for extra_new in [0, 2] {
         for approximate in [false, true] {
@@ -324,10 +346,13 @@ fn offline_review_queue_refreshes_when_reviews_run_out_before_the_interval() -> 
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn offline_subdeck_uses_its_shared_scopes_refresh_interval() -> Result<()> {
     let (_dir, mut col) = offline_review_collection(
         "../qt/aqt/rwkv_inference/sm56/weights.f32.bin",
@@ -350,10 +375,13 @@ fn offline_subdeck_uses_its_shared_scopes_refresh_interval() -> Result<()> {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn offline_answer_catches_up_when_the_fast_append_cannot_run() -> Result<()> {
     let (_dir, mut col) = offline_review_collection(
         "../qt/aqt/rwkv_inference/sm56/weights.f32.bin",
@@ -377,10 +405,13 @@ fn offline_answer_catches_up_when_the_fast_append_cannot_run() -> Result<()> {
 }
 
 #[test]
+<<<<<<< HEAD
 #[cfg_attr(
     not(rwkv_models),
     ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
 )]
+=======
+>>>>>>> a8cf880ce2907229d2edcadcd6977d855b7954a8
 fn offline_deck_counts_rescore_cards_outside_the_approximate_batch() -> Result<()> {
     let (_dir, mut col) = offline_review_collection(
         "../qt/aqt/rwkv_inference/sm56/weights.f32.bin",
