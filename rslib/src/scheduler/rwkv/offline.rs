@@ -934,6 +934,20 @@ impl Collection {
             // the retained queue was ordered with the old state's scores
             self.invalidate_rwkv_review_queue();
         }
+        if self.state.rwkv_offline.is_none() {
+            // The history changed under the state (an undo, a sync) and it is
+            // being rebuilt on its own thread: not ready yet, as with no
+            // runtime above. An error here crashed the app's ready poll.
+            if let Err(err) = &result {
+                tracing::info!(?err, "RWKV runtime dropped; rebuilding");
+            }
+            return Ok(RwkvOfflineInstantPassProgress {
+                replay_done: REPLAY_DONE.load(Ordering::Relaxed),
+                replay_total: REPLAY_TOTAL.load(Ordering::Relaxed),
+                build_error: build_error(),
+                ..Default::default()
+            });
+        }
         let scored = result? as u32;
         Ok(RwkvOfflineInstantPassProgress {
             available: true,
