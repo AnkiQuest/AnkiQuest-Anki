@@ -32,13 +32,8 @@ git = "https://github.com/ankitects/linkcheck.git"
 rev = "2c7c081b148f8c1053df33768bc99f05311cb9a0"
 
 [workspace.dependencies.fsrs]
-<<<<<<< HEAD
 git = "https://github.com/JSchoreels/fsrs-rs.git"
-rev = "bd8932bb33d68bf0ac0e4367b154eec837f7fad2"
-=======
-git = "https://github.com/open-spaced-repetition/fsrs-rs.git"
-rev = "9fb03928d8c8fd84f5b9df2b2f6ddc631e6cae81"
->>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+rev = "4d829b655310eca64362fd0b0075149ad1daa889"
 
 [workspace.dependencies]
 # local
@@ -119,11 +114,7 @@ rand = "0.10.1"
 rayon = "1.10.0"
 regex = "1.11.1"
 reqwest = { version = "0.12.20", default-features = false, features = ["json", "socks", "stream", "multipart"] }
-<<<<<<< HEAD
 rusqlite = { version = "0.41.1", default-features = false, features = ["trace", "functions", "collation", "bundled", "fallible_uint", "cache", "blob"] }
-=======
-rusqlite = { version = "0.41.0", features = ["trace", "functions", "collation", "bundled", "blob", "fallible_uint"] }
->>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 rustls-pemfile = "2.2.0"
 same-file = "1.0.6"
 scopeguard = "1.2.0"
@@ -140,11 +131,7 @@ syn = { version = "3.0.6", features = ["parsing", "printing"] }
 tar = "0.4.46"
 tempfile = "3.20.0"
 termcolor = "1.4.1"
-<<<<<<< HEAD
 tokio = { version = "1.51.6", features = ["fs", "io-util", "rt-multi-thread", "macros", "signal"] }
-=======
-tokio = { version = "1.53.3", features = ["fs", "io-util", "rt-multi-thread", "macros", "signal"] }
->>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 tokio-util = { version = "0.7.15", features = ["io"] }
 tower-http = { version = "0.7.1", features = ["trace"] }
 tracing = { version = "0.1.41", features = ["max_level_trace", "release_max_level_debug"] }
@@ -160,11 +147,7 @@ winapi = { version = "0.3", features = ["wincon", "winreg"] }
 windows = { version = "0.62.2", features = ["Media_SpeechSynthesis", "Media_Core", "Foundation_Collections", "Storage_Streams", "Win32_System_Console", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_Foundation", "Win32_UI_Shell", "Wdk_System_SystemServices"] }
 wiremock = "0.6.3"
 xz2 = "0.1.7"
-<<<<<<< HEAD
 zip = { version = "9.0.5", default-features = false, features = ["deflate", "time"] }
-=======
-zip = { version = "9.0.0", default-features = false, features = ["deflate", "time"] }
->>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 zstd = { version = "0.14.3", features = ["zstdmt"] }
 
 # Apply mild optimizations to our dependencies in dev mode, which among other things

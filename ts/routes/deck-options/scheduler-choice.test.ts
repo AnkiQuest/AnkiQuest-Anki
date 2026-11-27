@@ -8,7 +8,7 @@
 import { DeckConfig_Config, DeckConfig_Config_FsrsVersion } from "@generated/anki/deck_config_pb";
 import { expect, test } from "vitest";
 
-import { dueDateScheduler, scheduler, withDueDateScheduler, withScheduler } from "./scheduler-choice";
+import { dueDateScheduler, scheduler, usesRwkv, withDueDateScheduler, withScheduler } from "./scheduler-choice";
 
 test("existing Instant presets keep their selected due-date scheduler", () => {
     for (const curveEnabled of [false, true]) {
@@ -67,4 +67,13 @@ test("FSRS versions on older presets are read without rewriting their configurat
         expect(scheduler(config)).toBe(version === DeckConfig_Config_FsrsVersion.FOUR ? "fsrs-4" : "fsrs-5");
         expect(config.fsrsVersion).toBe(version);
     }
+});
+
+test("RWKV-Curve and RWKV-Instant presets use RWKV, FSRS presets don't", () => {
+    const preset = (rwkvReviewEnabled: boolean, rwkvReviewInstantOrderEnabled: boolean) =>
+        new DeckConfig_Config({ rwkvReviewEnabled, rwkvReviewInstantOrderEnabled });
+    expect(usesRwkv(preset(false, false))).toBe(false);
+    expect(usesRwkv(preset(true, false))).toBe(true);
+    expect(usesRwkv(preset(false, true))).toBe(true);
+    expect(usesRwkv(preset(true, true))).toBe(true);
 });
