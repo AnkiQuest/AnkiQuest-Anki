@@ -34,8 +34,13 @@ where
         Self::from_parts(
             one,
             two,
+<<<<<<< HEAD
             one_answered,
             two_answered,
+=======
+            one_idx: one_answered,
+            two_idx: two_answered,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             one_len,
             two_len,
             ratio,
@@ -183,6 +188,7 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     fn resumed_interspersing() {
         let resumed = |ratio, ones_done, twos_done| -> Vec<u32> {
             Intersperser::resumed(
@@ -208,6 +214,8 @@ mod test {
     }
 
     #[test]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn resumed_mixing_preserves_the_remaining_order() {
         for (one_count, two_count) in [(20, 1), (20, 4), (2, 6)] {
             let one: Vec<_> = (1..=one_count).collect();

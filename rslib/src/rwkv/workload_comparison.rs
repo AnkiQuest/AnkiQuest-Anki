@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Compare two scheduling policies against the same simulated learner.
@@ -137,7 +145,11 @@ impl BackgroundReplay {
                 worker.apply_simulation_answer(answer, states)?;
             }
         } else {
+<<<<<<< HEAD
             replay_background_batch(&answers, worker, states);
+=======
+            replay_background_batch(&answers, worker, states)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         *cursor = end;
         Ok(())
@@ -148,7 +160,11 @@ fn replay_background_batch(
     answers: &[ReviewInput],
     worker: &mut RwkvInference,
     states: &mut SimulationStates<'_>,
+<<<<<<< HEAD
 ) {
+=======
+) -> io::Result<()> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn import(
         own: &mut HashMap<i64, ModuleState>,
         base: &HashMap<i64, ModuleState>,
@@ -160,6 +176,7 @@ fn replay_background_batch(
             }
         }
     }
+<<<<<<< HEAD
     fn import_shared(
         own: &mut HashMap<i64, ModuleState>,
         base: &SharedStateMap,
@@ -174,17 +191,28 @@ fn replay_background_batch(
     for input in answers {
         import_shared(&mut states.card, &states.base.card, Some(input.card_id));
         import_shared(&mut states.note, &states.base.note, input.note_id);
+=======
+    for input in answers {
+        import(&mut states.card, &states.base.card, Some(input.card_id));
+        import(&mut states.note, &states.base.note, input.note_id);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         import(&mut states.deck, &states.base.deck, input.deck_id);
         import(&mut states.preset, &states.base.preset, input.preset_id);
     }
     let mut replay_states = ReviewStateMaps {
+<<<<<<< HEAD
         card: std::mem::take(&mut states.card).into_iter().collect(),
         note: std::mem::take(&mut states.note).into_iter().collect(),
+=======
+        card: std::mem::take(&mut states.card),
+        note: std::mem::take(&mut states.note),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         deck: std::mem::take(&mut states.deck),
         preset: std::mem::take(&mut states.preset),
         global: states.global.take().or_else(|| states.base.global.clone()),
         ..Default::default()
     };
+<<<<<<< HEAD
     bulk::replay_simulation_background(worker, &mut replay_states, answers);
     fn unshare(mut map: SharedStateMap) -> HashMap<i64, ModuleState> {
         map.ids()
@@ -197,6 +225,15 @@ fn replay_background_batch(
     states.deck = replay_states.deck;
     states.preset = replay_states.preset;
     states.global = replay_states.global;
+=======
+    let result = bulk::replay_simulation_background(worker, &mut replay_states, answers);
+    states.card = replay_states.card;
+    states.note = replay_states.note;
+    states.deck = replay_states.deck;
+    states.preset = replay_states.preset;
+    states.global = replay_states.global;
+    result
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl RwkvInference {
@@ -784,6 +821,7 @@ fn scheduler_predictions(
             .iter()
             .map(|index| simulation_query_input_for_card(&cards[*index].card, retention, day))
             .collect::<Vec<_>>();
+<<<<<<< HEAD
         let views = queries
             .iter()
             .map(|query| states.state_view(query))
@@ -794,6 +832,13 @@ fn scheduler_predictions(
             .map(|(query, view)| ReviewPredictionBorrowedWorkItem {
                 features: worker.features.features_for(query),
                 state: view.as_ref(),
+=======
+        let work_items = queries
+            .iter()
+            .map(|query| ReviewPredictionBorrowedWorkItem {
+                features: worker.features.features_for(query),
+                state: states.state_ref(query),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             })
             .collect::<Vec<_>>();
         worker
@@ -840,7 +885,11 @@ fn learner_retrievability(
             // The per-answer draw needs recall only; the final S90 weight is
             // calculated separately when the memorized total is computed.
             worker
+<<<<<<< HEAD
                 .review_heads_for_state(query, states.state_view(query).as_ref())?
+=======
+                .review_heads_for_state(query, states.state_ref(query))?
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .retrievability
         }
     };
@@ -1084,7 +1133,15 @@ mod tests {
 
     #[test]
     fn batched_background_preserves_sequential_state_and_features() {
+<<<<<<< HEAD
         for precision in [StatePrecision::F32, StatePrecision::Int4CardsInt8Notes] {
+=======
+        for precision in [
+            StatePrecision::F32,
+            StatePrecision::Int4CardsInt8Notes,
+            StatePrecision::CompactCardsInt8,
+        ] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             check_batched_background_state(precision);
         }
     }
@@ -1114,6 +1171,7 @@ mod tests {
                 .apply_simulation_answer(answer, &mut sequential_states)
                 .unwrap();
         }
+<<<<<<< HEAD
         replay_background_batch(&answers, &mut batched, &mut batched_states);
         assert_eq!(sequential.cache_state(), batched.cache_state());
         for input in &inputs {
@@ -1122,6 +1180,14 @@ mod tests {
             let actual_view = batched_states.state_view(query);
             let expected = expected_view.as_ref();
             let actual = actual_view.as_ref();
+=======
+        replay_background_batch(&answers, &mut batched, &mut batched_states).unwrap();
+        assert_eq!(sequential.cache_state(), batched.cache_state());
+        for input in &inputs {
+            let query = &input.input.review_input;
+            let expected = sequential_states.state_ref(query);
+            let actual = batched_states.state_ref(query);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             for (expected, actual) in [
                 (expected.card, actual.card),
                 (expected.note, actual.note),
@@ -1288,11 +1354,19 @@ mod tests {
             query.current_elapsed_days = Some(day + 2);
             query.current_elapsed_seconds = None;
             let shared_r = shared_worker
+<<<<<<< HEAD
                 .review_heads_for_state(&query, shared_states.state_view(&query).as_ref())
                 .unwrap()
                 .retrievability;
             let learner_r = learner_worker
                 .review_heads_for_state(&query, learner_states.state_view(&query).as_ref())
+=======
+                .review_heads_for_state(&query, shared_states.state_ref(&query))
+                .unwrap()
+                .retrievability;
+            let learner_r = learner_worker
+                .review_heads_for_state(&query, learner_states.state_ref(&query))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .unwrap()
                 .retrievability;
             assert_eq!(shared_r.to_bits(), learner_r.to_bits());
@@ -1320,10 +1394,15 @@ mod tests {
                 .unwrap();
             assert_eq!(shared_worker.cache_state(), scheduler_worker.cache_state());
             assert_eq!(shared_worker.cache_state(), learner_worker.cache_state());
+<<<<<<< HEAD
             let shared_view = shared_states.state_view(&query);
             let reference_view = learner_states.state_view(&query);
             let shared = shared_view.as_ref();
             let reference = reference_view.as_ref();
+=======
+            let shared = shared_states.state_ref(&query);
+            let reference = learner_states.state_ref(&query);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             for (actual, expected) in [
                 (shared.card, reference.card),
                 (shared.note, reference.note),
@@ -1437,7 +1516,11 @@ mod tests {
         for (query, (expected, actual)) in queries.iter().zip(reference.iter().zip(&optimized)) {
             assert!((expected.retrievability - actual.retrievability).abs() < 1e-6);
             let scalar = worker
+<<<<<<< HEAD
                 .review_heads_for_state(query, states.state_view(query).as_ref())
+=======
+                .review_heads_for_state(query, states.state_ref(query))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .unwrap();
             assert!((expected.retrievability - scalar.retrievability).abs() < 1e-6);
         }

@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! NEON kernels for the per-row parts of RWKV query scoring.
@@ -11,10 +19,14 @@
 //! scalar code already uses a fused multiply-add.
 
 // Only the macOS batched query path uses the row kernels outside tests.
+<<<<<<< HEAD
 #![cfg_attr(
     not(any(target_os = "macos", target_arch = "aarch64", test)),
     allow(dead_code)
 )]
+=======
+#![cfg_attr(not(any(target_os = "macos", test)), allow(dead_code))]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
 use std::arch::aarch64::*;
 

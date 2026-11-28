@@ -21,9 +21,20 @@ service DeckConfigService {
   rpc NewDeckConfigLegacy(generic.Empty) returns (generic.Json);
   rpc RemoveDeckConfig(DeckConfigId) returns (generic.Empty);
   rpc GetDeckConfigsForUpdate(decks.DeckId) returns (DeckConfigsForUpdate);
+<<<<<<< HEAD
   rpc UpdateDeckConfigs(UpdateDeckConfigsRequest) returns (collection.OpChanges);
   rpc GetIgnoredBeforeCount(GetIgnoredBeforeCountRequest) returns (GetIgnoredBeforeCountResponse);
   rpc GetRetentionWorkload(GetRetentionWorkloadRequest) returns (GetRetentionWorkloadResponse);
+=======
+  rpc UpdateDeckConfigs(UpdateDeckConfigsRequest)
+      returns (collection.OpChanges);
+  rpc GetIgnoredBeforeCount(GetIgnoredBeforeCountRequest)
+      returns (GetIgnoredBeforeCountResponse);
+  rpc GetRetentionWorkload(GetRetentionWorkloadRequest)
+      returns (GetRetentionWorkloadResponse);
+  rpc PreviewStudySession(PreviewStudySessionRequest)
+      returns (StudySessionPreview);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 // Implicitly includes any of the above methods that are not listed in the
@@ -32,6 +43,61 @@ service BackendDeckConfigService {}
 
 message DeckConfigId {
   int64 dcid = 1;
+}
+
+message PreviewStudySessionRequest {
+  enum Source {
+    SOURCE_DECK = 0;
+    SOURCE_NUMBERED = 1;
+    SOURCE_STEPS = 2;
+  }
+  UpdateDeckConfigsRequest options = 1;
+  Source source = 2;
+}
+
+message StudySessionPreview {
+  enum Kind {
+    KIND_NEW = 0;
+    KIND_SUSPENDED = 1;
+    KIND_REVIEW = 2;
+    KIND_SAME_DAY = 3;
+    KIND_CARRIED_OVER = 4;
+  }
+  enum Reason {
+    REASON_SCHEDULED = 0;
+    REASON_DAILY_LIMIT = 1;
+    REASON_SIBLING = 2;
+    REASON_SUSPENDED = 3;
+    REASON_LATER = 4;
+    REASON_NOT_SELECTED = 5;
+    REASON_MINIMUM = 6;
+    REASON_BURIED = 7;
+  }
+  enum DailyLimit {
+    DAILY_LIMIT_NEW_CARDS = 0;
+    DAILY_LIMIT_REVIEWS = 1;
+  }
+  message Card {
+    int64 id = 1;
+    string label = 2;
+    Kind kind = 3;
+    Reason reason = 4;
+    uint32 position = 5;
+    uint32 gather_position = 6;
+    string field_value = 7;
+    sint32 due = 8;
+    uint32 interval = 9;
+    optional float recall = 10;
+    uint32 template_number = 11;
+    optional DailyLimit daily_limit = 12;
+  }
+  uint32 total = 1;
+  repeated Card cards = 2;
+  // True when the scheduler has Instant scores for the requested deck.
+  bool has_rwkv_scores = 3;
+  uint32 new_count = 4;
+  uint32 review_count = 5;
+  uint32 learning_count = 6;
 }
 
 message GetRetentionWorkloadRequest {
@@ -80,6 +146,11 @@ message DeckConfig {
       NEW_CARD_GATHER_PRIORITY_DESCENDING_RETRIEVABILITY = 6;
       // Ascending RWKV retrievability, then ascending position.
       NEW_CARD_GATHER_PRIORITY_ASCENDING_RETRIEVABILITY = 7;
+<<<<<<< HEAD
+=======
+      NEW_CARD_GATHER_PRIORITY_NOTE_FIELD_ASCENDING = 8;
+      NEW_CARD_GATHER_PRIORITY_NOTE_FIELD_DESCENDING = 9;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
     enum NewCardSortOrder {
       // Ascending card template ordinal.
@@ -94,6 +165,11 @@ message DeckConfig {
       NEW_CARD_SORT_ORDER_RANDOM_NOTE_THEN_TEMPLATE = 3;
       // Fully randomized order.
       NEW_CARD_SORT_ORDER_RANDOM_CARD = 4;
+    }
+    enum SuspendedCardOrder {
+      SUSPENDED_CARD_ORDER_MIXED = 0;
+      SUSPENDED_CARD_ORDER_SUSPENDED_BEFORE_NEW = 1;
+      SUSPENDED_CARD_ORDER_NEW_BEFORE_SUSPENDED = 2;
     }
     enum ReviewCardOrder {
       REVIEW_CARD_ORDER_DAY = 0;
@@ -161,6 +237,10 @@ message DeckConfig {
 
     uint32 new_per_day = 9;
     uint32 reviews_per_day = 10;
+    bool include_suspended_cards_in_learnable_pool = 87;
+    SuspendedCardOrder suspended_card_order = 88;
+    // An empty name selects each note type's sort field.
+    string new_card_gather_field = 89;
 
     // not currently used
     uint32 new_per_day_minimum = 35;
@@ -204,6 +284,12 @@ message DeckConfig {
     bool rwkv_review_first_review_elapsed_from_card_creation = 82;
     bool rwkv_review_enforce_grade_order = 83;
     uint32 rwkv_review_minimum_reviews_per_day = 84;
+<<<<<<< HEAD
+=======
+    // When on, new cards are gathered and shown before reviews pulled only to
+    // reach rwkv_review_minimum_reviews_per_day.
+    bool rwkv_review_new_cards_ignore_minimum_reviews = 90;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     bool same_day_reviews_ignore_review_limit = 85;
     bool rwkv_review_precompute_next_card = 86;
 
@@ -300,6 +386,10 @@ message DeckConfigsForUpdate {
   RwkvProfileSettings rwkv_profile_settings = 21;
   // Desktop-only inputs for the RWKV model-state estimate.
   RwkvCollectionCounts rwkv_collection_counts = 22;
+<<<<<<< HEAD
+=======
+  repeated string field_names = 23;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 message RwkvCollectionCounts {

@@ -141,6 +141,7 @@ impl StateContext<'_> {
         (minimum, maximum)
     }
 
+<<<<<<< HEAD
     pub(crate) fn fsrs_uses_learning_queues(&self) -> bool {
         self.fsrs_next_states.is_none() || !self.fsrs_learning_queues_disabled
     }
@@ -149,6 +150,15 @@ impl StateContext<'_> {
         (self.fsrs_fractional_intervals || self.fsrs_allow_short_term)
             && self.fsrs_short_term_with_steps_enabled
             && self.fsrs_uses_learning_queues()
+=======
+    pub(crate) fn uses_review_queue_for_steps(&self) -> bool {
+        self.fsrs_learning_queues_disabled && self.fsrs_next_states.is_some()
+    }
+
+    pub(crate) fn allows_short_term_model_intervals(&self) -> bool {
+        (self.fsrs_fractional_intervals || self.fsrs_allow_short_term)
+            && self.fsrs_short_term_with_steps_enabled
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     #[cfg(test)]
@@ -197,6 +207,49 @@ pub struct SchedulingStates {
     pub easy: CardState,
     pub dynamic_desired_retentions: Option<[f32; 4]>,
     pub dynamic_desired_retention_enabled: bool,
+<<<<<<< HEAD
+=======
+}
+
+impl SchedulingStates {
+    /// Apply `update` to the memory state of each answer's next state. The
+    /// current state is left alone, because answering compares it with the
+    /// card.
+    pub(crate) fn update_next_memory_states(
+        &mut self,
+        update: impl Fn(&mut crate::card::FsrsMemoryState),
+    ) {
+        for state in [
+            &mut self.again,
+            &mut self.hard,
+            &mut self.good,
+            &mut self.easy,
+        ] {
+            let normal = match state {
+                CardState::Normal(normal) => normal,
+                CardState::Filtered(FilteredState::Rescheduling(filtered)) => {
+                    &mut filtered.original_state
+                }
+                CardState::Filtered(FilteredState::Preview(_)) => continue,
+            };
+            match normal {
+                NormalState::New(_) => {}
+                NormalState::Learning(learning) => {
+                    learning.memory_state.iter_mut().for_each(&update)
+                }
+                NormalState::Review(review) => review.memory_state.iter_mut().for_each(&update),
+                NormalState::Relearning(relearning) => {
+                    relearning
+                        .learning
+                        .memory_state
+                        .iter_mut()
+                        .for_each(&update);
+                    relearning.review.memory_state.iter_mut().for_each(&update);
+                }
+            }
+        }
+    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl From<NewState> for CardState {

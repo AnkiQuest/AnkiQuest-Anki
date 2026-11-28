@@ -8,40 +8,18 @@ from cogdocs import get_file_contents
 cog.out(get_file_contents("releasing"))
 >>>> -->
 
-Releases are prepared with a script that a maintainer runs locally, then built
-and published by a GitHub Actions workflow:
+Releases are managed by two GitHub Actions workflows in this fork:
 
-1. **`tools/prepare_release.py`** — Run first, on your own machine.
-   Validates the version, checks out the matching `release/YY.MM` branch, checks
-   that CI passed, makes sure no duplicate tag or release exists, syncs
-   translations, then commits the updated `.version` and pushes the branch. CI
-   then runs automatically on the resulting commit (for `release/**` branches).
-   The CI check can be skipped with `--skip-ci-check`.
+1. **`prepare-release.yml`** — Validates a version, checks CI and duplicate
+   tags/releases, commits `.version`, and pushes the dispatching branch.
 
-2. **`.github/workflows/release.yml`** — Dispatch after CI passes on the
-   prepared commit. Builds installers and wheels for all platforms (Linux
+2. **`release.yml`** — Builds installers and wheels for all platforms (Linux
    x86/ARM, macOS Intel/ARM, Windows), and can optionally sign macOS/Windows
    artifacts, create a draft GitHub release, publish wheels to TestPyPI, and
    publish wheels to PyPI.
 
-`release.yml` is `workflow_dispatch` and uses a `release`
-concurrency group, so two release builds cannot run simultaneously.
-
-## Prepare script requirements
-
-The prepare script runs on your machine, so it needs:
-
-- A clean working tree. The script stops if there are uncommitted changes.
-- An authenticated `gh` CLI, with push access to `ankitects/anki` and to the two
-  translation repos.
-- `rsync` on the `PATH`. It copies the translation templates.
-- A Python interpreter with the `packaging` module, which the project's `uv`
-  environment provides.
-
-The script pushes translation template commits to the translation repos before
-it commits `.version`, so a failure after that point leaves those pushes in
-place. Re-running the script is safe: the translation step is a no-op when there
-is nothing new to copy.
+Both workflows are manually dispatched and share a `release` concurrency group,
+so only one preparation/build operation runs at a time.
 
 ## Version format
 
@@ -51,6 +29,63 @@ suffixes (`b1`, `rc1`, `a1`). Months must be zero-padded.
 
 Examples: `26.05b1` (beta), `26.05rc1` (release candidate), `26.05` (stable),
 `26.05.1` (patch).
+
+Fork application versions add the local suffix `+fsrs7`, for example
+`26.09b1+fsrs7`. Unsigned draft releases append
+`.build.<github-actions-run-number>` to the release tag, while the application
+keeps the base fork version. The Actions run number is the monotonically
+increasing fork build number: never reset, reuse, or manually replace it.
+
+The release jobs pass the full tag through `ANKI_ARTIFACT_VERSION`. Python build
+metadata stores it as `anki.buildinfo.artifact_version`, separately from the base
+application version. Automatic and manual update checks compare this full version,
+including numeric build and retry suffixes, so running a draft cannot offer an
+older published build of the same application version. A matching release commit
+also suppresses the prompt. Local builds without `ANKI_ARTIFACT_VERSION` use the
+base application version for update comparisons.
+
+## Synchronizing an upstream Anki release
+
+Use this process whenever this fork is aligned to a new official Anki release:
+
+1. Confirm every developer's work is committed and pushed. Fetch `origin`,
+   `upstream`, all collaborator remotes, and tags. Audit unmerged remote commits
+   before changing the release branch.
+2. Identify the official release tag and review its range from the previous
+   upstream tag. Merge that exact tag, not `upstream/main`, so post-release
+   commits are excluded:
+
+    ```
+    git merge --no-ff <official-tag>
+    ```
+
+3. Resolve conflicts by retaining the fork's user-facing behavior and accepting
+   the upstream changes included in that tag. Do not merge stale collaborator
+   branches whose commits are already present or superseded.
+4. Set `.version` to `<official-tag>+fsrs7`; do not put the build number in this
+   file. Verify the update endpoints in `rslib/src/backend/github.rs` still use
+   `JSchoreels/anki`, and that both automatic and manual update checks use the
+   fork's GitHub releases.
+5. Update `RELEASE.md`. Link the official upstream release and summarize both
+   the upstream alignment and the fork-specific changes retained in the build.
+6. Run targeted tests and `just check-local`, then commit the merge. Run
+   `just check` on that commit before pushing it and wait for its complete CI
+   matrix to succeed. For `main`, dispatch the full matrix with
+   `just ci --branch main`.
+7. Dispatch `just release::draft --ref <branch>`. The recipe and release
+   workflow both require a successful CI run with all six platform checks
+   passing on the release commit. The workflow creates an unsigned draft tag named
+   `<version>.build.<run-number>`.
+8. Verify the workflow, installers, draft target commit, and release assets.
+   Replace generated notes with notes that link the official release and explain
+   the fork changes.
+9. Publish that verified draft as the current release, preserving its beta/RC
+   status when applicable, and verify the GitHub Releases API returns it to the
+   application's update checker.
+
+If the draft build fails, fix the release commit, push it, wait for CI again,
+and dispatch a new draft. Do not publish the failed draft or reuse its build
+number.
 
 ## Release branch workflow
 
@@ -72,12 +107,13 @@ candidates, and the stable release all come from the same branch.
 3. Prepare the release (updates `.version` on the branch):
 
     ```
-    just release::prepare --version 26.05b1
+    just release::prepare --version 26.05b1 --ref release/26.05
     ```
 
-4. Verify on TestPyPI:
+4. Pull the preparation commit, then verify on TestPyPI:
 
     ```
+    git pull origin release/26.05
     just release::testpypi --ref release/26.05
     ```
 
@@ -90,6 +126,8 @@ candidates, and the stable release all come from the same branch.
 6. For subsequent pre-releases or the stable release from the same cycle,
    repeat steps 3-5 with the new version (e.g. `26.05b2`, `26.05rc1`, `26.05`).
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 7. Merge the release branch back to `main`. When a stable release is published,
    `.github/workflows/sync-release.yml` opens a PR from `release/26.05` to
    `main`, which brings in the `.version` bump, the translation updates, and any
@@ -97,6 +135,24 @@ candidates, and the stable release all come from the same branch.
 
 8. Delete the release branch after the merge PR is merged.
 
+=======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+    The release-sync automation in steps 7-10 runs only in `ankitects/anki`;
+    fork releases use their own release workflow and do not update upstream
+    Flathub or website resources.
+
+7. Merge the release branch back to `main`. When a stable release is published,
+   `.github/workflows/sync-release.yml` opens a PR from `release/26.05` to
+   `main`, which brings in the `.version` bump, the translation updates, and any
+   cherry-picked fixes. Review the PR and merge it.
+
+8. Delete the release branch after the merge PR is merged.
+
+<<<<<<< HEAD
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 9. Submit the Flathub update. When a stable release is published,
    `.github/workflows/sync-release.yml` makes a patch that moves
    [flathub/net.ankiweb.Anki](https://github.com/flathub/net.ankiweb.Anki)
@@ -154,7 +210,7 @@ Once the fix is ready:
 
 ```{mermaid}
 flowchart LR
-    A["<b>prepare_release.py</b><br/><i>local</i><br/>validate version<br/>check out release branch<br/>check CI<br/>check duplicate tag<br/>sync translations<br/>update .version<br/>push to branch"] --> B["<b>CI (ci.yml)</b><br/>runs automatically<br/>on release/** branches"]
+    A["<b>prepare-release.yml</b><br/>validate version<br/>check CI<br/>check duplicate tag<br/>update .version<br/>push to branch"] --> B["<b>CI (ci.yml)</b><br/>runs automatically<br/>on release/** branches"]
     B --> C["<b>release.yml</b><br/>build all platforms<br/>optionally sign macOS/Windows<br/>optionally create draft GitHub release<br/>optionally publish to TestPyPI/PyPI"]
 
     style A fill:#2d333b,stroke:#539bf5,color:#adbac7
@@ -212,9 +268,8 @@ flowchart TD
 
 ## Inputs
 
-**prepare_release.py:** takes a `version` argument and an optional
-`--skip-ci-check` flag. The release branch is derived from the version, so there
-is no branch argument.
+**prepare-release:** takes a `version`, the workflow ref, and an optional
+`skip-ci-check` flag.
 
 **release:** takes a `version` (must match `.version` for public release
 operations) and five boolean inputs:
@@ -223,7 +278,7 @@ operations) and five boolean inputs:
 - `draft-release` creates the draft GitHub release.
 - `publish-testpypi` publishes wheels to TestPyPI.
 - `publish-pypi` publishes wheels to PyPI.
-- `skip-ci-check` skips the CI status check.
+- `skip-ci-check` skips the CI status check for release runs that create no draft.
 
 All booleans default to `false`. Non-release runs use the `.version`
 already in the repo, so builds work without a prepare step.
@@ -252,21 +307,23 @@ secrets.
 The `release.yml` workflow uses independent boolean inputs to control what gets
 signed and published:
 
-| Input              | Effect                                                                                                                                                                                                                                            |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sign`             | Signs macOS and Windows artifacts. Requires the `release` environment. When false, those jobs upload unsigned artifacts and do not access signing secrets.                                                                                        |
-| `draft-release`    | Creates a draft GitHub release with generated release notes and installer artifacts. Requires `sign=true`, the `release` environment, passing CI (unless skipped), no duplicate tag/release, and `version` matching `.version`.                   |
-| `publish-testpypi` | Publishes wheels to TestPyPI. Requires the `release` environment.                                                                                                                                                                                 |
-| `publish-pypi`     | Publishes wheels to PyPI. Requires the `release` environment, passing CI (unless skipped), and `version` matching `.version`. It also runs and waits for the TestPyPI publish job first. It does not require signing unless `draft-release=true`. |
-| `skip-ci-check`    | Skips the CI status check. Useful for hotfix releases.                                                                                                                                                                                            |
-| `version`          | For `draft-release` or `publish-pypi`: must match `.version`. For build-only, signed-only, or TestPyPI-only runs: ignored (`.version` from the branch is used automatically).                                                                     |
+| Input              | Effect                                                                                                                                                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sign`             | Signs macOS and Windows artifacts. Requires the `release` environment. When false, those jobs upload unsigned artifacts and do not access signing secrets.                                                                                                                   |
+| `draft-release`    | Creates a draft GitHub release with generated release notes and installer artifacts. Requires all six CI platform checks to pass on the release commit, a unique tag and release, and `version` matching `.version`. Unsigned fork drafts receive an automatic build suffix. |
+| `publish-testpypi` | Publishes wheels to TestPyPI. Requires the `release` environment.                                                                                                                                                                                                            |
+| `publish-pypi`     | Publishes wheels to PyPI. Requires the `release` environment, passing CI (unless skipped), and `version` matching `.version`. It also runs and waits for the TestPyPI publish job first. It does not require signing unless `draft-release=true`.                            |
+| `skip-ci-check`    | Skips the CI status check for release runs that create no draft.                                                                                                                                                                                                             |
+| `version`          | For `draft-release` or `publish-pypi`: must match `.version`. For build-only, signed-only, or TestPyPI-only runs: ignored (`.version` from the branch is used automatically).                                                                                                |
 
 ## Running releases with just
 
-The `release` module defined in `release.just` wraps both the prepare script and
-the `release.yml` dispatches. `release::prepare` runs locally and takes no
-`--ref`. Every other recipe dispatches `release.yml` and requires an explicit
-`--ref` argument pointing to the release branch.
+The `release` module in `release.just` wraps both workflow dispatches. Release
+recipes take an explicit `--ref` pointing at the commit or branch to build.
+
+Before drafting, run `just check` on the release commit and ensure all six CI
+platform checks have passed on that commit. Use `just ci --branch <branch>` when
+the push-triggered CI run omits some platforms.
 
 Run `just --list --list-submodules` to see all available recipes and their
 arguments.
@@ -310,8 +367,9 @@ To test the signing flow from a feature branch:
   write `.version` — that is done by the prepare script. If you dispatch release
   before the prepare commit has been pushed, the build will use whatever
   `.version` was HEAD at dispatch time.
-- `draft-release=true` with `sign=false` is rejected — draft releases must use
-  signed installer artifacts.
+- `just release::draft` intentionally creates unsigned fork builds. It assigns
+  the GitHub Actions run number as the build number and keeps that build number
+  in the release tag rather than the application version.
 - When `publish-pypi=true`, wheels are published to TestPyPI first, then to
   PyPI after the TestPyPI job succeeds. If `draft-release=true` is also set,
   PyPI publishing waits for the draft GitHub release to succeed too.
@@ -337,4 +395,13 @@ Audio playback and recording is handled by the `anki-audio` package under **`qt/
     ```
 6. Once the package is published, update the pinned `anki-audio` version in **`qt/pyproject.toml`** to the new version.
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 <!-- <<<<end>>>> -->
+=======
+<!-- <<<end>>> -->
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+<!-- <<<<end>>>> -->
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345

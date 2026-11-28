@@ -10,10 +10,19 @@ import {
     DeckConfig_Config_QuestionAction,
     DeckConfig_Config_ReviewCardOrder,
     DeckConfig_Config_ReviewMix,
+    DeckConfig_Config_SuspendedCardOrder as SuspendedCardOrder,
 } from "@generated/anki/deck_config_pb";
 import * as tr from "@generated/ftl";
 
 import type { Choice } from "#lib/components/EnumSelector.svelte";
+
+export function suspendedCardOrderChoices(): Choice<SuspendedCardOrder>[] {
+    return [
+        { label: tr.deckConfigSuspendedBeforeNew(), value: SuspendedCardOrder.SUSPENDED_BEFORE_NEW },
+        { label: tr.deckConfigNewBeforeSuspended(), value: SuspendedCardOrder.NEW_BEFORE_SUSPENDED },
+        { label: tr.deckConfigSuspendedOrderMixed(), value: SuspendedCardOrder.MIXED },
+    ];
+}
 
 export function newGatherPriorityChoices(): Choice<DeckConfig_Config_NewCardGatherPriority>[] {
     return [
@@ -34,6 +43,22 @@ export function newGatherPriorityChoices(): Choice<DeckConfig_Config_NewCardGath
             value: DeckConfig_Config_NewCardGatherPriority.HIGHEST_POSITION,
         },
         {
+            label: tr.deckConfigNoteFieldAscending(),
+            value: DeckConfig_Config_NewCardGatherPriority.NOTE_FIELD_ASCENDING,
+        },
+        {
+            label: tr.deckConfigNoteFieldDescending(),
+            value: DeckConfig_Config_NewCardGatherPriority.NOTE_FIELD_DESCENDING,
+        },
+        {
+            label: tr.deckConfigNewGatherPriorityAscendingRetrievability(),
+            value: DeckConfig_Config_NewCardGatherPriority.ASCENDING_RETRIEVABILITY,
+        },
+        {
+            label: tr.deckConfigNewGatherPriorityDescendingRetrievability(),
+            value: DeckConfig_Config_NewCardGatherPriority.DESCENDING_RETRIEVABILITY,
+        },
+        {
             label: tr.deckConfigNewGatherPriorityRandomNotes(),
             value: DeckConfig_Config_NewCardGatherPriority.RANDOM_NOTES,
         },
@@ -44,14 +69,14 @@ export function newGatherPriorityChoices(): Choice<DeckConfig_Config_NewCardGath
     ];
 }
 
-export function newSortOrderChoices(): Choice<DeckConfig_Config_NewCardSortOrder>[] {
+export function newSortOrderChoices(study = false): Choice<DeckConfig_Config_NewCardSortOrder>[] {
     return [
         {
-            label: tr.deckConfigSortOrderTemplateThenGather(),
+            label: study ? tr.deckConfigStudyTypeThenSelection() : tr.deckConfigSortOrderTemplateThenGather(),
             value: DeckConfig_Config_NewCardSortOrder.TEMPLATE,
         },
         {
-            label: tr.deckConfigSortOrderGather(),
+            label: study ? tr.deckConfigStudySelectionOrder() : tr.deckConfigSortOrderGather(),
             value: DeckConfig_Config_NewCardSortOrder.NO_SORT,
         },
         {
@@ -67,6 +92,15 @@ export function newSortOrderChoices(): Choice<DeckConfig_Config_NewCardSortOrder
             value: DeckConfig_Config_NewCardSortOrder.RANDOM_CARD,
         },
     ];
+}
+
+export function disabledSortOrders(
+    priority: DeckConfig_Config_NewCardGatherPriority,
+): DeckConfig_Config_NewCardSortOrder[] {
+    const sort = DeckConfig_Config_NewCardSortOrder;
+    const redundant = [sort.TEMPLATE_THEN_RANDOM, sort.RANDOM_NOTE_THEN_TEMPLATE];
+    if (priority === DeckConfig_Config_NewCardGatherPriority.RANDOM_CARDS) { return [...redundant, sort.RANDOM_CARD]; }
+    return priority === DeckConfig_Config_NewCardGatherPriority.RANDOM_NOTES ? redundant : [];
 }
 
 export function reviewOrderChoices(

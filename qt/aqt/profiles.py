@@ -238,8 +238,16 @@ class ProfileManager:
         self.db.execute(sql, self._pickle(self.meta), "_global")
         self.db.commit()
 
+    def close(self) -> None:
+        if self.db:
+            self.db.close()
+            self.db = None
+
     def create(self, name: str) -> None:
+        from aqt.rwkv_model import RWKV_MODEL_KEY, RWKV_MODEL_SMALL
+
         prof = profileConf.copy()
+        prof[RWKV_MODEL_KEY] = RWKV_MODEL_SMALL
         if self.db.scalar("select 1 from profiles where name = ? collate nocase", name):
             return
         self.db.execute(

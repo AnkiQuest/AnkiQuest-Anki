@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Instant forecast driven by recorded review timing patterns.
@@ -17,6 +25,10 @@ use super::instant_forecast_queue::InstantReviewPolicy;
 use super::instant_forecast_sampling::day_deviations;
 use super::instant_forecast_sampling::AnswerStratum;
 use super::instant_forecast_sampling::PREVIEW_LIMIT;
+<<<<<<< HEAD
+=======
+use super::instant_forecast_sampling::STRATIFIED_PATH_COUNTS;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use super::workload_comparison::paired_grade;
 use super::workload_forecast::summarize_forecast;
 use super::workload_forecast::ForecastPath;
@@ -259,6 +271,12 @@ impl InstantCard {
             interval_days: self.input.input.interval_days.unwrap_or(1),
             ease_factor: self.input.input.ease_factor.unwrap_or(0),
             reviewed_today,
+<<<<<<< HEAD
+=======
+            review_step_due: self
+                .has_timed_review_step()
+                .then_some(self.learning_due_millis <= millis),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             elapsed_seconds: self
                 .last_millis
                 .map(|last| ((millis - last).max(0) / 1000).min(i64::from(u32::MAX)) as u32),
@@ -273,6 +291,17 @@ impl InstantCard {
         }
     }
 
+<<<<<<< HEAD
+=======
+    fn has_timed_review_step(&self) -> bool {
+        self.input.queue == 2
+            && matches!(
+                self.state,
+                CardState::Normal(NormalState::Learning(_) | NormalState::Relearning(_))
+            )
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[allow(clippy::too_many_arguments)]
     fn answer(
         &mut self,
@@ -316,7 +345,15 @@ impl InstantCard {
         };
         let params = &self.input.fsrs_parameters;
         let fractional = crate::scheduler::fsrs::uses_fractional_intervals(params);
+<<<<<<< HEAD
         let elapsed = if fractional || intraday_learning {
+=======
+        let short_review_step = self.has_timed_review_step()
+            && self
+                .last_millis
+                .is_some_and(|last| self.learning_due_millis - last < DAY_MILLIS);
+        let elapsed = if fractional || intraday_learning || short_review_step {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             elapsed_secs as f32 / 86_400.0
         } else {
             elapsed_days as f32
@@ -403,9 +440,29 @@ impl InstantCard {
             }
         };
         let secs_to_rollover = ((DAY_MILLIS - millis.rem_euclid(DAY_MILLIS)) / 1000) as u32;
+<<<<<<< HEAD
         let interval = next.interval_kind().maybe_as_days(secs_to_rollover);
         self.input.queue = match next {
             CardState::Normal(NormalState::Review(_)) => 2,
+=======
+        let timed_review_step = context.uses_review_queue_for_steps()
+            && matches!(
+                next,
+                CardState::Normal(NormalState::Learning(_) | NormalState::Relearning(_))
+            );
+        let interval = if timed_review_step {
+            next.interval_kind()
+        } else {
+            next.interval_kind().maybe_as_days(secs_to_rollover)
+        };
+        self.input.queue = match next {
+            CardState::Normal(NormalState::Review(_)) => 2,
+            CardState::Normal(NormalState::Learning(_) | NormalState::Relearning(_))
+                if timed_review_step =>
+            {
+                2
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             CardState::Normal(NormalState::Learning(_) | NormalState::Relearning(_)) => {
                 match interval {
                     IntervalKind::InSecs(_) => 1,
@@ -424,7 +481,15 @@ impl InstantCard {
         }
         match interval {
             IntervalKind::InSecs(seconds) => {
+<<<<<<< HEAD
                 self.learning_due_millis = millis + i64::from(seconds) * 1000
+=======
+                self.learning_due_millis = millis + i64::from(seconds) * 1000;
+                if timed_review_step {
+                    self.input.due_day =
+                        self.learning_due_millis.div_euclid(DAY_MILLIS).max(day + 1);
+                }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             }
             IntervalKind::InDays(days) => {
                 self.learning_due_millis = (day + i64::from(days)) * DAY_MILLIS;
@@ -471,7 +536,11 @@ impl RwkvInference {
             ));
         }
         if config.stratified_answers
+<<<<<<< HEAD
             && (config.paths != 3
+=======
+            && (!STRATIFIED_PATH_COUNTS.contains(&config.paths)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 || config.scenario_sigma.is_some()
                 || !config.stratified_scale.is_finite()
                 || config.stratified_scale < 0.0
@@ -482,7 +551,11 @@ impl RwkvInference {
         {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
+<<<<<<< HEAD
                 "stratified answers require three paths, no scenario sigma, and nonnegative finite scale, bias and variance",
+=======
+                "stratified answers require 3, 5 or 7 paths, no scenario sigma, and nonnegative finite scale, bias and variance",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ));
         }
         if config
@@ -562,11 +635,25 @@ impl RwkvInference {
                                     break;
                                 }
                                 // Show the central scenario first when memory
+<<<<<<< HEAD
                                 // limits the forecast to sequential paths.
                                 let path = if config.scenario_sigma.is_some()
                                     || config.stratified_answers
                                 {
                                     [1, 0, 2][slot as usize]
+=======
+                                // limits the forecast to sequential paths, then
+                                // the others from low to high.
+                                let path = if config.scenario_sigma.is_some()
+                                    || config.stratified_answers
+                                {
+                                    let center = (config.paths - 1) / 2;
+                                    match slot {
+                                        0 => center,
+                                        slot if slot <= center => slot - 1,
+                                        slot => slot,
+                                    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                                 } else {
                                     slot
                                 };
@@ -723,6 +810,14 @@ impl RwkvInference {
                     "forecast study deck has no preset",
                 )
             })?;
+<<<<<<< HEAD
+=======
+        // Mirrors QueueSortOptions::new_cards_ignore_minimum_reviews.
+        let new_cards_ignore_minimum_reviews = study_preset.inner.rwkv_review_instant_order_enabled
+            && study_preset
+                .inner
+                .rwkv_review_new_cards_ignore_minimum_reviews;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let score_new = matches!(
             study_preset.inner.new_card_gather_priority(),
             NewCardGatherPriority::AscendingRetrievability
@@ -769,6 +864,10 @@ impl RwkvInference {
                 days,
                 seed,
                 stratum,
+<<<<<<< HEAD
+=======
+                config.paths as usize,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 f64::from(config.stratified_scale),
                 kappa,
             )
@@ -889,7 +988,12 @@ impl RwkvInference {
                                         .cmp(&cards[b].input.input.review_input.card_id)
                                 })
                         });
-                        indexes.truncate(config.candidate_refresh_limit.max(1));
+                        trim_refresh_window(
+                            &mut indexes,
+                            config.candidate_refresh_limit.max(1),
+                            config.review_order,
+                            (answers_today / refresh_interval) as usize,
+                        );
                     }
                     let queries = indexes
                         .iter()
@@ -916,6 +1020,10 @@ impl RwkvInference {
                 review_candidates.extend(queue_members[2].iter().map(|&index| candidate(index)));
                 let policy = InstantReviewPolicy {
                     study_deck_id: DeckId(config.study_deck_id),
+<<<<<<< HEAD
+=======
+                    new_cards_ignore_minimum_reviews,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     same_day_allowed: config.same_day_allowed,
                     min_intervening: config.min_intervening_reviews,
                     min_elapsed_seconds: config.min_elapsed_secs,
@@ -981,7 +1089,14 @@ impl RwkvInference {
                             NewCardGatherPriority::DeckThenRandomNotes => {
                                 deck().then_with(|| random(a, true).total_cmp(&random(b, true)))
                             }
+<<<<<<< HEAD
                             NewCardGatherPriority::LowestPosition => position(),
+=======
+                            // Forecast inputs carry positions but no note fields.
+                            NewCardGatherPriority::LowestPosition
+                            | NewCardGatherPriority::NoteFieldAscending
+                            | NewCardGatherPriority::NoteFieldDescending => position(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                             NewCardGatherPriority::HighestPosition => position().reverse(),
                             NewCardGatherPriority::RandomNotes => {
                                 random(a, true).total_cmp(&random(b, true))
@@ -1052,11 +1167,20 @@ impl RwkvInference {
                     .into_iter()
                     .map(|index| reviews[index])
                     .collect::<Vec<_>>();
+<<<<<<< HEAD
+=======
+                let minimum_queue = queues
+                    .minimum_review
+                    .into_iter()
+                    .map(|index| reviews[index])
+                    .collect::<Vec<_>>();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 let new_queue = queues
                     .new
                     .into_iter()
                     .map(|index| new[index])
                     .collect::<Vec<_>>();
+<<<<<<< HEAD
                 let main = mix_queues(
                     review_queue,
                     day_queue,
@@ -1067,6 +1191,16 @@ impl RwkvInference {
                 let main = mix_queues(
                     main,
                     new_queue,
+=======
+                let main = main_queue(
+                    MainQueueParts {
+                        due: review_queue,
+                        minimum: minimum_queue,
+                        day_learning: day_queue,
+                        new: new_queue,
+                    },
+                    study_preset.inner.interday_learning_mix(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     study_preset.inner.new_mix(),
                     main_answered,
                     new_answered,
@@ -1359,6 +1493,7 @@ impl RwkvInference {
         inputs: &[ReviewInput],
         states: &SimulationStates<'_>,
     ) -> io::Result<Vec<f32>> {
+<<<<<<< HEAD
         let views = inputs
             .iter()
             .map(|input| states.state_view(input))
@@ -1369,10 +1504,35 @@ impl RwkvInference {
             .map(|(input, view)| ReviewPredictionBorrowedWorkItem {
                 features: self.features.features_for(input),
                 state: view.as_ref(),
+=======
+        let work_items = inputs
+            .iter()
+            .map(|input| ReviewPredictionBorrowedWorkItem {
+                features: self.features.features_for(input),
+                state: states.state_ref(input),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             })
             .collect::<Vec<_>>();
         self.model.review_retrievability_many_borrowed(&work_items)
     }
+}
+
+/// Mirrors the reviewer's partial refresh of a stale, priority-sorted score
+/// map.
+fn trim_refresh_window(
+    ranked: &mut Vec<usize>,
+    limit: usize,
+    order: ReviewCardOrder,
+    refresh_round: usize,
+) {
+    let probe = limit / 4;
+    if order == ReviewCardOrder::RetrievabilityAscending && ranked.len() > limit && probe > 0 {
+        let leaders = limit - probe;
+        let blocks = (ranked.len() - leaders).div_ceil(probe).min(8);
+        let start = (leaders + refresh_round % blocks * probe).min(ranked.len() - probe);
+        ranked.copy_within(start..start + probe, leaders);
+    }
+    ranked.truncate(limit);
 }
 
 /// The `queue_members` slot of an Instant forecast queue, if it is tracked.
@@ -1380,6 +1540,36 @@ fn queue_slot(queue: i32) -> Option<usize> {
     usize::try_from(queue).ok().filter(|queue| *queue < 4)
 }
 
+<<<<<<< HEAD
+=======
+/// Queue entries before the intraday-learning mix.
+struct MainQueueParts {
+    /// Due reviews, plus minimum reviews unless new cards ignore the minimum.
+    due: Vec<usize>,
+    /// Reviews pulled only to reach the daily minimum when new cards ignore it.
+    minimum: Vec<usize>,
+    day_learning: Vec<usize>,
+    new: Vec<usize>,
+}
+
+/// Mirrors the live builder: interday learning mixed into due reviews, new
+/// cards mixed into that (resuming the session's mix progress), then the
+/// reviews pulled only for the daily minimum. Mix progress counts every
+/// answered review and interday-learning card, as the live queue does.
+fn main_queue(
+    parts: MainQueueParts,
+    interday_mix: ReviewMix,
+    new_mix: ReviewMix,
+    main_answered: usize,
+    new_answered: usize,
+) -> Vec<usize> {
+    let main = mix_queues(parts.due, parts.day_learning, interday_mix, 0, 0);
+    let mut main = mix_queues(main, parts.new, new_mix, main_answered, new_answered);
+    main.extend(parts.minimum);
+    main
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn mix_queues(
     first: Vec<usize>,
     second: Vec<usize>,
@@ -1453,6 +1643,20 @@ fn increment_study_counts(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascending_refresh_keeps_leaders_and_rotates_nearby_candidates() {
+        for (round, expected) in [(0, [1, 2, 3, 4]), (1, [1, 2, 3, 5]), (8, [1, 2, 3, 4])] {
+            let mut ranked = (1..=16).collect();
+            trim_refresh_window(
+                &mut ranked,
+                4,
+                ReviewCardOrder::RetrievabilityAscending,
+                round,
+            );
+            assert_eq!(ranked, expected);
+        }
+    }
 
     #[test]
     fn review_duration_uses_recall_and_grade_with_historical_variation() {
@@ -1533,6 +1737,21 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn forecast_keeps_preset_steps_in_review_until_their_due_time() {
+        let mut preset = DeckConfig::default();
+        preset.inner.learn_steps = vec![1.0, 10.0];
+        let (mut card, _) = InstantCard::new(input(0, 0, true), 0, &mut HashMap::new()).unwrap();
+        card.answer(0, 0, 3, &preset, true, false, 0).unwrap();
+        assert_eq!(card.input.queue, 2);
+        assert_eq!(card.learning_due_millis, 600_000);
+        assert_eq!(card.candidate(0, 599_999, 0).review_step_due, Some(false));
+        assert_eq!(card.candidate(0, 600_000, 0).review_step_due, Some(true));
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn a_failed_review_enters_relearning() {
         let mut preset = DeckConfig::default();
         preset.inner.relearn_steps = vec![10.0];
@@ -1573,6 +1792,79 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn minimum_reviews_follow_new_cards_whatever_the_new_mix() {
+        // 1, 2 = due reviews; 10 = interday learning; 20, 21 = new cards;
+        // 30, 31 = reviews pulled only for the daily minimum.
+        let queue = |new_mix| {
+            main_queue(
+                MainQueueParts {
+                    due: vec![1, 2],
+                    minimum: vec![30, 31],
+                    day_learning: vec![10],
+                    new: vec![20, 21],
+                },
+                ReviewMix::AfterReviews,
+                new_mix,
+                0,
+                0,
+            )
+        };
+        assert_eq!(
+            queue(ReviewMix::BeforeReviews),
+            vec![20, 21, 1, 2, 10, 30, 31]
+        );
+        assert_eq!(
+            queue(ReviewMix::AfterReviews),
+            vec![1, 2, 10, 20, 21, 30, 31]
+        );
+        // New cards spread over due reviews and interday learning only.
+        let mixed = queue(ReviewMix::MixWithReviews);
+        assert_eq!(
+            mixed,
+            Intersperser::new(vec![1, 2, 10].into_iter(), vec![20, 21].into_iter())
+                .chain([30, 31])
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(&mixed[5..], &[30, 31]);
+    }
+
+    #[test]
+    fn main_queue_without_minimum_reviews_matches_the_previous_mix() {
+        for new_mix in [
+            ReviewMix::BeforeReviews,
+            ReviewMix::AfterReviews,
+            ReviewMix::MixWithReviews,
+        ] {
+            let parts = || MainQueueParts {
+                due: vec![1, 2, 3, 4],
+                minimum: Vec::new(),
+                day_learning: vec![10],
+                new: vec![20, 21],
+            };
+            let previous = mix_queues(
+                mix_queues(
+                    parts().due,
+                    parts().day_learning,
+                    ReviewMix::MixWithReviews,
+                    0,
+                    0,
+                ),
+                parts().new,
+                new_mix,
+                2,
+                1,
+            );
+            assert_eq!(
+                main_queue(parts(), ReviewMix::MixWithReviews, new_mix, 2, 1),
+                previous
+            );
+        }
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn a_new_session_requires_a_recorded_break_and_a_future_timestamp() {
         let pattern = [(1000, 100), (2000, 100), (1_802_000, 100), (1_803_000, 100)];
         assert_eq!(next_recorded_session(&pattern, 0, 1000), Some(2));

@@ -10,10 +10,14 @@ workspace = ".."
 description = "Anki's Rust library code"
 
 [features]
+<<<<<<< HEAD
 # kuma3: off, so crate::rwkv is the big model and crate::rwkv::alternate the
 # small one, as kuma3's offline runtime (scheduler/rwkv/offline_engine.rs)
 # expects; the fork's own runtime (rwkv/runtime.rs) picks either way.
 default = []
+=======
+default = ["rwkv-sm40"]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 # Select the primary engine for offline comparisons; both models are always available at runtime.
 rwkv-sm40 = []
 bench = ["criterion"]
@@ -28,6 +32,10 @@ required-features = ["bench"]
 [[bench]]
 name = "fsrs"
 harness = false
+required-features = ["bench"]
+
+[[example]]
+name = "instant_forecast_bench"
 required-features = ["bench"]
 
 [build-dependencies]

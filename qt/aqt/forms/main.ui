@@ -49,11 +49,21 @@
      <height>43</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuSupport">
+    <property name="title">
+     <string>qt_misc_campaign_support</string>
+    </property>
+    <addaction name="actionCampaignUpload"/>
+    <addaction name="actionCampaignDetails"/>
+    <addaction name="actionStopMonthlyUploads"/>
+   </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>qt_accel_help</string>
     </property>
     <addaction name="actionDocumentation"/>
+    <addaction name="actionExportExecutionLog"/>
+    <addaction name="actionPostLogs"/>
     <addaction name="separator"/>
     <addaction name="actionDonate"/>
     <addaction name="actionAbout"/>
@@ -111,8 +121,18 @@
    <addaction name="menuEdit"/>
    <addaction name="menuqt_accel_view"/>
    <addaction name="menuTools"/>
+   <addaction name="menuSupport"/>
    <addaction name="menuHelp"/>
   </widget>
+  <action name="actionCampaignUpload">
+   <property name="text"><string>qt_misc_campaign_upload</string></property>
+  </action>
+  <action name="actionCampaignDetails">
+   <property name="text"><string>qt_misc_campaign_details</string></property>
+  </action>
+  <action name="actionStopMonthlyUploads">
+   <property name="text"><string>qt_misc_campaign_stop_monthly</string></property>
+  </action>
   <action name="actionExit">
    <property name="text">
     <string>qt_accel_exit</string>
@@ -170,6 +190,16 @@
   <action name="actionFullDatabaseCheck">
    <property name="text">
     <string>qt_accel_check_database</string>
+   </property>
+  </action>
+  <action name="actionExportExecutionLog">
+   <property name="text">
+    <string>qt_misc_export_execution_log</string>
+   </property>
+  </action>
+  <action name="actionPostLogs">
+   <property name="text">
+    <string>qt_misc_post_logs_on_github_issues</string>
    </property>
   </action>
   <action name="actionDocumentation">

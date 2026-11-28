@@ -8,7 +8,6 @@ mod notes;
 
 use std::fs::File;
 use std::path::Path;
-use std::path::PathBuf;
 
 use anki_io::new_tempfile;
 use anki_io::open_file;
@@ -150,9 +149,28 @@ impl ExchangeData {
         let mut data = ExchangeData::default();
         data.gather_data(&mut col, search, with_scheduling, with_deck_configs)?;
         if with_scheduling {
+<<<<<<< HEAD
             data.foreign_fsrs_card_ids = col
                 .storage
                 .card_ids_with_foreign_fsrs_state()?
+=======
+            if with_deck_configs {
+                let configs = col.storage.get_deck_config_map()?;
+                data.fsrs_params_by_deck = data
+                    .decks
+                    .iter()
+                    .filter_map(|deck| {
+                        let config = configs.get(&deck.config_id()?)?;
+                        // Without exported presets an archive contains only the generated Default.
+                        (config.id != DeckConfigId(1) || config.mtime_secs.0 != 0)
+                            .then(|| (deck.id, config.fsrs_params().to_vec()))
+                    })
+                    .collect();
+            }
+            data.foreign_fsrs_card_ids = col
+                .storage
+                .card_ids_with_foreign_fsrs_state(None)?
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .into_iter()
                 .collect();
         }
@@ -163,12 +181,19 @@ impl ExchangeData {
 
 fn collection_to_tempfile(meta: &Meta, archive: &mut ZipArchive<File>) -> Result<NamedTempFile> {
     let mut zip_file = archive.by_name(meta.collection_filename())?;
-    let filename = PathBuf::from(zip_file.name()?.as_ref());
     let mut tempfile = new_tempfile()?;
     meta.copy(&mut zip_file, &mut tempfile)
         .with_context(|_| FileIoSnafu {
             path: tempfile.path(),
+<<<<<<< HEAD
+<<<<<<< HEAD
             op: FileOp::copy(filename),
+=======
+            op: FileOp::copy(meta.collection_filename()),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+            op: FileOp::copy(meta.collection_filename()),
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         })?;
 
     Ok(tempfile)

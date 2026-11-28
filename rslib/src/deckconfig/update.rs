@@ -120,6 +120,7 @@ impl Collection {
             review_fuzz_factor_mid: review_fuzz_config.factor_mid,
             review_fuzz_factor_long: review_fuzz_config.factor_long,
             all_config: self.get_deck_config_with_extra_for_update()?,
+            field_names: self.storage.all_field_names()?,
             current_deck: Some(self.get_current_deck_for_update(deck)?),
             defaults: Some(defaults.into()),
             schema_modified: self
@@ -284,7 +285,12 @@ impl Collection {
             // If the user has provided empty FSRS6 params, zero out any
             // old params as well, so we don't fall back on them, which would
             // be surprising as they're not shown in the GUI.
-            if conf.inner.fsrs_params_6.is_empty() {
+            if conf.inner.fsrs_version == FsrsVersion::Six as i32
+                && conf.inner.fsrs_params_6.is_empty()
+                && configs_before_update
+                    .get(&conf.id)
+                    .is_some_and(|old| !old.inner.fsrs_params_6.is_empty())
+            {
                 conf.inner.fsrs_params_5.clear();
                 conf.inner.fsrs_params_4.clear();
             }
@@ -535,7 +541,7 @@ impl Collection {
 
         // frontend didn't include any unmodified deck configs, so we need to fill them
         // in
-        let changed_configs: HashSet<_> = req.configs.iter().map(|c| c.id).collect();
+        let mut changed_configs: HashSet<_> = req.configs.iter().map(|c| c.id).collect();
         let previous_last = req.configs.pop().or_invalid("no configs provided")?;
         for config in self.storage.all_deck_config()? {
             if !changed_configs.contains(&config.id) {
@@ -581,7 +587,19 @@ impl Collection {
                 desired_retention: config.inner.desired_retention,
                 dynamic_desired_retention_simulator_options:
                     DynamicDesiredRetentionSimulatorOptions::default(),
+<<<<<<< HEAD
             })?;
+=======
+            });
+            let prepared = match prepared {
+                Ok(prepared) => prepared,
+                Err(AnkiError::Interrupted) => return Err(AnkiError::Interrupted),
+                Err(err) => {
+                    warn!(preset = config.name, error = %err, "failed to prepare FSRS preset");
+                    continue;
+                }
+            };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             anki_progress.check_cancelled()?;
             if prepared.target_counts.total_targets == 0 {
                 debug!(preset = config.name, "skipping FSRS preset with no reviews");
@@ -600,6 +618,10 @@ impl Collection {
                         continue;
                     }
                     debug!(preset = output.name, params = ?params.params, "optimized FSRS preset");
+<<<<<<< HEAD
+=======
+                    changed_configs.insert(req.configs[output.index].id);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     *selected_fsrs_params_mut(&mut req.configs[output.index]) = params.params;
                     if !params.fsrs_dynamic_desired_retention_params.is_empty() {
                         req.configs[output.index]
@@ -646,6 +668,11 @@ impl Collection {
                 }
             }
         }
+<<<<<<< HEAD
+=======
+        req.configs
+            .retain(|config| changed_configs.contains(&config.id));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let today = self.timing_today()?.days_elapsed as i32;
         self.set_config_i32_inner(I32ConfigKey::LastFsrsOptimize, today)?;
         Ok(())
@@ -708,7 +735,7 @@ fn normal_deck_to_limits(deck: &NormalDeck, today: u32) -> Limits {
     }
 }
 
-fn update_deck_limits(deck: &mut NormalDeck, limits: &Limits, today: u32) {
+pub(crate) fn update_deck_limits(deck: &mut NormalDeck, limits: &Limits, today: u32) {
     deck.review_limit = limits.review;
     deck.new_limit = limits.new;
     update_day_limit(&mut deck.review_limit_today, limits.review_today, today);
@@ -741,6 +768,44 @@ mod test {
     use crate::timestamp::TimestampSecs;
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn optimize_all_preserves_an_unedited_legacy_preset_when_its_search_fails() -> Result<()> {
+        let mut col = Collection::new();
+        let deck = crate::tests::DeckAdder::new("Legacy")
+            .with_config(|config| {
+                config.clear_fsrs_params();
+                config.inner.fsrs_version = FsrsVersion::Six as i32;
+                config.inner.fsrs_params_6 = fsrs::FSRS6_DEFAULT_PARAMETERS.to_vec();
+                config.inner.param_search = "prop:ivl=oops".into();
+            })
+            .add(&mut col);
+        let id = deck.config_id().unwrap();
+        let before = col.get_deck_config(id, false)?.unwrap();
+        let default = col.get_deck_config(DeckConfigId(1), false)?.unwrap();
+        col.update_deck_configs(UpdateDeckConfigsRequest {
+            target_deck_id: DeckId(1),
+            configs: vec![default],
+            removed_config_ids: vec![],
+            mode: UpdateDeckConfigsMode::ComputeAllParams,
+            card_state_customizer: String::new(),
+            limits: Limits::default(),
+            new_cards_ignore_review_limit: false,
+            apply_all_parent_limits: false,
+            fsrs: true,
+            load_balancer_enabled: false,
+            fsrs_short_term_with_steps_enabled: false,
+            fsrs_learning_queues_disabled: false,
+            review_fuzz_config: Default::default(),
+            fsrs_reschedule: false,
+            fsrs_health_check: true,
+        })?;
+        assert_eq!(col.get_deck_config(id, false)?.unwrap(), before);
+        Ok(())
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn fsrs7_optimize_include_same_day_reviews_reads_stored_flag() -> Result<()> {
         let mut config = DeckConfig::default();
         config.inner.fsrs_version = FsrsVersion::Seven as i32;

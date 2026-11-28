@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use serde::Deserialize;
@@ -8,6 +16,11 @@ use serde_json::Value;
 
 use super::DeckConfigInner;
 use super::FsrsVersion;
+<<<<<<< HEAD
+=======
+use super::SuspendedCardOrder;
+use super::DECK_OPTIONS_KEY;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use super::DEFAULT_RWKV_REVIEW_ALLOW_SAME_DAY_REVIEW;
 use super::DEFAULT_RWKV_REVIEW_BATCH_SIZE;
 use super::DEFAULT_RWKV_REVIEW_ENFORCE_GRADE_ORDER;
@@ -19,6 +32,12 @@ use super::DEFAULT_RWKV_REVIEW_REFRESH_INTERVAL;
 
 const FSRS_FORK_FIELDS_KEY: &str = "jschoreels.fsrs";
 const RWKV_FORK_FIELDS_KEY: &str = "jschoreels.rwkv";
+<<<<<<< HEAD
+=======
+const INCLUDE_SUSPENDED_KEY: &str = "include_suspended_cards_in_learnable_pool";
+const SUSPENDED_ORDER_KEY: &str = "suspended_card_order";
+const GATHER_FIELD_KEY: &str = "new_card_gather_field";
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 const FSRS_MINIMUM_INTERVAL_SECS_DEFAULT: u32 = 1;
 const DYNAMIC_DR_MIN_DEFAULT: f32 = 0.30;
 const DYNAMIC_DR_MAX_DEFAULT: f32 = 0.995;
@@ -225,6 +244,11 @@ struct RwkvDeckConfigFields {
     rwkv_review_enforce_grade_order: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rwkv_review_minimum_reviews_per_day: Option<u32>,
+<<<<<<< HEAD
+=======
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rwkv_review_new_cards_ignore_minimum_reviews: Option<bool>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl RwkvDeckConfigFields {
@@ -273,6 +297,12 @@ impl RwkvDeckConfigFields {
                 config.rwkv_review_minimum_reviews_per_day,
                 0,
             ),
+<<<<<<< HEAD
+=======
+            rwkv_review_new_cards_ignore_minimum_reviews: true_only(
+                config.rwkv_review_new_cards_ignore_minimum_reviews,
+            ),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
     }
 
@@ -319,6 +349,12 @@ impl RwkvDeckConfigFields {
         if let Some(value) = self.rwkv_review_minimum_reviews_per_day {
             config.rwkv_review_minimum_reviews_per_day = value;
         }
+<<<<<<< HEAD
+=======
+        if let Some(value) = self.rwkv_review_new_cards_ignore_minimum_reviews {
+            config.rwkv_review_new_cards_ignore_minimum_reviews = value;
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     fn is_empty(&self) -> bool {
@@ -330,6 +366,23 @@ impl RwkvDeckConfigFields {
 }
 
 pub(crate) fn restore_fork_fields_from_other(config: &mut DeckConfigInner) {
+<<<<<<< HEAD
+=======
+    if let Ok(other) = serde_json::from_slice::<Value>(&config.other) {
+        let options = &other[DECK_OPTIONS_KEY];
+        config.include_suspended_cards_in_learnable_pool =
+            options[INCLUDE_SUSPENDED_KEY].as_bool().unwrap_or(false);
+        config.suspended_card_order = options[SUSPENDED_ORDER_KEY]
+            .as_i64()
+            .and_then(|n| i32::try_from(n).ok())
+            .and_then(|n| SuspendedCardOrder::try_from(n).ok())
+            .unwrap_or_default() as i32;
+        config.new_card_gather_field = options[GATHER_FIELD_KEY]
+            .as_str()
+            .unwrap_or_default()
+            .into();
+    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     config.rwkv_review_precompute_next_card = DEFAULT_RWKV_REVIEW_PRECOMPUTE_NEXT_CARD;
     if !config.rwkv_review_allow_same_day_review {
         config.rwkv_review_allow_same_day_review = DEFAULT_RWKV_REVIEW_ALLOW_SAME_DAY_REVIEW;
@@ -379,7 +432,11 @@ pub(crate) fn deck_config_inner_for_storage(config: &DeckConfigInner) -> DeckCon
     let mut storage_config = config.clone();
     let fields = ForkDeckConfigFields::from_config(&storage_config);
     let rwkv_fields = RwkvDeckConfigFields::from_config(&storage_config);
+<<<<<<< HEAD
     storage_config.other = other_with_fork_fields(&storage_config.other, fields, rwkv_fields);
+=======
+    storage_config.other = other_with_fork_fields(config, fields, rwkv_fields);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     clear_numbered_fork_fields(&mut storage_config);
     storage_config
 }
@@ -400,11 +457,19 @@ fn legacy_rwkv_fields_from_fsrs_other(other: &[u8]) -> Option<RwkvDeckConfigFiel
 }
 
 fn other_with_fork_fields(
+<<<<<<< HEAD
     other: &[u8],
     fields: ForkDeckConfigFields,
     rwkv_fields: RwkvDeckConfigFields,
 ) -> Vec<u8> {
     let mut object = serde_json::from_slice::<Value>(other)
+=======
+    config: &DeckConfigInner,
+    fields: ForkDeckConfigFields,
+    rwkv_fields: RwkvDeckConfigFields,
+) -> Vec<u8> {
+    let mut object = serde_json::from_slice::<Value>(&config.other)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         .ok()
         .and_then(|value| value.as_object().cloned())
         .unwrap_or_default();
@@ -421,6 +486,43 @@ fn other_with_fork_fields(
         object.insert(RWKV_FORK_FIELDS_KEY.to_string(), value);
     }
 
+<<<<<<< HEAD
+=======
+    let options = object
+        .entry(DECK_OPTIONS_KEY)
+        .or_insert_with(|| Value::Object(Map::new()));
+    if let Some(options) = options.as_object_mut() {
+        for (key, value) in [
+            (
+                INCLUDE_SUSPENDED_KEY,
+                true_only(config.include_suspended_cards_in_learnable_pool).map(Value::from),
+            ),
+            (
+                SUSPENDED_ORDER_KEY,
+                non_default(
+                    config.suspended_card_order,
+                    SuspendedCardOrder::Mixed as i32,
+                )
+                .map(Value::from),
+            ),
+            (
+                GATHER_FIELD_KEY,
+                (!config.new_card_gather_field.is_empty())
+                    .then(|| Value::from(config.new_card_gather_field.as_str())),
+            ),
+        ] {
+            if let Some(value) = value {
+                options.insert(key.into(), value);
+            } else {
+                options.remove(key);
+            }
+        }
+        if options.is_empty() {
+            object.remove(DECK_OPTIONS_KEY);
+        }
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     if object.is_empty() {
         Vec::new()
     } else {
@@ -455,6 +557,12 @@ fn clear_numbered_fork_fields(config: &mut DeckConfigInner) {
     config.review_fuzz_factor_long = None;
     config.review_fuzz_enabled = None;
     config.same_day_reviews_ignore_review_limit = false;
+<<<<<<< HEAD
+=======
+    config.include_suspended_cards_in_learnable_pool = false;
+    config.suspended_card_order = 0;
+    config.new_card_gather_field.clear();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     config.rwkv_review_enabled = false;
     config.rwkv_review_batch_size = 0;
     config.rwkv_review_refresh_interval = 0;
@@ -469,6 +577,10 @@ fn clear_numbered_fork_fields(config: &mut DeckConfigInner) {
     config.rwkv_review_first_review_elapsed_from_card_creation = false;
     config.rwkv_review_enforce_grade_order = false;
     config.rwkv_review_minimum_reviews_per_day = 0;
+<<<<<<< HEAD
+=======
+    config.rwkv_review_new_cards_ignore_minimum_reviews = false;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 fn non_empty_vec(values: &[f32]) -> Option<Vec<f32>> {
@@ -517,6 +629,12 @@ mod tests {
             review_fuzz_factor_long: Some(0.05),
             review_fuzz_enabled: Some(false),
             same_day_reviews_ignore_review_limit: true,
+<<<<<<< HEAD
+=======
+            include_suspended_cards_in_learnable_pool: true,
+            suspended_card_order: SuspendedCardOrder::NewBeforeSuspended as i32,
+            new_card_gather_field: "Frequency".into(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_review_enabled: true,
             rwkv_review_batch_size: 1024,
             rwkv_review_refresh_interval: 5,
@@ -531,6 +649,10 @@ mod tests {
             rwkv_review_first_review_elapsed_from_card_creation: false,
             rwkv_review_enforce_grade_order: false,
             rwkv_review_minimum_reviews_per_day: 42,
+<<<<<<< HEAD
+=======
+            rwkv_review_new_cards_ignore_minimum_reviews: true,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ..Default::default()
         }
     }
@@ -549,6 +671,15 @@ mod tests {
         assert_eq!(storage_config.fsrs_version, FsrsVersion::Seven as i32);
         assert_eq!(storage_config.review_fuzz_base, None);
         assert!(!storage_config.same_day_reviews_ignore_review_limit);
+<<<<<<< HEAD
+=======
+        assert!(!storage_config.include_suspended_cards_in_learnable_pool);
+        assert!(storage_config.new_card_gather_field.is_empty());
+        assert_eq!(
+            storage_config.suspended_card_order(),
+            SuspendedCardOrder::Mixed
+        );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         assert!(!storage_config.rwkv_review_enabled);
         assert_eq!(storage_config.rwkv_review_batch_size, 0);
         assert_eq!(storage_config.rwkv_review_refresh_interval, 0);
@@ -563,6 +694,10 @@ mod tests {
         assert!(!storage_config.rwkv_review_first_review_elapsed_from_card_creation);
         assert!(!storage_config.rwkv_review_enforce_grade_order);
         assert_eq!(storage_config.rwkv_review_minimum_reviews_per_day, 0);
+<<<<<<< HEAD
+=======
+        assert!(!storage_config.rwkv_review_new_cards_ignore_minimum_reviews);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         let other: Value = serde_json::from_slice(&storage_config.other).unwrap();
         let fsrs_other = other.get(FSRS_FORK_FIELDS_KEY).unwrap();
@@ -612,6 +747,10 @@ mod tests {
                 "rwkv_review_first_review_elapsed_from_card_creation": false,
                 "rwkv_review_enforce_grade_order": false,
                 "rwkv_review_minimum_reviews_per_day": 42,
+<<<<<<< HEAD
+=======
+                "rwkv_review_new_cards_ignore_minimum_reviews": true,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             }))
         );
     }
@@ -636,6 +775,15 @@ mod tests {
         );
         assert_eq!(decoded.fsrs_version, config.fsrs_version);
         assert_eq!(decoded.review_fuzz_base, config.review_fuzz_base);
+<<<<<<< HEAD
+=======
+        assert!(decoded.include_suspended_cards_in_learnable_pool);
+        assert_eq!(decoded.new_card_gather_field, "Frequency");
+        assert_eq!(
+            decoded.suspended_card_order(),
+            SuspendedCardOrder::NewBeforeSuspended
+        );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         assert_eq!(
             decoded.same_day_reviews_ignore_review_limit,
             config.same_day_reviews_ignore_review_limit
@@ -693,6 +841,30 @@ mod tests {
             decoded.rwkv_review_minimum_reviews_per_day,
             config.rwkv_review_minimum_reviews_per_day
         );
+<<<<<<< HEAD
+=======
+        assert_eq!(
+            decoded.rwkv_review_new_cards_ignore_minimum_reviews,
+            config.rwkv_review_new_cards_ignore_minimum_reviews
+        );
+    }
+
+    #[test]
+    fn new_cards_ignore_minimum_reviews_is_omitted_from_storage_when_off() {
+        let config = DeckConfigInner {
+            rwkv_review_minimum_reviews_per_day: 5,
+            ..Default::default()
+        };
+        let storage = deck_config_inner_for_storage(&config);
+        let other: Value = serde_json::from_slice(&storage.other).unwrap();
+        assert!(other[RWKV_FORK_FIELDS_KEY]
+            .get("rwkv_review_new_cards_ignore_minimum_reviews")
+            .is_none());
+
+        let mut decoded = DeckConfigInner::decode(storage.encode_to_vec().as_slice()).unwrap();
+        restore_fork_fields_from_other(&mut decoded);
+        assert!(!decoded.rwkv_review_new_cards_ignore_minimum_reviews);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     #[test]

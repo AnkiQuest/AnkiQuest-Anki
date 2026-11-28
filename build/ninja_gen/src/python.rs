@@ -27,14 +27,34 @@ pub fn uv_archive(platform: Platform) -> OnlineArchive {
     match platform {
         Platform::LinuxX64 => {
             OnlineArchive {
+<<<<<<< HEAD
+<<<<<<< HEAD
                 url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-unknown-linux-gnu.tar.gz",
                 sha256: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83",
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-x86_64-unknown-linux-gnu.tar.gz",
+                sha256: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-unknown-linux-gnu.tar.gz",
+                sha256: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             }
         },
         Platform::LinuxArm => {
             OnlineArchive {
+<<<<<<< HEAD
+<<<<<<< HEAD
                 url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-unknown-linux-gnu.tar.gz",
                 sha256: "71279f8d3c67241e807b9d8db872d1bf541579fb9f08b7d1eb1682196d1e57dc",
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-aarch64-unknown-linux-gnu.tar.gz",
+                sha256: "229e194255c7958d86d56e8790d969a6f74736592133f0dfd0076f754c642c1d",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-unknown-linux-gnu.tar.gz",
+                sha256: "71279f8d3c67241e807b9d8db872d1bf541579fb9f08b7d1eb1682196d1e57dc",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             }
         },
         Platform::OpenBSDX64 => {
@@ -42,26 +62,66 @@ pub fn uv_archive(platform: Platform) -> OnlineArchive {
         },
         Platform::MacX64 => {
             OnlineArchive {
+<<<<<<< HEAD
+<<<<<<< HEAD
                 url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-apple-darwin.tar.gz",
                 sha256: "20c47e4c1f630b8abaff8c291fa9b9aa300fef92c4fbff95adf198b55287cda7",
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-x86_64-apple-darwin.tar.gz",
+                sha256: "63ba17fdda55ad1a230d4b37fc6017ffa10c23688c83818bd3bfdf914c652a02",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-apple-darwin.tar.gz",
+                sha256: "20c47e4c1f630b8abaff8c291fa9b9aa300fef92c4fbff95adf198b55287cda7",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             }
         },
         Platform::MacArm => {
             OnlineArchive {
+<<<<<<< HEAD
+<<<<<<< HEAD
                 url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-apple-darwin.tar.gz",
                 sha256: "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731",
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-aarch64-apple-darwin.tar.gz",
+                sha256: "60fbd5c8a1ed681845eea28d9d622fcde03c51e91a43465b64a1e17db1ed3472",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-apple-darwin.tar.gz",
+                sha256: "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             }
         },
         Platform::WindowsX64 => {
             OnlineArchive {
+<<<<<<< HEAD
+<<<<<<< HEAD
                 url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-pc-windows-msvc.zip",
                 sha256: "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021",
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-x86_64-pc-windows-msvc.zip",
+                sha256: "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-pc-windows-msvc.zip",
+                sha256: "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             }
         },
         Platform::WindowsArm => {
             OnlineArchive {
+<<<<<<< HEAD
+<<<<<<< HEAD
                 url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-pc-windows-msvc.zip",
                 sha256: "505d9e65e7692bac3ddf98c66754aa26c5050c409c184af30a881a0a72cc85e3",
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-aarch64-pc-windows-msvc.zip",
+                sha256: "c2426c0c8e28b53d8c440e47a18d96ad4db51e159866c0e81435b196d7f0081c",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+                url: "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-pc-windows-msvc.zip",
+                sha256: "505d9e65e7692bac3ddf98c66754aa26c5050c409c184af30a881a0a72cc85e3",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             }
         }
     }
@@ -255,19 +315,55 @@ impl BuildAction for RuffCheck {
 
 pub struct PythonTest {
     pub folder: &'static str,
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    pub ignore: Option<&'static str>,
+    pub python_path: &'static [&'static str],
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    pub ignore: Option<&'static str>,
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     pub deps: BuildInput,
 }
 
 impl BuildAction for PythonTest {
     fn command(&self) -> &str {
+<<<<<<< HEAD
+<<<<<<< HEAD
         "$pytest $folder"
+=======
+        "$pytest -p no:cacheprovider $folder $ignore_arg"
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+        "$pytest $folder $ignore_arg"
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     }
 
     fn files(&mut self, build: &mut impl crate::build::FilesHandle) {
         build.add_inputs("", &self.deps);
         build.add_inputs("pytest", inputs![":pyenv:pytest"]);
         build.add_variable("folder", self.folder);
+<<<<<<< HEAD
+<<<<<<< HEAD
         let hash = simple_hash(self.folder);
+=======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+        build.add_variable(
+            "ignore_arg",
+            self.ignore
+                .map(|path| format!("--ignore={path}"))
+                .unwrap_or_default(),
+        );
+        let hash = match self.ignore {
+            Some(path) => simple_hash((self.folder, path)),
+            None => simple_hash(self.folder),
+        };
+<<<<<<< HEAD
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         build.add_output_stamp(format!("tests/python_pytest.{hash}"));
     }
 

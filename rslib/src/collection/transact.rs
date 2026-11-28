@@ -27,10 +27,16 @@ impl Collection {
                 self.storage.commit_rust_trx()?;
                 // finalize undo
                 let changes = if have_op {
+<<<<<<< HEAD
                     let changes = self.op_changes();
                     self.maybe_clear_fsrs_preset_overlay_cache_after_op(&changes);
                     self.maybe_clear_addon_retention_scores_after_op(&changes);
                     self.maybe_clear_study_queues_after_op(&changes);
+=======
+                    let mut changes = self.op_changes();
+                    self.maybe_clear_fsrs_preset_overlay_cache_after_op(&changes);
+                    self.maybe_clear_study_queues_after_op(&mut changes);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     self.maybe_coalesce_note_undo_entry(&changes);
                     changes
                 } else {
@@ -82,6 +88,7 @@ impl Collection {
             self.clear_fsrs_preset_overlay_card_matches();
         }
     }
+<<<<<<< HEAD
 
     fn maybe_clear_addon_retention_scores_after_op(&mut self, changes: &OpChanges) {
         let c = &changes.changes;
@@ -96,4 +103,6 @@ impl Collection {
             self.invalidate_rwkv_offline_targets();
         }
     }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }

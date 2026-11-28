@@ -38,10 +38,14 @@ use crate::deckconfig::LeechAction;
 use crate::decks::Deck;
 use crate::prelude::*;
 use crate::revlog::RevlogReviewKind;
+<<<<<<< HEAD
 use crate::scheduler::addon_desired_retention::AddonRetentionRules;
 use crate::scheduler::addon_desired_retention::RetentionMatch;
 use crate::scheduler::fsrs::dynamic_desired_retention::DynamicDesiredRetentionStates;
 use crate::scheduler::fsrs::memory_state::fsrs_interval_at_retrievability_for_params;
+=======
+use crate::scheduler::fsrs::dynamic_desired_retention::DynamicDesiredRetentionStates;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::scheduler::fsrs::memory_state::fsrs_item_for_memory_state;
 use crate::scheduler::fsrs::memory_state::fsrs_memory_state_for_params;
 use crate::scheduler::fsrs::memory_state::fsrs_memory_state_for_s90;
@@ -117,6 +121,24 @@ struct CardStateUpdater {
 }
 
 impl CardStateUpdater {
+    fn next_answer_states(
+        &self,
+        current: CardState,
+        context: &StateContext,
+    ) -> Result<SchedulingStates> {
+        let mut states = current.next_states(context);
+        if self.fsrs_preset.fsrs_version == crate::deckconfig::FsrsVersion::Seven
+            && context.fsrs_next_states.is_some()
+        {
+            let fsrs = FSRS::new(&self.fsrs_preset.params)?;
+            states.update_next_memory_states(|state| state.stability = fsrs.s90((*state).into()));
+        }
+        states.dynamic_desired_retentions = self.dynamic_desired_retentions;
+        states.dynamic_desired_retention_enabled =
+            self.fsrs_preset.dynamic_desired_retention.is_some();
+        Ok(states)
+    }
+
     /// Returns information required when transitioning from one card state to
     /// another with `next_states()`. This separate structure decouples the
     /// state handling code from the rest of the Anki codebase.
@@ -222,7 +244,11 @@ impl CardStateUpdater {
         next: CardState,
         rating: Rating,
     ) -> Result<RevlogEntryPartial> {
-        let revlog = match next {
+        let previous_review_step = self
+            .card
+            .review_step_due_at()
+            .and(self.card.review_step_secs);
+        let mut revlog = match next {
             CardState::Normal(normal) => {
                 // transitioning from filtered state?
                 if let CardState::Filtered(filtered) = &current {
@@ -255,6 +281,9 @@ impl CardStateUpdater {
             }
         };
 
+        if !matches!(next, CardState::Filtered(FilteredState::Preview(_))) {
+            revlog.set_review_steps(previous_review_step, self.card.review_step_secs);
+        }
         Ok(revlog)
     }
 
@@ -313,6 +342,7 @@ impl Rating {
     fn index(self) -> usize {
         self.as_number() as usize - 1
     }
+<<<<<<< HEAD
 }
 
 fn addon_review_state_mut(state: &mut CardState) -> Option<&mut ReviewState> {
@@ -388,6 +418,8 @@ fn use_external_intervals(state_ctx: &mut StateContext, intervals: [Option<f32>;
         }
         state_ctx.fsrs_fractional_intervals = true;
     }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl Collection {
@@ -414,6 +446,7 @@ impl Collection {
         let (addon_rules, addon_match) = self.addon_retention_for_card(&card)?;
         let base_override = desired_retention_override.or(addon_match.map(|value| value.retention));
         let note_id = card.note_id;
+<<<<<<< HEAD
         let ctx = self.card_state_updater(card, base_override)?;
         let current = ctx.current_card_state();
         // RWKV-Curve (a Curve preset, or Instant's Curve due dates) without the
@@ -433,8 +466,46 @@ impl Collection {
             )
         } else {
             None
-        };
+=======
+        let stored_queue = card.queue;
+        let ctx = self.card_state_updater(card, desired_retention_override)?;
+        let current = ctx.current_card_state();
 
+        let load_balancer_ctx = self.review_load_balancer_ctx(&ctx, note_id)?;
+
+        let state_ctx = ctx.state_context(load_balancer_ctx)?;
+        let states = ctx.next_answer_states(current, &state_ctx)?;
+        let mut card = ctx.into_card();
+        card.queue = stored_queue;
+        Ok((states, card))
+    }
+
+    fn review_load_balancer_ctx(
+        &self,
+        ctx: &CardStateUpdater,
+        note_id: NoteId,
+    ) -> Result<Option<LoadBalancerContext<'_>>> {
+        let Some(load_balancer) = self
+            .state
+            .card_queues
+            .as_ref()
+            .and_then(|card_queues| card_queues.load_balancer.as_ref())
+        else {
+            return Ok(None);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+        };
+        let Some(deck_config_id) = ctx.original_deck.config_id() else {
+            return Ok(None);
+        };
+        let note_id = self
+            .get_deck_config(deck_config_id, false)?
+            .map(|deck_config| deck_config.inner.bury_reviews)
+            .unwrap_or(false)
+            .then_some(note_id);
+        Ok(Some(load_balancer.review_context(note_id, deck_config_id)))
+    }
+
+<<<<<<< HEAD
         let load_balancer_ctx = self.review_load_balancer_ctx(&ctx, note_id)?;
 
         let mut state_ctx = ctx.state_context(load_balancer_ctx)?;
@@ -556,6 +627,8 @@ impl Collection {
         Ok(Some(load_balancer.review_context(note_id, deck_config_id)))
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     /// Build answer states after replacing any supplied unrounded intervals.
     pub fn scheduling_states_with_intervals(
         &mut self,
@@ -563,6 +636,7 @@ impl Collection {
         intervals: [Option<f32>; 4],
     ) -> Result<SchedulingStates> {
         let card = self.storage.get_card(cid)?.or_not_found(cid)?;
+<<<<<<< HEAD
         let (addon_rules, addon_match) = self.addon_retention_for_card(&card)?;
         let base_override = addon_match.map(|value| value.retention);
         let note_id = card.note_id;
@@ -584,17 +658,52 @@ impl Collection {
                 base_override,
             )?;
         }
+=======
+        let note_id = card.note_id;
+        let ctx = self.card_state_updater(card, None)?;
+        let current = ctx.current_card_state();
+        let load_balancer_ctx = self.review_load_balancer_ctx(&ctx, note_id)?;
+        let mut state_ctx = ctx.state_context(load_balancer_ctx)?;
+        if let Some(states) = state_ctx.fsrs_next_states.as_mut() {
+            for (item, interval) in [
+                &mut states.again,
+                &mut states.hard,
+                &mut states.good,
+                &mut states.easy,
+            ]
+            .into_iter()
+            .zip(intervals)
+            {
+                if let Some(interval) = interval.filter(|days| days.is_finite() && *days > 0.0) {
+                    item.interval = interval;
+                }
+            }
+            state_ctx.fsrs_fractional_intervals = true;
+        }
+        let states = ctx.next_answer_states(current, &state_ctx)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(states)
     }
 
     /// Describe the next intervals, to display on the answer buttons.
     pub fn describe_next_states(&mut self, choices: &SchedulingStates) -> Result<Vec<String>> {
+        let timed_reviews =
+            self.fsrs_enabled() && self.get_config_bool(BoolKey::FsrsLearningQueuesDisabled);
+        self.describe_next_states_with_timing(choices, timed_reviews)
+    }
+
+    pub(crate) fn describe_next_states_with_timing(
+        &mut self,
+        choices: &SchedulingStates,
+        timed_reviews: bool,
+    ) -> Result<Vec<String>> {
         let collapse_time = self.learn_ahead_secs();
         let now = TimestampSecs::now();
         let timing = self.timing_for_timestamp(now)?;
         let secs_until_rollover = timing.next_day_at.elapsed_secs_since(now).max(0) as u32;
         let show_fuzz_delta = self.get_config_bool(BoolKey::ShowFuzzDeltaAboveAnswerButtons);
 
+<<<<<<< HEAD
         Ok(vec![
             describe_next_state(
                 choices.again,
@@ -625,6 +734,22 @@ impl Collection {
                 &self.tr,
             ),
         ])
+=======
+        Ok([choices.again, choices.hard, choices.good, choices.easy]
+            .into_iter()
+            .map(|state| {
+                let timed = timed_reviews
+                    && !matches!(state, CardState::Filtered(FilteredState::Preview(_)));
+                describe_next_state(
+                    state,
+                    if timed { u32::MAX } else { secs_until_rollover },
+                    if timed { 0 } else { collapse_time },
+                    show_fuzz_delta,
+                    &self.tr,
+                )
+            })
+            .collect())
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     /// Answer card, writing its new state to the database.
@@ -646,6 +771,7 @@ impl Collection {
         let original = card.clone();
         let usn = self.usn()?;
 
+<<<<<<< HEAD
         let (rules, matched) = self.addon_retention_for_card(&card)?;
         let mut addon_grade_target = None;
         if let Some(rules) = rules.filter(|_| !answer.desired_retention_override_is_final) {
@@ -657,6 +783,8 @@ impl Collection {
                 addon_grade_target = answer.desired_retention_override;
             }
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if answer.desired_retention_override_is_final {
             require!(
                 answer
@@ -666,6 +794,7 @@ impl Collection {
             );
         }
         let mut updater = self.card_state_updater(card, answer.desired_retention_override)?;
+<<<<<<< HEAD
         if let Some(target) = addon_grade_target {
             // Only opt in if the supplied state actually has the interval the
             // grade rule would produce. Unsupported or externally modified
@@ -680,6 +809,16 @@ impl Collection {
                 answer.desired_retention_override_is_final = state == answer.new_state;
             }
         }
+=======
+        let daily_limit_queue = if answer.from_queue
+            && original.queue == CardQueue::Suspended
+            && updater.card.queue != CardQueue::Suspended
+        {
+            CardQueue::New
+        } else {
+            original.queue
+        };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if answer.desired_retention_override_is_final {
             // The supplied scheduling state already uses the final target. Do
             // not replace it with a second native Dynamic DR mapping on save.
@@ -705,6 +844,7 @@ impl Collection {
         if original.ctype == CardType::New && !is_preview {
             self.prepare_rwkv_new_card_reset(&mut updater.card)?;
         }
+<<<<<<< HEAD
 
         let mut revlog_partial =
             updater.apply_study_state(current_state, answer.new_state, answer.rating)?;
@@ -762,8 +902,50 @@ impl Collection {
                 tracing::warn!(?err, "failed to store RWKV review retrievability cache");
             }
         }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
-        self.update_deck_stats_from_answer(usn, answer, &updater, original.queue)?;
+        let mut revlog_partial =
+            updater.apply_study_state(current_state, answer.new_state, answer.rating)?;
+        if let Some(review_kind) = answer.rwkv_review_kind {
+            require!(review_kind <= 3, "invalid RWKV review kind");
+            revlog_partial.set_review_kind(match review_kind {
+                0 => RevlogReviewKind::Learning,
+                1 => RevlogReviewKind::Review,
+                2 => RevlogReviewKind::Relearning,
+                3 => RevlogReviewKind::Filtered,
+                _ => unreachable!(),
+            });
+        }
+        let revlog_id = self.add_partial_revlog(revlog_partial, usn, answer)?;
+        if let Some(prediction) = updater.fsrs_review_retrievability {
+            if let Err(err) = self.storage.set_fsrs_review_retrievability_predictions(
+                &[FsrsReviewRetrievabilityCacheRow {
+                    revlog_id,
+                    prediction,
+                    sample_role: FsrsReviewRetrievabilitySampleRole::PostOptimization,
+                    fold_index: -1,
+                }],
+                "fsrs_review",
+            ) {
+                tracing::warn!(?err, "failed to store FSRS review retrievability cache");
+            }
+        }
+        if let Some(prediction) = answer.rwkv_retrievability {
+            require!(
+                prediction.is_finite() && (0.0..=1.0).contains(&prediction),
+                "invalid RWKV retrievability"
+            );
+            if let Err(err) = self.storage.set_rwkv_review_retrievability_prediction(
+                revlog_id,
+                prediction,
+                "rwkv_review",
+            ) {
+                tracing::warn!(?err, "failed to store RWKV review retrievability cache");
+            }
+        }
+
+        self.update_deck_stats_from_answer(usn, answer, &updater, daily_limit_queue)?;
         self.maybe_bury_siblings(&original, &updater.config)?;
         let timing = updater.timing;
         let deckconfig_id = updater.original_deck.config_id();
@@ -800,7 +982,7 @@ impl Collection {
             self.add_leech_tags(card.note_id, card.queue == CardQueue::Suspended)?;
         }
 
-        if card.queue == CardQueue::Review {
+        if card.queue == CardQueue::Review && card.review_step_secs.is_none() {
             if let Some(load_balancer) = self
                 .state
                 .card_queues
@@ -926,6 +1108,17 @@ impl Collection {
             .storage
             .get_deck_config(home_deck_config_id)?
             .unwrap_or_default();
+<<<<<<< HEAD
+=======
+        if card.queue == CardQueue::Suspended
+            && !deck.is_filtered()
+            && config.inner.include_suspended_cards_in_learnable_pool
+        {
+            // Only the scheduling copy is unsuspended. The answer transaction
+            // records the real transition, with the suspended original for undo.
+            card.restore_queue_from_type();
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let fsrs_preset = self.fsrs_preset_for_card(&card)?;
 
         let desired_retention = desired_retention_override.unwrap_or(fsrs_preset.desired_retention);
@@ -1168,7 +1361,12 @@ pub(crate) fn fsrs_elapsed_days(
     fractional: bool,
 ) -> f32 {
     if fractional
+<<<<<<< HEAD
         || matches!(card.queue, CardQueue::Learn)
+=======
+        || (card.queue == CardQueue::Learn
+            || card.review_step_secs.is_some_and(|secs| secs < 86_400))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             && matches!(card.ctype, CardType::Learn | CardType::Relearn)
     {
         (now.elapsed_secs_since(last_review_time).max(0) as f32) / 86_400.0
@@ -1319,6 +1517,10 @@ pub(crate) mod test {
     use crate::scheduler::fsrs::preset::FsrsPresetOverlay;
     use crate::scheduler::fsrs::preset::FsrsPresetRule;
     use crate::scheduler::fsrs::preset::FSRS_PRESET_OVERLAY_CONFIG_KEY;
+<<<<<<< HEAD
+=======
+    use crate::scheduler::states::IntervalKind;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     use crate::scheduler::states::LearnState;
     use crate::scheduler::states::NewState;
     use crate::scheduler::states::NormalState;
@@ -1342,6 +1544,29 @@ pub(crate) mod test {
     const SHORT_TERM_RELEARNING_RETENTION: f32 = 0.85;
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn fsrs7_next_states_carry_the_s90_as_stability() -> Result<()> {
+        let mut col = Collection::new();
+        col.set_config_bool(BoolKey::Fsrs, true, false)?;
+        let note = crate::tests::NoteAdder::basic(&mut col).add(&mut col);
+        let cid = col.storage.card_ids_of_notes(&[note.id])?[0];
+        let fsrs = FSRS::new(&fsrs::DEFAULT_PARAMETERS)?;
+        let states = col.get_scheduling_states(cid)?;
+        let CardState::Normal(NormalState::Learning(good)) = states.good else {
+            panic!("a new card stays in learning on Good: {:?}", states.good);
+        };
+        let state = good.memory_state.unwrap();
+        assert_ne!(state.stability, state.stability_internal);
+        assert_eq!(
+            state.stability,
+            fsrs.interval_at_retrievability(state.into(), 0.9)
+        );
+        Ok(())
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn fsrs7_uses_fractional_elapsed_time_for_review_cards() {
         const HOUR: i64 = 3_600;
         const DAY: i64 = 86_400;
@@ -1710,6 +1935,12 @@ pub(crate) mod test {
                 false,
             )?;
             col.update_default_deck_config(|config| {
+<<<<<<< HEAD
+=======
+                // Keep the first FSRS interval in Review so Instant can select the repeat.
+                config.desired_retention = 0.75;
+                config.relearn_steps.clear();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 config.rwkv_review_instant_order_enabled = true;
                 config.rwkv_review_allow_same_day_review = true;
                 config.rwkv_review_min_intervening_reviews = 0;
@@ -1719,11 +1950,19 @@ pub(crate) mod test {
             });
             let card_id = add_due_review_card(
                 &mut col,
+<<<<<<< HEAD
                 1,
                 0,
                 Some(FsrsMemoryState {
                     stability: 1.0,
                     stability_internal: 1.0,
+=======
+                10,
+                0,
+                Some(FsrsMemoryState {
+                    stability: 10.0,
+                    stability_internal: 10.0,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     stability_fast: None,
                     difficulty: 5.0,
                 }),
@@ -1744,10 +1983,35 @@ pub(crate) mod test {
             )?;
             if allow_same_day {
                 assert_eq!(col.answer_again().card_id, card_id);
+<<<<<<< HEAD
                 let card = col.storage.get_card(card_id)?.unwrap();
                 assert_eq!(card.queue, CardQueue::Review);
                 assert_eq!(card.lapses, 1);
                 assert_eq!(col.storage.get_revlog_entries_for_card(card_id)?.len(), 2);
+=======
+                let mut card = col.storage.get_card(card_id)?.unwrap();
+                assert_eq!(card.ctype, CardType::Relearn);
+                assert_eq!(card.queue, CardQueue::Review);
+                assert_eq!(card.lapses, 1);
+                assert_eq!(col.storage.get_revlog_entries_for_card(card_id)?.len(), 2);
+
+                col.set_rwkv_review_queue_scores(
+                    DeckId(1),
+                    std::collections::HashMap::from([(card_id, 0.1)]),
+                )?;
+                assert!(col.get_next_card()?.is_none());
+                let delay = card.review_step_secs.unwrap();
+                card.last_review_time = Some(TimestampSecs::now().adding_secs(-i64::from(delay)));
+                col.storage.update_card(&card)?;
+                col.clear_study_queues();
+                col.set_rwkv_review_queue_scores(
+                    DeckId(1),
+                    std::collections::HashMap::from([(card_id, 0.99)]),
+                )?;
+                let ready = col.get_next_card()?.unwrap();
+                assert_eq!(ready.card.id, card_id);
+                assert_eq!(ready.card.queue, CardQueue::Review);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             } else {
                 assert!(col.get_next_card()?.is_none());
             }
@@ -2284,15 +2548,95 @@ pub(crate) mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     fn fsrs_relearning_good_with_tiny_stability_writes_revlog() -> Result<()> {
         let mut col = Collection::new();
         col.set_config_bool(BoolKey::Fsrs, true, false)?;
         col.set_config_bool(BoolKey::FsrsShortTermWithStepsEnabled, true, false)?;
+=======
+    fn preset_learning_steps_advance_in_review_queue() -> Result<()> {
+        let mut col = Collection::new();
+        col.set_config_bool(BoolKey::Fsrs, true, false)?;
+        col.set_config_bool(BoolKey::FsrsLearningQueuesDisabled, true, false)?;
+        col.set_config_bool(BoolKey::FsrsShortTermWithStepsEnabled, false, false)?;
+        col.update_default_deck_config(|config| {
+            config.learn_steps = vec![1.0, 10.0];
+            config.review_order = ReviewCardOrder::RetrievabilityAscending as i32;
+        });
+        NoteAdder::basic(&mut col).add(&mut col);
+
+        let queued = col.get_next_card()?.unwrap();
+        let card_id = queued.card.id;
+        let states = queued.states.unwrap();
+        let answered_at = TimestampSecs::now().adding_secs(-60);
+        col.answer_card(&mut CardAnswer {
+            card_id,
+            current_state: states.current,
+            new_state: states.again,
+            rating: Rating::Again,
+            // The one-minute step has reached its due time when we poll the queue.
+            answered_at: answered_at.as_millis(),
+            milliseconds_taken: 0,
+            custom_data: None,
+            desired_retention_override: None,
+            desired_retention_override_is_final: false,
+            rwkv_s90: None,
+            rwkv_retrievability: None,
+            rwkv_review_kind: None,
+            from_queue: true,
+        })?;
+        let waiting = col.storage.get_card(card_id)?.unwrap();
+        assert_eq!(waiting.queue, CardQueue::Review);
+        assert_eq!(
+            waiting.review_step_due_at(),
+            Some(answered_at.adding_secs(60))
+        );
+        assert_eq!(waiting.remaining_steps, 2);
+        assert_eq!(col.counts(), [0, 0, 1]);
+        assert_eq!(col.search_cards("is:due", SortMode::NoOrder)?, [card_id]);
+
+        assert_eq!(col.answer_good().card_id, card_id);
+        let waiting = col.storage.get_card(card_id)?.unwrap();
+        assert_eq!(waiting.queue, CardQueue::Review);
+        assert_eq!(waiting.remaining_steps, 1);
+        let due = waiting.last_review_time.unwrap().adding_secs(600);
+        assert_eq!(waiting.review_step_due_at(), Some(due));
+        assert_eq!(col.counts(), [0, 0, 0]);
+        assert!(col.search_cards("is:due", SortMode::NoOrder)?.is_empty());
+
+        let timing = col.timing_today()?;
+        for (now, expected) in [(due.adding_secs(-1), 0), (due, 1)] {
+            let counts = col.due_counts(SchedTimingToday { now, ..timing }, 0)?;
+            assert_eq!(counts[&waiting.deck_id].review, expected);
+            assert_eq!(counts[&waiting.deck_id].learning, 0);
+        }
+        col.undo()?;
+        assert_eq!(col.get_next_card()?.unwrap().card.remaining_steps, 2);
+        col.redo()?;
+        assert_eq!(
+            col.storage.get_card(card_id)?.unwrap().review_step_due_at(),
+            Some(due)
+        );
+        assert!(col.get_next_card()?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn fsrs_relearning_good_saves_model_interval_as_timed_review() -> Result<()> {
+        let mut col = Collection::new();
+        col.set_config_bool(BoolKey::Fsrs, true, false)?;
+        col.set_config_bool(BoolKey::FsrsShortTermWithStepsEnabled, true, false)?;
+        col.set_config_bool(BoolKey::FsrsLearningQueuesDisabled, true, false)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         col.update_default_deck_config(|config| {
             config.fsrs_version = FsrsVersion::Seven as i32;
             config.fsrs_params_7 = low_retention_fsrs7_params();
             config.desired_retention = SHORT_TERM_RELEARNING_RETENTION;
+<<<<<<< HEAD
             config.relearn_steps = vec![];
+=======
+            config.relearn_steps = vec![1.0, 10.0];
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         });
 
         let nt = col.get_notetype_by_name("Basic")?.unwrap();
@@ -2300,12 +2644,22 @@ pub(crate) mod test {
         col.add_note(&mut note, DeckId(1))?;
         let mut card = col.get_first_card();
         let now = TimestampSecs::now();
+<<<<<<< HEAD
+=======
+        let mut scheduler_info = col.scheduler_info()?;
+        scheduler_info.timing.next_day_at = now.adding_secs(60);
+        col.state.scheduler_info = Some(scheduler_info);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         card.ctype = CardType::Relearn;
         card.queue = CardQueue::Learn;
         card.due = now.0 as i32;
         card.interval = 1;
         card.lapses = 1;
+<<<<<<< HEAD
         card.remaining_steps = 0;
+=======
+        card.remaining_steps = 1;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         card.memory_state = Some(FsrsMemoryState {
             stability: 0.0001,
             stability_internal: 0.0001,
@@ -2315,8 +2669,17 @@ pub(crate) mod test {
         card.last_review_time = Some(now.adding_secs(-105));
         col.storage.update_card(&card)?;
 
+<<<<<<< HEAD
         let revlogs_before = col.storage.get_revlog_entries_for_card(card.id)?.len();
         let states = col.get_scheduling_states(card.id)?;
+=======
+        let states = col.get_scheduling_states(card.id)?;
+        let IntervalKind::InSecs(scheduled_secs) = states.good.interval_kind() else {
+            panic!("expected a short model interval, got {:?}", states.good);
+        };
+        assert!((1_800..43_200).contains(&scheduled_secs));
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         col.answer_card(&mut CardAnswer {
             card_id: card.id,
             current_state: states.current,
@@ -2333,18 +2696,36 @@ pub(crate) mod test {
             from_queue: true,
         })?;
 
+<<<<<<< HEAD
         let revlogs_after = col.storage.get_revlog_entries_for_card(card.id)?.len();
         assert_eq!(revlogs_after, revlogs_before + 1);
         let card = col.storage.get_card(card.id)?.unwrap();
         assert_eq!(card.reps, 1);
         assert_eq!(card.ctype, CardType::Relearn);
+=======
+        let revlogs = col.storage.get_revlog_entries_for_card(card.id)?;
+        assert_eq!(revlogs.len(), 1);
+        assert_eq!(revlogs[0].interval, -(scheduled_secs as i32));
+        let card = col.storage.get_card(card.id)?.unwrap();
+        assert_eq!(card.reps, 1);
+        assert_eq!(card.ctype, CardType::Relearn);
+        assert_eq!(card.queue, CardQueue::Review);
+        assert_eq!(card.remaining_steps, 0);
+        assert_eq!(card.review_step_secs, Some(scheduled_secs));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(())
     }
 
     #[test]
+<<<<<<< HEAD
     fn fractional_scheduling_obeys_same_day_setting_with_empty_steps() -> Result<()> {
         for allow_same_day in [false, true] {
             for skip_learning_queues in [false, true] {
+=======
+    fn fractional_scheduling_obeys_same_day_setting_when_no_preset_step_applies() -> Result<()> {
+        for allow_same_day in [false, true] {
+            for skip_learning_queue in [false, true] {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 let mut col = Collection::new();
                 col.set_config_bool(BoolKey::Fsrs, true, false)?;
                 col.set_config_bool(
@@ -2354,13 +2735,22 @@ pub(crate) mod test {
                 )?;
                 col.set_config_bool(
                     BoolKey::FsrsLearningQueuesDisabled,
+<<<<<<< HEAD
                     skip_learning_queues,
+=======
+                    skip_learning_queue,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     false,
                 )?;
                 col.update_default_deck_config(|config| {
                     config.fsrs_version = FsrsVersion::Seven as i32;
+<<<<<<< HEAD
                     config.learn_steps = vec![];
                     config.relearn_steps = vec![];
+=======
+                    config.learn_steps.clear();
+                    config.relearn_steps.clear();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 });
                 NoteAdder::basic(&mut col).add(&mut col);
                 let mut card = col.get_first_card();
@@ -2389,10 +2779,21 @@ pub(crate) mod test {
                     // RWKV-Curve supplies unrounded intervals through this same path.
                     let states = col.scheduling_states_with_intervals(
                         card.id,
+<<<<<<< HEAD
                         [Some(0.1), Some(0.2), Some(0.3), Some(0.4)],
                     )?;
                     for state in [states.again, states.hard, states.good, states.easy] {
                         if allow_same_day && !skip_learning_queues {
+=======
+                        [Some(0.125), Some(0.25), Some(0.375), Some(0.4375)],
+                    )?;
+                    for (state, expected_secs) in
+                        [states.again, states.hard, states.good, states.easy]
+                            .into_iter()
+                            .zip([10_800, 21_600, 32_400, 37_800])
+                    {
+                        if allow_same_day {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                             let learning = match state {
                                 CardState::Normal(NormalState::Learning(learning)) => learning,
                                 CardState::Normal(NormalState::Relearning(relearning)) => {
@@ -2400,6 +2801,7 @@ pub(crate) mod test {
                                 }
                                 _ => panic!("expected a short-term state: {state:?}"),
                             };
+<<<<<<< HEAD
                             assert!(learning.scheduled_secs > 0);
                             assert!(learning.scheduled_secs < 43_200);
                         } else {
@@ -2407,6 +2809,13 @@ pub(crate) mod test {
                                 panic!(
                                     "expected Review for {card_type:?}, same-day={allow_same_day}, skip={skip_learning_queues}: {state:?}"
                                 );
+=======
+                            assert_eq!(learning.scheduled_secs, expected_secs);
+                            assert_eq!(learning.remaining_steps, 0);
+                        } else {
+                            let CardState::Normal(NormalState::Review(review)) = state else {
+                                panic!("expected day-based Review for {card_type:?}: {state:?}");
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                             };
                             assert!(review.scheduled_days >= 1);
                         }
@@ -2418,7 +2827,11 @@ pub(crate) mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     fn fsrs_learning_queue_bypass_keeps_rwkv_relearning_answer_in_review_queue() -> Result<()> {
+=======
+    fn rwkv_relearning_graduates_on_a_day_interval_after_the_final_step() -> Result<()> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut col = Collection::new();
         col.set_config_bool(BoolKey::Fsrs, true, false)?;
         col.set_config_bool(BoolKey::FsrsShortTermWithStepsEnabled, true, false)?;
@@ -2428,12 +2841,17 @@ pub(crate) mod test {
             config.fsrs_params_7 = low_retention_fsrs7_params();
             config.desired_retention = 0.65;
             config.learn_steps = vec![1.0, 10.0];
+<<<<<<< HEAD
             config.relearn_steps = vec![10.0];
+=======
+            config.relearn_steps = vec![1.0, 10.0];
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         });
 
         let nt = col.get_notetype_by_name("Basic")?.unwrap();
         let mut note = nt.new_note();
         col.add_note(&mut note, DeckId(1))?;
+<<<<<<< HEAD
         let new_card = col.get_first_card();
         let states = col.get_scheduling_states(new_card.id)?;
         assert!(matches!(
@@ -2443,12 +2861,20 @@ pub(crate) mod test {
 
         let now = TimestampSecs::now();
         let mut relearn_card = new_card;
+=======
+        let now = TimestampSecs::now();
+        let mut relearn_card = col.get_first_card();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         relearn_card.ctype = CardType::Relearn;
         relearn_card.queue = CardQueue::Learn;
         relearn_card.due = now.0 as i32;
         relearn_card.interval = 1;
         relearn_card.lapses = 1;
+<<<<<<< HEAD
         relearn_card.remaining_steps = 0;
+=======
+        relearn_card.remaining_steps = 1;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         relearn_card.memory_state = Some(FsrsMemoryState {
             stability: 0.0001,
             stability_internal: 0.0001,
@@ -2458,6 +2884,7 @@ pub(crate) mod test {
         relearn_card.last_review_time = Some(now.adding_secs(-105));
         col.storage.update_card(&relearn_card)?;
 
+<<<<<<< HEAD
         let states = col.get_scheduling_states(relearn_card.id)?;
         assert!(matches!(
             states.again,
@@ -2466,6 +2893,10 @@ pub(crate) mod test {
 
         col.update_default_deck_config(|config| config.relearn_steps = vec![]);
         let states = col.get_scheduling_states(relearn_card.id)?;
+=======
+        let states =
+            col.scheduling_states_with_intervals(relearn_card.id, [None, None, Some(1.0), None])?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         assert!(matches!(
             states.good,
             CardState::Normal(NormalState::Review(_))

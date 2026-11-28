@@ -24,7 +24,10 @@ pub(crate) use revlog::FsrsReviewRetrievabilitySampleRole;
 pub(crate) use revlog::RwkvHistoricalReviewRow;
 pub(crate) use revlog::RwkvReviewRetrievabilityCacheRow;
 pub(crate) use revlog::RwkvReviewRetrievabilitySampleRole;
+<<<<<<< HEAD
 pub(crate) use revlog::RWKV_HISTORY_RESET_AFTER_SQL;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 pub(crate) use sqlite::ProcessTextFlags;
 pub(crate) use sqlite::SqliteStorage;
 

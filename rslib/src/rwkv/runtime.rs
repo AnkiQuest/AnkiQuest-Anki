@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use std::io;
@@ -19,7 +27,19 @@ pub enum ModelKind {
     Sm72,
     Sm72e20,
     Sm72e25,
+<<<<<<< HEAD
     Sm92,
+=======
+    /// The show-time retrain (SM92): Small's two-head model until the
+    /// 2026-11 release candidate; still a profile value of its own.
+    Sm92,
+    /// The show-time two-head cool-down for Small (SM118): SM92's epoch 26
+    /// with a two-pass 32k Muon cool-down distilled from the show-time big
+    /// model (SM91s2). A full model of the small plan with an answer-time
+    /// head (SM119); Small's two-head model since the 2026-11 release
+    /// candidate, in SM92's place.
+    Sm118,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     /// The instant-only small model (SM57): its curve head is untrained, so
     /// it never provides curve outputs (see [`RwkvRuntime::InstantOnly`] and
     /// [`RwkvRuntime::load_paired`]).
@@ -42,9 +62,41 @@ pub enum ModelKind {
     /// The Tiny two-head model (SM106), the Tiny choice's one model: the
     /// show-time retrain (SM92) cut to one card layer (the tiny plan of
     /// SM101) and trained on with both heads on show-time inputs. A full
+<<<<<<< HEAD
     /// model (curve, intervals, S90, instant recall and buttons) without an
     /// answer-time head; it runs alone when the one-model opt-out is on.
     Sm106,
+=======
+    /// model (curve, intervals, S90, instant recall and buttons, answer time
+    /// since the time heads for the family (SM117)); it runs alone when the
+    /// one-model opt-out is on.
+    Sm106,
+    /// The longer Small Instant-Only model (SM113): the Small Instant-Only
+    /// model (SM98)'s recipe with a two-epoch cool-down distilled from the
+    /// show-time instant-only big model (SM99). Small's Instant-Only model
+    /// since 2026-11-16, in SM98's place.
+    Sm113,
+    /// The longer cool-down for Tiny (SM115): the Tiny Instant-Only model
+    /// (SM101)'s recipe (one card layer) with the same longer cool-down as
+    /// SM113. Tiny's Instant-Only model from 2026-11-16 to the 2026-11
+    /// release candidate, in SM101's place.
+    Sm115,
+    /// The six-layer Tiny two-head model (SM130): the Tiny two-head chain
+    /// (SM106's constant-LR epoch 29) cut to six layer steps (arch
+    /// `w64-c1-d2p1u1`: card 1, deck 2, note 1, preset 1, user 1 layers; two
+    /// schedule rounds), recovered three epochs and cooled down like the
+    /// show-time two-head cool-down for Tiny (SM124). A full model; Tiny's
+    /// two-head model since the 2026-11 release candidate (user decision
+    /// 2026-11-21), in SM106's place. Its answer-time head (SM138) takes 346
+    /// inputs.
+    Sm130Th,
+    /// The six-layer Tiny Instant-Only model (SM130): the Tiny Instant-Only
+    /// chain (SM101's epoch 38) cut the same way and cooled down like the
+    /// longer cool-down for Tiny (SM115). Tiny's Instant-Only model since the
+    /// 2026-11 release candidate, in SM115's place; 346-input answer-time
+    /// head (SM138).
+    Sm130Io,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl ModelKind {
@@ -59,11 +111,22 @@ impl ModelKind {
             "sm72e20" => Ok(Self::Sm72e20),
             "sm72e25" => Ok(Self::Sm72e25),
             "sm92" => Ok(Self::Sm92),
+<<<<<<< HEAD
+=======
+            "sm118" => Ok(Self::Sm118),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             "sm57" => Ok(Self::Sm57),
             "sm98" => Ok(Self::Sm98),
             "sm101" => Ok(Self::Sm101),
             "sm99" => Ok(Self::Sm99),
             "sm106" => Ok(Self::Sm106),
+<<<<<<< HEAD
+=======
+            "sm113" => Ok(Self::Sm113),
+            "sm115" => Ok(Self::Sm115),
+            "sm130th" => Ok(Self::Sm130Th),
+            "sm130io" => Ok(Self::Sm130Io),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "unknown RWKV model",
@@ -83,18 +146,42 @@ impl ModelKind {
                 | Self::Sm72e20
                 | Self::Sm72e25
                 | Self::Sm92
+<<<<<<< HEAD
+=======
+                | Self::Sm118
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 | Self::Sm57
                 | Self::Sm98
                 | Self::Sm101
                 | Self::Sm99
                 | Self::Sm106
+<<<<<<< HEAD
+=======
+                | Self::Sm113
+                | Self::Sm115
+                | Self::Sm130Th
+                | Self::Sm130Io
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )
     }
 
     /// Checkpoints whose curve head was never trained: they may provide
     /// instant recall and button probabilities only, never intervals.
     pub fn instant_only(self) -> bool {
+<<<<<<< HEAD
         matches!(self, Self::Sm57 | Self::Sm98 | Self::Sm101 | Self::Sm99)
+=======
+        matches!(
+            self,
+            Self::Sm57
+                | Self::Sm98
+                | Self::Sm101
+                | Self::Sm99
+                | Self::Sm113
+                | Self::Sm115
+                | Self::Sm130Io
+        )
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     /// The small architecture; `Legacy` and `Sm99` run on the big engine.
@@ -108,6 +195,7 @@ impl ModelKind {
         self.small() == super::SMALL_MODEL
     }
 
+<<<<<<< HEAD
     /// Card layers of the small models' checkpoints: the small engine reads
     /// the count from the weights, and a file that does not match its model
     /// key is refused.
@@ -123,6 +211,153 @@ impl ModelKind {
 fn check_card_layers(model: ModelKind, card_layers: usize) -> io::Result<()> {
     match model.card_layers() {
         Some(expected) if expected != card_layers => {
+=======
+    /// Layer counts per stream (card, deck, note, preset, user) of the small
+    /// models' checkpoints: the small engine reads them from the weights
+    /// (its layer plan), and a file that does not match its model key is
+    /// refused, so a key never runs another size's weights.
+    fn module_layers(self) -> Option<[usize; 5]> {
+        match self {
+            Self::Legacy | Self::Sm99 => None,
+            Self::Sm101 | Self::Sm106 | Self::Sm115 => Some([1, 4, 1, 3, 3]),
+            Self::Sm130Th | Self::Sm130Io => Some([1, 2, 1, 1, 1]),
+            _ => Some([2, 4, 1, 3, 3]),
+        }
+    }
+
+    /// Card layers of the small models' checkpoints.
+    #[cfg(test)]
+    fn card_layers(self) -> Option<usize> {
+        self.module_layers().map(|layers| layers[0])
+    }
+}
+
+/// The Tiny instant ensemble (SM170): the weight of the six-layer Tiny
+/// Instant-Only model (SM130)'s logit beside the six-layer Tiny two-head
+/// model (SM130)'s instant head, fitted on 100 training users in the
+/// deploy-time ensemble test (SM160): -0.067% instant LogLoss against the
+/// Instant-Only model alone on the 732 set, -0.062% [-0.066, -0.057] on
+/// 1,385 users in the decisive check (SM169).
+pub(crate) const TINY_INSTANT_ENSEMBLE_WEIGHT: f64 = 0.69;
+
+/// Probabilities are clipped to `[ENSEMBLE_CLIP, 1 - ENSEMBLE_CLIP]` before
+/// the logit, as in the ensemble test (SM160, `sm160_report.py`).
+const ENSEMBLE_CLIP: f64 = 1e-7;
+
+/// The weight of the Instant-Only model's logit in a pair's instant
+/// prediction, per size: only the Tiny pair (the six-layer Tiny two-head and
+/// Instant-Only models (SM130)) has one (SM170). Big and Small show their
+/// Instant-Only model alone: their ensembles gained less than 0.05% (SM160).
+pub(crate) fn instant_ensemble_weight(release: ModelKind, instant: ModelKind) -> Option<f64> {
+    match (release, instant) {
+        (ModelKind::Sm130Th, ModelKind::Sm130Io) => Some(TINY_INSTANT_ENSEMBLE_WEIGHT),
+        _ => None,
+    }
+}
+
+fn ensemble_logit(p: f32) -> f64 {
+    let p = f64::from(p).clamp(ENSEMBLE_CLIP, 1.0 - ENSEMBLE_CLIP);
+    p.ln() - (-p).ln_1p()
+}
+
+/// `sigmoid(w * logit(p_instant) + (1 - w) * logit(p_release))` in float64
+/// with clipped probabilities, exactly as the ensemble test (SM160).
+pub(crate) fn ensemble_instant(weight: f64, p_instant: f32, p_release: f32) -> f32 {
+    let z = weight * ensemble_logit(p_instant) + (1.0 - weight) * ensemble_logit(p_release);
+    (1.0 / (1.0 + (-z).exp())) as f32
+}
+
+/// Button probabilities that agree with an ensembled recall: Again is
+/// `1 - retrievability` and Hard, Good and Easy keep the instant model's
+/// shares of a successful answer (as card info's
+/// `_rwkv_button_probabilities_with_retrievability`).
+fn ensemble_buttons(buttons: [f32; 4], retrievability: f32) -> [f32; 4] {
+    let successful = f64::from(buttons[1]) + f64::from(buttons[2]) + f64::from(buttons[3]);
+    if successful.is_nan() || successful <= 0.0 || !retrievability.is_finite() {
+        return buttons;
+    }
+    let scale = f64::from(retrievability) / successful;
+    [
+        1.0 - retrievability,
+        (f64::from(buttons[1]) * scale) as f32,
+        (f64::from(buttons[2]) * scale) as f32,
+        (f64::from(buttons[3]) * scale) as f32,
+    ]
+}
+
+/// A pair's instant recall and buttons: the instant model's, or the
+/// ensemble with the release's instant head when the size has a weight.
+fn paired_instant_outputs(
+    weight: Option<f64>,
+    (retrievability, buttons): (f32, [f32; 4]),
+    release_retrievability: f32,
+) -> (f32, [f32; 4]) {
+    match weight {
+        Some(weight) => {
+            let retrievability = ensemble_instant(weight, retrievability, release_retrievability);
+            (retrievability, ensemble_buttons(buttons, retrievability))
+        }
+        None => (retrievability, buttons),
+    }
+}
+
+fn mismatched_pair() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        "RWKV paired models returned different predictions",
+    )
+}
+
+fn ensemble_values(weight: f64, instant: Vec<f32>, release: Vec<f32>) -> io::Result<Vec<f32>> {
+    if instant.len() != release.len() {
+        return Err(mismatched_pair());
+    }
+    Ok(instant
+        .into_iter()
+        .zip(release)
+        .map(|(instant, release)| ensemble_instant(weight, instant, release))
+        .collect())
+}
+
+fn ensemble_rows(
+    weight: f64,
+    instant: Vec<Vec<f32>>,
+    release: Vec<Vec<f32>>,
+) -> io::Result<Vec<Vec<f32>>> {
+    if instant.len() != release.len() {
+        return Err(mismatched_pair());
+    }
+    instant
+        .into_iter()
+        .zip(release)
+        .map(|(instant, release)| ensemble_values(weight, instant, release))
+        .collect()
+}
+
+fn ensemble_predictions(
+    weight: f64,
+    instant: Vec<(usize, f32)>,
+    release: Vec<(usize, f32)>,
+) -> io::Result<Vec<(usize, f32)>> {
+    if instant.len() != release.len()
+        || instant
+            .iter()
+            .zip(&release)
+            .any(|((instant, _), (release, _))| instant != release)
+    {
+        return Err(mismatched_pair());
+    }
+    Ok(instant
+        .into_iter()
+        .zip(release)
+        .map(|((index, instant), (_, release))| (index, ensemble_instant(weight, instant, release)))
+        .collect())
+}
+
+fn check_module_layers(model: ModelKind, module_layers: [usize; 5]) -> io::Result<()> {
+    match model.module_layers() {
+        Some(expected) if expected != module_layers => {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             Err(invalid_input("RWKV weights do not match the model"))
         }
         _ => Ok(()),
@@ -132,6 +367,7 @@ fn check_card_layers(model: ModelKind, card_layers: usize) -> io::Result<()> {
 /// The release model and a second small model for RWKV-Instant (the
 /// show-time retrain, or the instant-only model) replaying the same history.
 /// Both keep their own recurrent state; the release provides the curve,
+<<<<<<< HEAD
 /// intervals, S90 and the answer-time head, the instant model provides
 /// instant recall and button probabilities. Every serialized state holds
 /// both (`super::paired`). Both models are of one architecture and run on
@@ -141,6 +377,26 @@ fn check_card_layers(model: ModelKind, card_layers: usize) -> io::Result<()> {
 pub struct PairedRuntime<E> {
     release: E,
     instant: E,
+=======
+/// intervals and S90, the instant model provides instant recall and button
+/// probabilities, and the answer time comes from the instant model's head
+/// when it has one (the head reads the same trunk as the grade
+/// probabilities it is mixed with), else from the release's. Every serialized
+/// state holds both (`super::paired`). Both models are of one architecture and
+/// run on its engine: two small models (Small, Tiny) or the two big models
+/// (Big: the show-time big model (SM91s2) and the show-time instant-only big
+/// model (SM99)).
+///
+/// For the Tiny pair every instant recall the pair returns (and the buttons
+/// beside it) is the Tiny instant ensemble (SM170) of both models' instant
+/// heads, [`instant_ensemble_weight`]; the instant workload forecast and the
+/// answer time still run on the instant model alone.
+pub struct PairedRuntime<E> {
+    release: E,
+    instant: E,
+    /// [`instant_ensemble_weight`] of the pair.
+    instant_weight: Option<f64>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 pub enum RwkvRuntime {
@@ -160,6 +416,34 @@ pub enum RwkvRuntime {
     AlternatePaired(Box<PairedRuntime<super::alternate::RwkvInference>>),
 }
 
+<<<<<<< HEAD
+=======
+/// An independent copy of the model that serves a runtime's answer times
+/// (see [`RwkvRuntime::predict_answer_times`]), sharing its weights but no
+/// state, so the answer-time recalibration (SM175) can be fitted while the
+/// runtime keeps serving the reviewer.
+pub enum AnswerTimeRecalibrator {
+    Primary(Box<super::RwkvInference>),
+    Alternate(Box<super::alternate::RwkvInference>),
+}
+
+impl AnswerTimeRecalibrator {
+    /// See [`super::RwkvInference::fit_answer_time_recalibration`]: the fit
+    /// for `today`'s block from the whole canonical history (the warm-up
+    /// rows), or `None` while the history is too short.
+    pub fn fit(
+        &self,
+        reviews: &[ReviewInput],
+        today: i64,
+    ) -> io::Result<Option<super::AnswerTimeRecalibration>> {
+        match self {
+            Self::Primary(engine) => engine.fit_answer_time_recalibration(reviews, today),
+            Self::Alternate(engine) => engine.fit_answer_time_recalibration(reviews, today),
+        }
+    }
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[derive(Clone)]
 pub enum RwkvRuntimeState {
     Primary(super::RwkvInferenceState),
@@ -318,6 +602,18 @@ impl<E: Send> PairedRuntime<E> {
     }
 }
 
+<<<<<<< HEAD
+=======
+/// The same rank schedule for the other engine (its own copy of the type).
+fn alternate_schedule(schedule: super::RankSchedule) -> super::alternate::RankSchedule {
+    super::alternate::RankSchedule {
+        low: schedule.low,
+        switch: schedule.switch,
+        high: schedule.high,
+    }
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 impl RwkvRuntime {
     pub fn load_with_precision(
         path: PathBuf,
@@ -384,6 +680,28 @@ impl RwkvRuntime {
             StatePrecision::Int4CardsInt8Notes => {
                 super::alternate::StatePrecision::Int4CardsInt8Notes
             }
+<<<<<<< HEAD
+=======
+            StatePrecision::Int8Compact => super::alternate::StatePrecision::Int8Compact,
+            StatePrecision::Int4Compact => super::alternate::StatePrecision::Int4Compact,
+            StatePrecision::CompactCardsInt8 => super::alternate::StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4 => super::alternate::StatePrecision::CompactCardsInt4,
+            StatePrecision::LowRankInt8(schedule) => {
+                super::alternate::StatePrecision::LowRankInt8(alternate_schedule(schedule))
+            }
+            StatePrecision::CompactLowRank(schedule) => {
+                super::alternate::StatePrecision::CompactLowRank(alternate_schedule(schedule))
+            }
+            StatePrecision::LowRankInt6(schedule) => {
+                super::alternate::StatePrecision::LowRankInt6(alternate_schedule(schedule))
+            }
+            StatePrecision::CompactLowRankInt6(schedule) => {
+                super::alternate::StatePrecision::CompactLowRankInt6(alternate_schedule(schedule))
+            }
+            StatePrecision::CompactLowRankBySize(schedule) => {
+                super::alternate::StatePrecision::CompactLowRankBySize(alternate_schedule(schedule))
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         };
         let engine = super::alternate::RwkvInference::load_with_precision(
             path,
@@ -391,7 +709,11 @@ impl RwkvRuntime {
             max_interval_days,
             precision,
         )?;
+<<<<<<< HEAD
         check_card_layers(model, engine.card_layers())?;
+=======
+        check_module_layers(model, engine.module_layers())?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if model.leak_free_inputs() {
             engine.with_leak_free_inputs()
         } else {
@@ -412,7 +734,11 @@ impl RwkvRuntime {
             max_interval_days,
             precision,
         )?;
+<<<<<<< HEAD
         check_card_layers(model, engine.card_layers())?;
+=======
+        check_module_layers(model, engine.module_layers())?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if model.leak_free_inputs() {
             engine.with_leak_free_inputs()
         } else {
@@ -425,7 +751,11 @@ impl RwkvRuntime {
     /// the small-model feature, or the two big models on the big engine)
     /// with the same inputs and state precision; the instant model may be
     /// instant-only (its curve is never used) or a full model, whose curve
+<<<<<<< HEAD
     /// and answer-time outputs are ignored.
+=======
+    /// outputs are ignored.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub fn load_paired(
         release_path: PathBuf,
         instant_path: PathBuf,
@@ -443,6 +773,10 @@ impl RwkvRuntime {
         {
             return Err(invalid_input("unsupported RWKV model pair"));
         }
+<<<<<<< HEAD
+=======
+        let instant_weight = instant_ensemble_weight(release_model, instant_model);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         if release_model.on_primary_engine() {
             let release = Self::load_primary(
                 release_path,
@@ -458,7 +792,15 @@ impl RwkvRuntime {
                 precision,
                 instant_model,
             )?;
+<<<<<<< HEAD
             Ok(Self::Paired(Box::new(PairedRuntime { release, instant })))
+=======
+            Ok(Self::Paired(Box::new(PairedRuntime {
+                release,
+                instant,
+                instant_weight,
+            })))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         } else {
             let release = Self::load_alternate(
                 release_path,
@@ -477,10 +819,28 @@ impl RwkvRuntime {
             Ok(Self::AlternatePaired(Box::new(PairedRuntime {
                 release,
                 instant,
+<<<<<<< HEAD
+=======
+                instant_weight,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             })))
         }
     }
 
+<<<<<<< HEAD
+=======
+    /// The weight of the instant model's logit in this runtime's instant
+    /// recall (the Tiny instant ensemble (SM170)): only the Tiny pair has
+    /// one; every other pair and every one-model runtime has none.
+    pub fn instant_ensemble_weight(&self) -> Option<f64> {
+        match self {
+            Self::Paired(pair) => pair.instant_weight,
+            Self::AlternatePaired(pair) => pair.instant_weight,
+            _ => None,
+        }
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub fn is_paired(&self) -> bool {
         matches!(self, Self::Paired(_) | Self::AlternatePaired(_))
     }
@@ -581,6 +941,10 @@ impl RwkvRuntime {
             engine.review_query_outputs(input, state)?,
         ));
         dispatch!(self, engine, engine.review(input, state), pair => {
+<<<<<<< HEAD
+=======
+            let weight = pair.instant_weight;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let (release_state, instant_state) = paired::split_review_state(&state)?;
             let release_input = input.clone();
             let (mut output, (retrievability, button_probabilities, next)) = pair.advance(
@@ -591,8 +955,16 @@ impl RwkvRuntime {
                 let instant = instant.ok_or_else(|| invalid_input("missing instant RWKV state"))?;
                 Ok(paired::join_state(release, &instant))
             };
+<<<<<<< HEAD
             output.retrievability = retrievability;
             output.button_probabilities = button_probabilities;
+=======
+            (output.retrievability, output.button_probabilities) = paired_instant_outputs(
+                weight,
+                (retrievability, button_probabilities),
+                output.retrievability,
+            );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             output.card_state = join(&output.card_state, next.card)?;
             output.deck_state = join(&output.deck_state, next.deck)?;
             output.note_state = join(&output.note_state, next.note)?;
@@ -612,16 +984,29 @@ impl RwkvRuntime {
             .map(|(retrievability, buttons)| instant_only_output(retrievability, buttons))
             .collect()));
         dispatch!(self, engine, engine.predict_many(requests), pair => {
+<<<<<<< HEAD
+=======
+            let weight = pair.instant_weight;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let (release_requests, instant_requests) = split_requests(requests)?;
             let (mut outputs, instant_outputs) = pair.advance(
                 |release| release.predict_many(release_requests),
                 |instant| instant.predict_query_outputs_many(&instant_requests),
             )?;
+<<<<<<< HEAD
             for (output, (retrievability, button_probabilities)) in
                 outputs.iter_mut().zip(instant_outputs)
             {
                 output.retrievability = retrievability;
                 output.button_probabilities = button_probabilities;
+=======
+            if outputs.len() != instant_outputs.len() {
+                return Err(mismatched_pair());
+            }
+            for (output, instant) in outputs.iter_mut().zip(instant_outputs) {
+                (output.retrievability, output.button_probabilities) =
+                    paired_instant_outputs(weight, instant, output.retrievability);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             }
             Ok(outputs)
         })
@@ -632,6 +1017,7 @@ impl RwkvRuntime {
         requests: Vec<ReviewPredictionRequest>,
     ) -> io::Result<Vec<f32>> {
         dispatch!(self, engine, engine.predict_retrievability_many(requests), pair => {
+<<<<<<< HEAD
             pair.instant
                 .predict_retrievability_many(instant_requests(requests)?)
         })
@@ -650,11 +1036,57 @@ impl RwkvRuntime {
 
     /// See [`super::RwkvInference::predict_answer_times`]. A paired runtime
     /// runs the head on the release's state, the features it was trained on.
+=======
+            match pair.instant_weight {
+                None => pair
+                    .instant
+                    .predict_retrievability_many(instant_requests(requests)?),
+                Some(weight) => {
+                    let (release_requests, instant_requests) = split_requests(requests)?;
+                    let (release, instant) = pair.advance(
+                        |release| release.predict_retrievability_many(release_requests),
+                        |instant| instant.predict_retrievability_many(instant_requests),
+                    )?;
+                    ensemble_values(weight, instant, release)
+                }
+            }
+        })
+    }
+
+    /// Whether the model folder had the optional answer-time head (for a
+    /// paired runtime: either model's folder). Each head was trained on its
+    /// own frozen model, so an instant-only model alone answers with its own
+    /// head.
+    pub fn has_answer_time_head(&self) -> bool {
+        dispatch!(self, engine, engine.has_answer_time_head(), pair => {
+            pair.instant.has_answer_time_head() || pair.release.has_answer_time_head()
+        })
+    }
+
+    /// Whether a paired runtime's answer time comes from its instant model
+    /// (see [`Self::predict_answer_times`]); false for one model.
+    pub fn answer_time_from_instant_model(&self) -> bool {
+        match self {
+            Self::Paired(pair) => pair.instant.has_answer_time_head(),
+            Self::AlternatePaired(pair) => pair.instant.has_answer_time_head(),
+            _ => false,
+        }
+    }
+
+    /// See [`super::RwkvInference::predict_answer_times`]. Every head runs
+    /// on the state of the model it was trained on. A paired runtime uses
+    /// the instant model's head when it has one: RWKV-Instant's grade
+    /// probabilities come from that model, and the head's per-grade times
+    /// are mixed with the grade probabilities of its own trunk, as in its
+    /// training and scoring (the time heads for the family (SM117)).
+    /// Otherwise it uses the release's head on the release's state.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub fn predict_answer_times(
         &mut self,
         requests: Vec<ReviewPredictionRequest>,
         history: Vec<[f32; super::ANSWER_TIME_FEATURES]>,
     ) -> io::Result<Vec<Option<super::AnswerTimePrediction>>> {
+<<<<<<< HEAD
         if self.is_instant_only() {
             // The head was trained on the release's features, never these.
             return Ok(vec![None; requests.len()]);
@@ -665,6 +1097,44 @@ impl RwkvRuntime {
         })
     }
 
+=======
+        dispatch!(self, engine, engine.predict_answer_times(requests, history), pair => {
+            if pair.instant.has_answer_time_head() {
+                pair.instant
+                    .predict_answer_times(instant_requests(requests)?, history)
+            } else {
+                pair.release
+                    .predict_answer_times(release_requests(requests)?, history)
+            }
+        })
+    }
+
+    /// The model whose head serves [`Self::predict_answer_times`], as an
+    /// [`AnswerTimeRecalibrator`]; `None` without an answer-time head.
+    pub fn answer_time_recalibrator(&self) -> Option<AnswerTimeRecalibrator> {
+        fn primary(engine: &super::RwkvInference) -> Option<AnswerTimeRecalibrator> {
+            engine
+                .answer_time_recalibration_worker()
+                .map(|worker| AnswerTimeRecalibrator::Primary(Box::new(worker)))
+        }
+        fn alternate(engine: &super::alternate::RwkvInference) -> Option<AnswerTimeRecalibrator> {
+            engine
+                .answer_time_recalibration_worker()
+                .map(|worker| AnswerTimeRecalibrator::Alternate(Box::new(worker)))
+        }
+        match self {
+            Self::Primary(engine) | Self::InstantOnly(engine) => primary(engine),
+            Self::Alternate(engine) | Self::AlternateInstantOnly(engine) => alternate(engine),
+            Self::Paired(pair) if pair.instant.has_answer_time_head() => primary(&pair.instant),
+            Self::Paired(pair) => primary(&pair.release),
+            Self::AlternatePaired(pair) if pair.instant.has_answer_time_head() => {
+                alternate(&pair.instant)
+            }
+            Self::AlternatePaired(pair) => alternate(&pair.release),
+        }
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub fn predict_retrievability_many_from_warm_up(
         &mut self,
         inputs: Vec<ReviewInput>,
@@ -673,7 +1143,21 @@ impl RwkvRuntime {
             self,
             engine,
             engine.predict_retrievability_many_from_warm_up(inputs),
+<<<<<<< HEAD
             pair => pair.instant.predict_retrievability_many_from_warm_up(inputs)
+=======
+            pair => match pair.instant_weight {
+                None => pair.instant.predict_retrievability_many_from_warm_up(inputs),
+                Some(weight) => {
+                    let release_inputs = inputs.clone();
+                    let (release, instant) = pair.advance(
+                        |release| release.predict_retrievability_many_from_warm_up(release_inputs),
+                        |instant| instant.predict_retrievability_many_from_warm_up(inputs),
+                    )?;
+                    ensemble_values(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )
     }
 
@@ -687,11 +1171,35 @@ impl RwkvRuntime {
             self,
             engine,
             engine.predict_retrievability_many_after_review(answer, query_inputs, snapshot),
+<<<<<<< HEAD
             pair => pair.instant.predict_retrievability_many_after_review(
                 answer,
                 query_inputs,
                 paired::simulation_snapshot_half(snapshot, true)?,
             )
+=======
+            pair => match pair.instant_weight {
+                None => pair.instant.predict_retrievability_many_after_review(
+                    answer,
+                    query_inputs,
+                    paired::simulation_snapshot_half(snapshot, true)?,
+                ),
+                Some(weight) => {
+                    let (release_half, instant_half) = paired::simulation_snapshot_halves(snapshot)?;
+                    let release = pair.release.predict_retrievability_many_after_review(
+                        answer.clone(),
+                        query_inputs.clone(),
+                        release_half,
+                    )?;
+                    let instant = pair.instant.predict_retrievability_many_after_review(
+                        answer,
+                        query_inputs,
+                        instant_half,
+                    )?;
+                    ensemble_values(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )
     }
 
@@ -705,11 +1213,35 @@ impl RwkvRuntime {
             self,
             engine,
             engine.predict_retrievability_many_after_reviews(answers, query_inputs, snapshot),
+<<<<<<< HEAD
             pair => pair.instant.predict_retrievability_many_after_reviews(
                 answers,
                 query_inputs,
                 paired::simulation_snapshot_half(snapshot, true)?,
             )
+=======
+            pair => match pair.instant_weight {
+                None => pair.instant.predict_retrievability_many_after_reviews(
+                    answers,
+                    query_inputs,
+                    paired::simulation_snapshot_half(snapshot, true)?,
+                ),
+                Some(weight) => {
+                    let (release_half, instant_half) = paired::simulation_snapshot_halves(snapshot)?;
+                    let release = pair.release.predict_retrievability_many_after_reviews(
+                        answers.clone(),
+                        query_inputs.clone(),
+                        release_half,
+                    )?;
+                    let instant = pair.instant.predict_retrievability_many_after_reviews(
+                        answers,
+                        query_inputs,
+                        instant_half,
+                    )?;
+                    ensemble_rows(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )
     }
 
@@ -722,9 +1254,36 @@ impl RwkvRuntime {
             self,
             engine,
             engine.predict_retrievability_many_after_reviews_from_warm_up(answers, query_inputs),
+<<<<<<< HEAD
             pair => pair
                 .instant
                 .predict_retrievability_many_after_reviews_from_warm_up(answers, query_inputs)
+=======
+            pair => match pair.instant_weight {
+                None => pair
+                    .instant
+                    .predict_retrievability_many_after_reviews_from_warm_up(answers, query_inputs),
+                Some(weight) => {
+                    let release_answers = answers.clone();
+                    let release_queries = query_inputs.clone();
+                    let (release, instant) = pair.advance(
+                        |release| {
+                            release.predict_retrievability_many_after_reviews_from_warm_up(
+                                release_answers,
+                                release_queries,
+                            )
+                        },
+                        |instant| {
+                            instant.predict_retrievability_many_after_reviews_from_warm_up(
+                                answers,
+                                query_inputs,
+                            )
+                        },
+                    )?;
+                    ensemble_rows(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )
     }
 
@@ -734,12 +1293,25 @@ impl RwkvRuntime {
         record_predictions: bool,
     ) -> io::Result<Vec<(usize, f32)>> {
         dispatch!(self, engine, engine.warm_up_reviews(reviews, record_predictions), pair => {
+<<<<<<< HEAD
             let release_reviews = reviews.clone();
             pair.advance(
                 |release| release.warm_up_reviews(release_reviews, false),
                 |instant| instant.warm_up_reviews(reviews, record_predictions),
             )
             .map(|(_, predictions)| predictions)
+=======
+            let weight = pair.instant_weight.filter(|_| record_predictions);
+            let release_reviews = reviews.clone();
+            let (release, instant) = pair.advance(
+                |release| release.warm_up_reviews(release_reviews, weight.is_some()),
+                |instant| instant.warm_up_reviews(reviews, record_predictions),
+            )?;
+            match weight {
+                Some(weight) => ensemble_predictions(weight, instant, release),
+                None => Ok(instant),
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         })
     }
 
@@ -752,7 +1324,26 @@ impl RwkvRuntime {
             self,
             engine,
             engine.forecast_history_predictions(reviews, progress),
+<<<<<<< HEAD
             pair => pair.instant.forecast_history_predictions(reviews, progress)
+=======
+            pair => match pair.instant_weight {
+                None => pair.instant.forecast_history_predictions(reviews, progress),
+                Some(weight) => {
+                    // The release runs first: each model reports half of the
+                    // progress.
+                    let release = pair.release.forecast_history_predictions(
+                        reviews.clone(),
+                        &mut |done, total| progress(done / 2, total),
+                    )?;
+                    let instant = pair.instant.forecast_history_predictions(
+                        reviews,
+                        &mut |done, total| progress(total / 2 + done.div_ceil(2), total),
+                    )?;
+                    ensemble_predictions(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )
     }
 
@@ -764,11 +1355,29 @@ impl RwkvRuntime {
     ) -> io::Result<Vec<(usize, f32)>> {
         dispatch!(self, engine, engine.warm_up_reviews_post(reviews), pair => {
             let release_reviews = reviews.clone();
+<<<<<<< HEAD
             pair.advance(
                 |release| release.warm_up_reviews(release_reviews, false),
                 |instant| instant.warm_up_reviews_post(reviews),
             )
             .map(|(_, predictions)| predictions)
+=======
+            match pair.instant_weight {
+                None => pair
+                    .advance(
+                        |release| release.warm_up_reviews(release_reviews, false),
+                        |instant| instant.warm_up_reviews_post(reviews),
+                    )
+                    .map(|(_, predictions)| predictions),
+                Some(weight) => {
+                    let (release, instant) = pair.advance(
+                        |release| release.warm_up_reviews_post(release_reviews),
+                        |instant| instant.warm_up_reviews_post(reviews),
+                    )?;
+                    ensemble_predictions(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         })
     }
 
@@ -795,11 +1404,32 @@ impl RwkvRuntime {
                 return Err(invalid_input("invalid replay queries"));
             }
             let release_reviews = reviews.clone();
+<<<<<<< HEAD
             pair.advance(
                 |release| release.warm_up_reviews(release_reviews, false),
                 |instant| instant.warm_up_reviews_query(reviews, queries, after),
             )
             .map(|(_, predictions)| predictions)
+=======
+            match pair.instant_weight {
+                None => pair
+                    .advance(
+                        |release| release.warm_up_reviews(release_reviews, false),
+                        |instant| instant.warm_up_reviews_query(reviews, queries, after),
+                    )
+                    .map(|(_, predictions)| predictions),
+                Some(weight) => {
+                    let release_queries = queries.clone();
+                    let (release, instant) = pair.advance(
+                        |release| {
+                            release.warm_up_reviews_query(release_reviews, release_queries, after)
+                        },
+                        |instant| instant.warm_up_reviews_query(reviews, queries, after),
+                    )?;
+                    ensemble_predictions(weight, instant, release)
+                }
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         })
     }
 
@@ -863,7 +1493,11 @@ impl RwkvRuntime {
                 durable
             ),
             pair => {
+<<<<<<< HEAD
                 let PairedRuntime { release, instant } = &mut **pair;
+=======
+                let PairedRuntime { release, instant, .. } = &mut **pair;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 release.write_paired_warm_up_state_checkpoint(
                     instant,
                     path,
@@ -901,7 +1535,11 @@ impl RwkvRuntime {
             engine,
             engine.restore_warm_up_state_checkpoint(path, store_generation, segment_id),
             pair => {
+<<<<<<< HEAD
                 let PairedRuntime { release, instant } = &mut **pair;
+=======
+                let PairedRuntime { release, instant, .. } = &mut **pair;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 release.restore_paired_warm_up_state_checkpoint(
                     instant,
                     path,
@@ -1113,25 +1751,44 @@ mod tests {
             ModelKind::Sm72e20 => "../qt/aqt/rwkv_inference/sm72e20/weights.f32.bin",
             ModelKind::Sm72e25 => "../qt/aqt/rwkv_inference/sm72e25/weights.f32.bin",
             ModelKind::Sm92 => "../qt/aqt/rwkv_inference/sm92/weights.f32.bin",
+<<<<<<< HEAD
+=======
+            ModelKind::Sm118 => "../qt/aqt/rwkv_inference/sm118/weights.f32.bin",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ModelKind::Sm57 => "../qt/aqt/rwkv_inference/sm57/weights.f32.bin",
             ModelKind::Sm98 => "../qt/aqt/rwkv_inference/sm98/weights.f32.bin",
             ModelKind::Sm101 => "../qt/aqt/rwkv_inference/sm101/weights.f32.bin",
             ModelKind::Sm99 => "../qt/aqt/rwkv_inference/sm99/weights.f32.bin",
             ModelKind::Sm106 => "../qt/aqt/rwkv_inference/sm106/weights.f32.bin",
+<<<<<<< HEAD
+=======
+            ModelKind::Sm113 => "../qt/aqt/rwkv_inference/sm113/weights.f32.bin",
+            ModelKind::Sm115 => "../qt/aqt/rwkv_inference/sm115/weights.f32.bin",
+            ModelKind::Sm130Th => "../qt/aqt/rwkv_inference/sm130th/weights.f32.bin",
+            ModelKind::Sm130Io => "../qt/aqt/rwkv_inference/sm130io/weights.f32.bin",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         });
         RwkvRuntime::load_with_precision(path, 0.9, 36_500, precision, model).unwrap()
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_runtime_restores_each_model_at_each_precision() {
         for precision in [
             StatePrecision::F32,
             StatePrecision::Int8,
             StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+            StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             let mut legacy = load(ModelKind::Legacy, precision);
             let mut small = load(ModelKind::Sm40, precision);
@@ -1150,7 +1807,13 @@ mod tests {
                 (ModelKind::Sm72e20, load(ModelKind::Sm72e20, precision)),
                 (ModelKind::Sm72e25, load(ModelKind::Sm72e25, precision)),
                 (ModelKind::Sm92, load(ModelKind::Sm92, precision)),
+<<<<<<< HEAD
                 (ModelKind::Sm106, load(ModelKind::Sm106, precision)),
+=======
+                (ModelKind::Sm118, load(ModelKind::Sm118, precision)),
+                (ModelKind::Sm106, load(ModelKind::Sm106, precision)),
+                (ModelKind::Sm130Th, load(ModelKind::Sm130Th, precision)),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ] {
                 let answers = crate::rwkv::precision_tests::reviews(14);
                 engine.warm_up_reviews(answers.clone(), false).unwrap();
@@ -1176,16 +1839,23 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_runtime_feeds_leak_free_inputs_to_leak_free_models() {
         assert_eq!(ModelKind::parse("sm72").unwrap(), ModelKind::Sm72);
         assert_eq!(ModelKind::parse("sm72e20").unwrap(), ModelKind::Sm72e20);
         assert_eq!(ModelKind::parse("sm72e25").unwrap(), ModelKind::Sm72e25);
         assert_eq!(ModelKind::parse("sm92").unwrap(), ModelKind::Sm92);
         assert_eq!(ModelKind::parse("sm106").unwrap(), ModelKind::Sm106);
+<<<<<<< HEAD
+=======
+        assert_eq!(ModelKind::parse("sm130th").unwrap(), ModelKind::Sm130Th);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         // The same checkpoint without the runtime's input rule.
         let unadjusted = |model: ModelKind| {
             let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(match model {
@@ -1195,6 +1865,10 @@ mod tests {
                 ModelKind::Sm72e25 => "../qt/aqt/rwkv_inference/sm72e25/weights.f32.bin",
                 ModelKind::Sm92 => "../qt/aqt/rwkv_inference/sm92/weights.f32.bin",
                 ModelKind::Sm106 => "../qt/aqt/rwkv_inference/sm106/weights.f32.bin",
+<<<<<<< HEAD
+=======
+                ModelKind::Sm130Th => "../qt/aqt/rwkv_inference/sm130th/weights.f32.bin",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 _ => "../qt/aqt/rwkv_inference/sm72/weights.f32.bin",
             });
             // Legacy runs on the big engine, the small models on the small one.
@@ -1235,6 +1909,10 @@ mod tests {
             ModelKind::Sm72e25,
             ModelKind::Sm92,
             ModelKind::Sm106,
+<<<<<<< HEAD
+=======
+            ModelKind::Sm130Th,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             assert_eq!(model.leak_free_inputs(), model != ModelKind::Sm56);
             for missing_ids in [false, true] {
@@ -1256,6 +1934,7 @@ mod tests {
 
     /// The answer-time head is optional: a model folder without
     /// `time_head.f32.bin` loads as before and predicts no answer time, and
+<<<<<<< HEAD
     /// loading the head changes no grade output.
     #[test]
     #[cfg_attr(
@@ -1277,6 +1956,215 @@ mod tests {
         std::fs::copy(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join(format!("../qt/aqt/rwkv_inference/{folder}/weights.f32.bin")),
+=======
+    /// loading the head changes no grade output. Every two-head model of the
+    /// family has a head since the time heads for the family (SM117), the
+    /// show-time big model (SM91s2) as
+    /// `RWKV_trained_on_5000_10000.time_head.f32.bin` beside its weights.
+    /// The SM117 heads (format 2) also answer same-day queries.
+    /// A synthetic history for the answer-time recalibration (SM175): 60
+    /// cards reviewed in turn, 45 reviews a day, varied grades and times.
+    fn recal_history(count: usize) -> Vec<ReviewInput> {
+        let mut last_day = std::collections::HashMap::new();
+        (0..count)
+            .map(|index| {
+                let card_id = 500 + (index % 60) as i64;
+                let day = 2_000 + (index / 45) as i64;
+                let previous = last_day.insert(card_id, day);
+                let grade = [3_u8, 3, 2, 3, 1, 3, 4, 3, 3, 2][index * 7 % 10];
+                ReviewInput {
+                    card_id,
+                    note_id: Some(card_id / 2),
+                    deck_id: Some(1 + (index % 3) as i64),
+                    preset_id: Some(1),
+                    is_query: false,
+                    ease: Some(grade),
+                    duration_millis: Some(1_200 + (index * 3_571 % 14_000) as i64),
+                    card_type: Some(if previous.is_none() { 0 } else { 2 }),
+                    day_offset: Some(day),
+                    current_elapsed_days: Some(previous.map_or(-1, |p| day - p)),
+                    current_elapsed_seconds: Some(previous.map_or(-1, |p| (day - p) * 86_400)),
+                    target_retentions: [Some(0.9); 4],
+                    enforce_grade_order: true,
+                }
+            })
+            .collect()
+    }
+
+    fn answer_time_query(review: &ReviewInput) -> ReviewInput {
+        let mut query = review.clone();
+        query.is_query = true;
+        query.ease = None;
+        query.duration_millis = None;
+        query
+    }
+
+    fn answer_time_history(reviews: &[ReviewInput]) -> super::super::AnswerTimeHistory {
+        let mut times = super::super::AnswerTimeHistory::new();
+        for review in reviews {
+            times.push(
+                review.card_id,
+                i64::from(review.ease.unwrap()),
+                review.duration_millis.unwrap(),
+            );
+        }
+        times
+    }
+
+    /// The recalibration replays the history on a private state with the
+    /// head's raw prediction taken exactly as Card Info queries it, fits
+    /// only on reviews before today's block, needs 1,000 of them, and leaves
+    /// the runtime's own grade and time outputs bitwise unchanged.
+    #[test]
+    fn rwkv_runtime_answer_time_recalibration_replays_privately() {
+        use crate::rwkv::answer_time_recal::answer_time_recal_window;
+        use crate::rwkv::answer_time_recal::ANSWER_TIME_RECAL_SHIPPED;
+        use crate::rwkv::TimedEvents;
+        let history = recal_history(1_500);
+        let today = history.last().unwrap().day_offset.unwrap() + 1;
+        let mut runtime = load(ModelKind::Sm130Th, StatePrecision::F32);
+        runtime.warm_up_reviews(history.clone(), false).unwrap();
+        let mut query = answer_time_query(&history[7]);
+        query.current_elapsed_days = Some(2);
+        query.current_elapsed_seconds = Some(2 * 86_400);
+        let features = answer_time_history(&history).features(query.card_id, 2);
+        let outputs = |runtime: &mut RwkvRuntime| {
+            let request = |runtime: &RwkvRuntime| ReviewPredictionRequest {
+                input: query.clone(),
+                state: runtime.warm_up_state(&query).unwrap(),
+            };
+            let requests = vec![request(runtime)];
+            let grades = runtime.predict_many(requests).unwrap();
+            let requests = vec![request(runtime)];
+            let time = runtime
+                .predict_answer_times(requests, vec![features])
+                .unwrap();
+            let grades: Vec<_> = grades
+                .iter()
+                .map(|output| {
+                    (
+                        output.retrievability.to_bits(),
+                        output.button_probabilities.map(f32::to_bits),
+                        output.curve_retrievability.map(f32::to_bits),
+                    )
+                })
+                .collect();
+            (grades, time)
+        };
+        let before = outputs(&mut runtime);
+        let recalibrator = runtime.answer_time_recalibrator().unwrap();
+        let fit = recalibrator.fit(&history, today).unwrap().unwrap();
+        assert_eq!(outputs(&mut runtime), before);
+
+        // The fit rows: every time-labelled review before today's block.
+        let labelled: Vec<i64> = history
+            .iter()
+            .filter(|review| review.card_type == Some(2))
+            .map(|review| review.day_offset.unwrap())
+            .collect();
+        let window = answer_time_recal_window(&labelled, today, ANSWER_TIME_RECAL_SHIPPED).unwrap();
+        assert_eq!(fit.fit_rows, window.fit.len());
+        assert_eq!(fit.block_start_day, window.block_start_day);
+        assert!(fit.fitted.iter().flatten().any(|&fitted| fitted));
+        let raw = TimedEvents::from_prediction(before.1[0].as_ref().unwrap());
+        assert_eq!(fit.apply(&raw).grade, raw.grade);
+
+        // Reviews of today's block do not enter the fit.
+        let mut changed = history.clone();
+        for review in changed
+            .iter_mut()
+            .filter(|review| review.day_offset.unwrap() >= fit.block_start_day)
+        {
+            review.ease = Some(1);
+            review.duration_millis = Some(59_000);
+        }
+        assert_eq!(
+            recalibrator.fit(&changed, today).unwrap(),
+            Some(fit.clone())
+        );
+        // A short history keeps the raw model.
+        assert_eq!(recalibrator.fit(&history[..900], today).unwrap(), None);
+
+        // The replay's raw prediction of a fit row equals the Card Info
+        // query on a runtime warmed up to just before that review.
+        let (rows, window, _) = match &recalibrator {
+            AnswerTimeRecalibrator::Primary(engine) => {
+                engine.answer_time_recal_rows(&history, today)
+            }
+            AnswerTimeRecalibrator::Alternate(engine) => {
+                engine.answer_time_recal_rows(&history, today)
+            }
+        }
+        .unwrap()
+        .unwrap();
+        let target = history
+            .iter()
+            .enumerate()
+            .filter(|(_, review)| review.card_type == Some(2))
+            .nth(window.fit.end - 1)
+            .unwrap()
+            .0;
+        let mut resident = load(ModelKind::Sm130Th, StatePrecision::F32);
+        resident
+            .warm_up_reviews(history[..target].to_vec(), false)
+            .unwrap();
+        let query = answer_time_query(&history[target]);
+        let elapsed = query.current_elapsed_days.unwrap();
+        let state = resident.warm_up_state(&query).unwrap();
+        let prediction = resident
+            .predict_answer_times(
+                vec![ReviewPredictionRequest {
+                    input: query.clone(),
+                    state,
+                }],
+                vec![answer_time_history(&history[..target]).features(query.card_id, elapsed)],
+            )
+            .unwrap()[0]
+            .clone()
+            .unwrap();
+        assert_eq!(
+            rows.last().unwrap().raw,
+            TimedEvents::from_prediction(&prediction)
+        );
+    }
+
+    #[test]
+    fn rwkv_runtime_answer_time_head_is_optional_and_leaves_grades_unchanged() {
+        for (model, file, same_day) in [
+            (ModelKind::Sm72e25, "sm72e25/weights.f32.bin", false),
+            (ModelKind::Sm92, "sm92/weights.f32.bin", true),
+            (ModelKind::Sm118, "sm118/weights.f32.bin", true),
+            (ModelKind::Sm106, "sm106/weights.f32.bin", true),
+            (ModelKind::Sm130Th, "sm130th/weights.f32.bin", true),
+            (ModelKind::Legacy, "RWKV_trained_on_5000_10000.bin", true),
+        ] {
+            check_answer_time_head_is_optional(model, file, same_day);
+        }
+        // Instant-only models with a head of their own (SM99) answer alone;
+        // the older ones (SM57, SM98, SM101) have none (small instant-only
+        // models load only with the small-model feature). The longer Small
+        // and Tiny Instant-Only models (SM113, SM115) have one (SM119), the
+        // six-layer Tiny Instant-Only model (SM130) too (SM138, 346 inputs).
+        assert!(load(ModelKind::Sm99, StatePrecision::F32).has_answer_time_head());
+        if super::super::SMALL_MODEL {
+            for model in [ModelKind::Sm113, ModelKind::Sm115, ModelKind::Sm130Io] {
+                assert!(load(model, StatePrecision::F32).has_answer_time_head());
+            }
+            for model in [ModelKind::Sm57, ModelKind::Sm98, ModelKind::Sm101] {
+                assert!(!load(model, StatePrecision::F32).has_answer_time_head());
+            }
+        }
+    }
+
+    fn check_answer_time_head_is_optional(model: ModelKind, file: &str, same_day_head: bool) {
+        let dir = tempfile::tempdir().unwrap();
+        let bare = dir
+            .path()
+            .join(Path::new(file).file_name().unwrap().to_str().unwrap());
+        std::fs::copy(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("../qt/aqt/rwkv_inference/{file}")),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             &bare,
         )
         .unwrap();
@@ -1333,13 +2221,32 @@ mod tests {
                 RwkvRuntime::load_with_precision(bare, 0.9, 36_500, StatePrecision::F32, model)
                     .unwrap(),
             );
+<<<<<<< HEAD
         assert!(with_head && !without_head);
+=======
+        assert!(with_head && !without_head, "{model:?}");
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         assert_eq!(grades, bare_grades);
         assert_eq!(bare_times, vec![None, None]);
         let prediction = times[0]
             .as_ref()
             .expect("a later-day query has an answer time");
+<<<<<<< HEAD
         assert!(times[1].is_none(), "same-day queries have no answer time");
+=======
+        assert_eq!(
+            times[1].is_some(),
+            same_day_head,
+            "{model:?}: only format 2 heads answer same-day queries"
+        );
+        if let Some(same_day) = &times[1] {
+            assert_eq!(
+                same_day.button_probabilities.map(f32::to_bits),
+                grades[1].2,
+                "{model:?}: same-day buttons"
+            );
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         for grade in 0..4 {
             let total: f32 = prediction.probabilities[grade].iter().sum();
             assert!((total - 1.0).abs() < 1e-5);
@@ -1371,6 +2278,7 @@ mod tests {
     ];
 
     /// The instant-only models: never a full model alone.
+<<<<<<< HEAD
     const INSTANT_ONLY_MODELS: [(ModelKind, &str); 3] = [
         (ModelKind::Sm57, "sm57"),
         (ModelKind::Sm98, "sm98"),
@@ -1380,6 +2288,22 @@ mod tests {
     /// A model key loads only weights with its card layers: the tiny model's
     /// key refuses two-layer weights and every other small key refuses the
     /// tiny weights, alone or in a pair.
+=======
+    const INSTANT_ONLY_MODELS: [(ModelKind, &str); 6] = [
+        (ModelKind::Sm57, "sm57"),
+        (ModelKind::Sm98, "sm98"),
+        (ModelKind::Sm101, "sm101"),
+        (ModelKind::Sm113, "sm113"),
+        (ModelKind::Sm115, "sm115"),
+        (ModelKind::Sm130Io, "sm130io"),
+    ];
+
+    /// A model key loads only weights with its layer counts: the tiny
+    /// model's key refuses two-layer weights and every other small key
+    /// refuses the tiny weights, and the six-layer Tiny (SM130) keys and the
+    /// four-round Tiny keys refuse each other's weights (same card layers,
+    /// fewer deck, preset and user layers), alone or in a pair.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[test]
     fn rwkv_runtime_refuses_weights_of_another_layer_plan() {
         if !super::super::SMALL_MODEL {
@@ -1392,6 +2316,17 @@ mod tests {
             (ModelKind::Sm106, "sm92"),
             (ModelKind::Sm92, "sm106"),
             (ModelKind::Sm72e25, "sm106"),
+<<<<<<< HEAD
+=======
+            (ModelKind::Sm130Th, "sm106"),
+            (ModelKind::Sm106, "sm130th"),
+            (ModelKind::Sm130Io, "sm115"),
+            (ModelKind::Sm115, "sm130io"),
+            (ModelKind::Sm130Th, "sm92"),
+            (ModelKind::Sm118, "sm106"),
+            (ModelKind::Sm118, "sm130th"),
+            (ModelKind::Sm72e25, "sm130th"),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             assert!(
                 RwkvRuntime::load_with_precision(
@@ -1427,6 +2362,7 @@ mod tests {
         .is_err());
     }
 
+<<<<<<< HEAD
     /// The Tiny two-head model (SM106) alone is a full runtime on the tiny
     /// plan: curve recall, intervals and S90 beside instant recall and
     /// buttons, one card layer, no answer-time head, at every state
@@ -1439,14 +2375,43 @@ mod tests {
     fn rwkv_sm106_alone_is_a_full_tiny_model() {
         assert!(!ModelKind::Sm106.instant_only() && ModelKind::Sm106.leak_free_inputs());
         assert!(ModelKind::Sm106.small() && ModelKind::Sm106.card_layers() == Some(1));
+=======
+    /// The Tiny two-head model (SM106) and the six-layer Tiny two-head model
+    /// (SM130) alone are full runtimes on their plans: curve recall,
+    /// intervals and S90 beside instant recall and buttons, one card layer,
+    /// and an answer-time head (the time heads for the family (SM117); SM138
+    /// for SM130, 346 inputs), at every state precision.
+    #[test]
+    fn rwkv_tiny_two_head_models_alone_are_full_models() {
+        assert_eq!(ModelKind::Sm130Th.module_layers(), Some([1, 2, 1, 1, 1]));
+        assert_eq!(ModelKind::Sm130Io.module_layers(), Some([1, 2, 1, 1, 1]));
+        assert!(ModelKind::Sm130Io.instant_only() && ModelKind::Sm130Io.small());
+        for model in [ModelKind::Sm106, ModelKind::Sm130Th] {
+            check_tiny_two_head_model_alone(model);
+        }
+    }
+
+    fn check_tiny_two_head_model_alone(model: ModelKind) {
+        assert!(!model.instant_only() && model.leak_free_inputs());
+        assert!(model.small() && model.card_layers() == Some(1));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         for precision in [
             StatePrecision::F32,
             StatePrecision::Int8,
             StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
         ] {
             let mut engine = load(ModelKind::Sm106, precision);
             assert!(!engine.is_paired() && engine.has_curve(), "{precision:?}");
             assert!(!engine.has_answer_time_head(), "{precision:?}");
+=======
+            StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4,
+        ] {
+            let mut engine = load(model, precision);
+            assert!(!engine.is_paired() && engine.has_curve(), "{precision:?}");
+            assert!(engine.has_answer_time_head(), "{precision:?}");
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             let answers = crate::rwkv::precision_tests::reviews(14);
             engine.warm_up_reviews(answers.clone(), false).unwrap();
             let review = review_with_state(&mut engine, &query_of(&answers[0], 2));
@@ -1560,9 +2525,38 @@ mod tests {
             .collect()
     }
 
+<<<<<<< HEAD
     /// Everything a paired runtime outputs, compared bit for bit with the
     /// two models run alone: instant recall and button probabilities from
     /// the instant-only model, the rest from the release.
+=======
+    /// A pair's expected instant recall from its two models alone: the
+    /// instant model's, or the Tiny instant ensemble (SM170).
+    fn expected_values(weight: Option<f64>, instant: &[f32], release: &[f32]) -> Vec<f32> {
+        match weight {
+            Some(weight) => ensemble_values(weight, instant.to_vec(), release.to_vec()).unwrap(),
+            None => instant.to_vec(),
+        }
+    }
+
+    fn expected_predictions(
+        weight: Option<f64>,
+        instant: &[(usize, f32)],
+        release: &[(usize, f32)],
+    ) -> Vec<(usize, f32)> {
+        match weight {
+            Some(weight) => {
+                ensemble_predictions(weight, instant.to_vec(), release.to_vec()).unwrap()
+            }
+            None => instant.to_vec(),
+        }
+    }
+
+    /// Everything a paired runtime outputs, compared bit for bit with the
+    /// two models run alone: instant recall and button probabilities from
+    /// the instant-only model (for the Tiny pair: the Tiny instant ensemble
+    /// (SM170) of both instant heads), the rest from the release.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn check_paired_outputs(
         pair: &mut RwkvRuntime,
         release: &mut RwkvRuntime,
@@ -1570,12 +2564,17 @@ mod tests {
         queries: &[ReviewInput],
         label: &str,
     ) {
+<<<<<<< HEAD
+=======
+        let weight = pair.instant_ensemble_weight();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let pair_r = pair
             .predict_retrievability_many_from_warm_up(queries.to_vec())
             .unwrap();
         let instant_r = instant
             .predict_retrievability_many_from_warm_up(queries.to_vec())
             .unwrap();
+<<<<<<< HEAD
         assert_eq!(bits(&pair_r), bits(&instant_r), "{label}: resident R");
         let release_r = release
             .predict_retrievability_many_from_warm_up(queries.to_vec())
@@ -1591,27 +2590,75 @@ mod tests {
                 (instant.0, instant.1),
                 "{label}: instant outputs"
             );
+=======
+        let release_r = release
+            .predict_retrievability_many_from_warm_up(queries.to_vec())
+            .unwrap();
+        assert_eq!(
+            bits(&pair_r),
+            bits(&expected_values(weight, &instant_r, &release_r)),
+            "{label}: resident R"
+        );
+        assert_ne!(bits(&pair_r), bits(&release_r), "{label}: models differ");
+        if weight.is_some() {
+            assert_ne!(bits(&pair_r), bits(&instant_r), "{label}: ensemble");
+        }
+
+        let pair_raw = pair.predict_many(requests(pair, queries)).unwrap();
+        let release_raw = release.predict_many(requests(release, queries)).unwrap();
+        let instant_raw = instant.predict_many(requests(instant, queries)).unwrap();
+        let expected_instant: Vec<_> = instant_raw
+            .iter()
+            .zip(&release_raw)
+            .map(|(instant, release)| {
+                let (retrievability, buttons) = paired_instant_outputs(
+                    weight,
+                    (instant.retrievability, instant.button_probabilities),
+                    release.retrievability,
+                );
+                (retrievability.to_bits(), buttons.map(f32::to_bits))
+            })
+            .collect();
+        let pair_out = output_bits(&pair_raw);
+        let release_out = output_bits(&release_raw);
+        for ((pair, release), instant) in pair_out.iter().zip(&release_out).zip(&expected_instant) {
+            assert_eq!((pair.0, pair.1), *instant, "{label}: instant outputs");
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             assert_eq!(
                 (pair.2, pair.3, pair.4, pair.5, pair.6),
                 (release.2, release.3, release.4, release.5, release.6),
                 "{label}: curve outputs"
             );
         }
+<<<<<<< HEAD
+=======
+        let request_instant = instant
+            .predict_retrievability_many(requests(instant, queries))
+            .unwrap();
+        let request_release = release
+            .predict_retrievability_many(requests(release, queries))
+            .unwrap();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         assert_eq!(
             bits(
                 &pair
                     .predict_retrievability_many(requests(pair, queries))
                     .unwrap()
             ),
+<<<<<<< HEAD
             bits(
                 &instant
                     .predict_retrievability_many(requests(instant, queries))
                     .unwrap()
             ),
+=======
+            bits(&expected_values(weight, &request_instant, &request_release)),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             "{label}: request R"
         );
 
         let history = vec![[0.25; super::super::ANSWER_TIME_FEATURES]; queries.len()];
+<<<<<<< HEAD
         // The pair answers time questions exactly as its release does (the Big
         // release has no answer-time head).
         assert_eq!(pair.has_answer_time_head(), release.has_answer_time_head());
@@ -1622,6 +2669,34 @@ mod tests {
                 .predict_answer_times(requests(release, queries), history)
                 .unwrap(),
             "{label}: answer time stays on the release state"
+=======
+        // The pair answers time questions exactly as its instant model alone
+        // does when that model has a head (on the instant model's state),
+        // else exactly as its release does.
+        assert_eq!(
+            pair.has_answer_time_head(),
+            instant.has_answer_time_head() || release.has_answer_time_head()
+        );
+        assert_eq!(
+            pair.answer_time_from_instant_model(),
+            instant.has_answer_time_head(),
+            "{label}"
+        );
+        let expected = if instant.has_answer_time_head() {
+            instant
+                .predict_answer_times(requests(instant, queries), history.clone())
+                .unwrap()
+        } else {
+            release
+                .predict_answer_times(requests(release, queries), history.clone())
+                .unwrap()
+        };
+        assert_eq!(
+            pair.predict_answer_times(requests(pair, queries), history)
+                .unwrap(),
+            expected,
+            "{label}: answer time on the state of the model whose head runs"
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         );
     }
 
@@ -1632,6 +2707,97 @@ mod tests {
             .unwrap()
     }
 
+<<<<<<< HEAD
+=======
+    /// The precision bytes of every module state in `bytes` (a card or note
+    /// state, alone or a paired one holding both models' states).
+    fn stored_precisions(bytes: &[u8]) -> Vec<u8> {
+        let magic = super::super::precision::MAGIC;
+        (0..bytes.len().saturating_sub(magic.len()))
+            .filter(|&at| bytes[at..].starts_with(magic))
+            .map(|at| bytes[at + magic.len()])
+            .collect()
+    }
+
+    /// The profile default (`compact_lowrank`) stores int6 factors (0x26)
+    /// for Big (the show-time big model (SM91s2), `Legacy`, and the
+    /// show-time instant-only big model (SM99)) and Small (the show-time
+    /// two-head cool-down for Small (SM118) and the longer Small
+    /// Instant-Only model (SM113)) and int8 factors (0x28) for Tiny (the
+    /// six-layer Tiny two-head and Instant-Only models (SM130)), each
+    /// two-head model alone and in its size's pair; the explicit policies
+    /// keep their width on every size.
+    #[test]
+    fn rwkv_runtime_default_lowrank_factor_width_follows_the_model_size() {
+        let by_size = StatePrecision::parse("compact_lowrank").unwrap();
+        assert_eq!(
+            by_size,
+            StatePrecision::CompactLowRankBySize(super::super::RankSchedule::DEFAULT)
+        );
+        let mut sizes = vec![(ModelKind::Legacy, ModelKind::Sm99, 0x26)];
+        if super::super::SMALL_MODEL {
+            sizes.push((ModelKind::Sm118, ModelKind::Sm113, 0x26));
+            sizes.push((ModelKind::Sm130Th, ModelKind::Sm130Io, 0x28));
+        }
+        let folder = |model: ModelKind| match model {
+            ModelKind::Legacy => PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin"),
+            ModelKind::Sm99 => model_path("sm99"),
+            ModelKind::Sm118 => model_path("sm118"),
+            ModelKind::Sm113 => model_path("sm113"),
+            ModelKind::Sm130Th => model_path("sm130th"),
+            ModelKind::Sm130Io => model_path("sm130io"),
+            _ => unreachable!(),
+        };
+        let check = |mut engine: RwkvRuntime, expected: u8, label: &str| {
+            let answers = crate::rwkv::precision_tests::reviews(14);
+            engine.warm_up_reviews(answers.clone(), false).unwrap();
+            let output = review_with_state(&mut engine, &answers[0]);
+            for state in [&output.card_state, &output.note_state] {
+                let codes = stored_precisions(state);
+                assert!(!codes.is_empty(), "{label}");
+                assert!(
+                    codes.iter().all(|&code| code == expected),
+                    "{label}: {codes:x?}"
+                );
+            }
+        };
+        for (release, instant, expected) in sizes {
+            // Alone: the two-head model (an instant-only model alone keeps
+            // no state of its own; the pair below stores both).
+            for model in [release] {
+                for (precision, code) in [
+                    (by_size, expected),
+                    (StatePrecision::parse("compact_lowrank_int8").unwrap(), 0x28),
+                    (StatePrecision::parse("compact_lowrank_int6").unwrap(), 0x26),
+                ] {
+                    let engine = RwkvRuntime::load_with_precision(
+                        folder(model),
+                        0.9,
+                        36_500,
+                        precision,
+                        model,
+                    )
+                    .unwrap();
+                    check(engine, code, &format!("{model:?} {precision:?}"));
+                }
+            }
+            let pair = RwkvRuntime::load_paired(
+                folder(release),
+                folder(instant),
+                0.9,
+                36_500,
+                by_size,
+                release,
+                instant,
+            )
+            .unwrap();
+            assert!(pair.is_paired());
+            check(pair, expected, &format!("{release:?} + {instant:?}"));
+        }
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[test]
     fn rwkv_paired_runtime_matches_each_model_alone() {
         if !super::super::SMALL_MODEL {
@@ -1693,6 +2859,11 @@ mod tests {
                 StatePrecision::F32,
                 StatePrecision::Int8,
                 StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+                StatePrecision::CompactCardsInt8,
+                StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ]
             .map(|p| (model, p))
         }) {
@@ -1701,8 +2872,13 @@ mod tests {
             let release = load(ModelKind::Sm72e25, precision);
             let instant = instant_alone_of(precision, instant_model);
             assert!(pair.is_paired() && pair.has_curve() && !release.is_paired());
+<<<<<<< HEAD
             // Only the instant-only models (SM57, SM98, SM101) lack an
             // answer-time head.
+=======
+            // Only the instant-only models without a head (SM57, SM98,
+            // SM101) lack an answer-time head here.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             assert_eq!(
                 instant.has_answer_time_head(),
                 !instant_model.0.instant_only()
@@ -1712,6 +2888,7 @@ mod tests {
         }
     }
 
+<<<<<<< HEAD
     /// The pairs of the RWKV family release's Small and Tiny sizes (the
     /// family wiring (SM114)): the show-time retrain (SM92) beside the Small
     /// Instant-Only model (SM98), and the Tiny two-head model (SM106) beside
@@ -1719,6 +2896,21 @@ mod tests {
     /// from the Instant-Only model, the curve, intervals, S90 and answer time
     /// from the two-head model, bit for bit, at every state precision. The
     /// Tiny pair has no answer-time head, like SM106 alone.
+=======
+    /// The pairs of the Small and Tiny sizes (the family wiring (SM114)):
+    /// the show-time two-head cool-down for Small (SM118) (until the 2026-11
+    /// release candidate: the show-time retrain (SM92)) beside the longer
+    /// Small Instant-Only
+    /// model (SM113), and the six-layer Tiny two-head model (SM130) beside
+    /// the six-layer Tiny Instant-Only model (SM130) (until the 2026-11
+    /// release candidate: the Tiny two-head model (SM106) beside the longer
+    /// cool-down for Tiny (SM115); until 2026-11-16: SM98 and SM101; all
+    /// still checked). Instant recall and buttons come from the Instant-Only
+    /// model, the curve, intervals and S90 from the two-head model, bit for
+    /// bit, at every state precision. The answer time comes from the
+    /// Instant-Only model's head when it has one, else from the two-head
+    /// model's (SM113 and SM115 have one since SM119; SM98 and SM101 do not).
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[test]
     fn rwkv_family_pairs_match_each_model_alone() {
         if !super::super::SMALL_MODEL {
@@ -1736,19 +2928,63 @@ mod tests {
             return;
         }
         // (two-head model, Instant-Only model, stored pair bytes per card and
+<<<<<<< HEAD
         // note at int4 cards + int8 notes)
         for (release, instant, stored) in [
             ((ModelKind::Sm92, "sm92"), (ModelKind::Sm98, "sm98"), 7_098),
+=======
+        // note at int4 cards + int8 notes and at the compact default)
+        for (release, instant, stored, stored_compact) in [
+            (
+                (ModelKind::Sm118, "sm118"),
+                (ModelKind::Sm113, "sm113"),
+                7_098,
+                7_758,
+            ),
+            (
+                (ModelKind::Sm92, "sm92"),
+                (ModelKind::Sm113, "sm113"),
+                7_098,
+                7_758,
+            ),
+            (
+                (ModelKind::Sm130Th, "sm130th"),
+                (ModelKind::Sm130Io, "sm130io"),
+                5_282,
+                5_298,
+            ),
+            (
+                (ModelKind::Sm106, "sm106"),
+                (ModelKind::Sm115, "sm115"),
+                5_282,
+                5_298,
+            ),
+            (
+                (ModelKind::Sm92, "sm92"),
+                (ModelKind::Sm98, "sm98"),
+                7_098,
+                7_758,
+            ),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             (
                 (ModelKind::Sm106, "sm106"),
                 (ModelKind::Sm101, "sm101"),
                 5_282,
+<<<<<<< HEAD
+=======
+                5_298,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ),
         ] {
             for precision in [
                 StatePrecision::F32,
                 StatePrecision::Int8,
                 StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+                StatePrecision::CompactCardsInt8,
+                StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ] {
                 let label = format!("{}+{} {precision:?}", release.1, instant.1);
                 let pair = || {
@@ -1766,17 +3002,42 @@ mod tests {
                 let alone = load(release.0, precision);
                 let instant_alone = instant_alone_of(precision, instant);
                 assert!(pair().is_paired() && pair().has_curve(), "{label}");
+<<<<<<< HEAD
                 let head = release.0 == ModelKind::Sm92;
                 assert_eq!(pair().has_answer_time_head(), head, "{label}");
                 assert_eq!(alone.has_answer_time_head(), head, "{label}");
                 if precision == StatePrecision::Int4CardsInt8Notes {
+=======
+                // Both two-head models have a head (SM117).
+                assert!(pair().has_answer_time_head(), "{label}");
+                assert!(alone.has_answer_time_head(), "{label}");
+                // The longer Instant-Only models carry their own head (SM119).
+                assert_eq!(
+                    pair().answer_time_from_instant_model(),
+                    matches!(
+                        instant.0,
+                        ModelKind::Sm113 | ModelKind::Sm115 | ModelKind::Sm130Io
+                    ),
+                    "{label}"
+                );
+                let expected = match precision {
+                    StatePrecision::Int4CardsInt8Notes => Some(stored),
+                    StatePrecision::CompactCardsInt8 => Some(stored_compact),
+                    _ => None,
+                };
+                if let Some(expected) = expected {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     let mut engine = pair();
                     let answers = crate::rwkv::precision_tests::reviews(14);
                     engine.warm_up_reviews(answers.clone(), false).unwrap();
                     let state = engine.warm_up_state(&answers[0]).unwrap();
                     assert_eq!(
                         state.card.unwrap().len() + state.note.unwrap().len(),
+<<<<<<< HEAD
                         stored,
+=======
+                        expected,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                         "{label}"
                     );
                 }
@@ -1786,14 +3047,21 @@ mod tests {
     }
 
     /// Replays answers, queries and reviews through a pair and through its two
+<<<<<<< HEAD
     /// models alone: instant outputs from the instant model, the rest from the
     /// release, bit for bit.
+=======
+    /// models alone: instant outputs from the instant model (for the Tiny
+    /// pair: the Tiny instant ensemble (SM170) of both instant heads), the
+    /// rest from the release, bit for bit.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn check_pair_matches_models(
         mut pair: RwkvRuntime,
         mut release: RwkvRuntime,
         mut instant: RwkvRuntime,
         label: String,
     ) {
+<<<<<<< HEAD
         let answers = crate::rwkv::precision_tests::reviews(21);
         let (first, rest) = answers.split_at(14);
         let pair_predictions = pair.warm_up_reviews(first.to_vec(), true).unwrap();
@@ -1802,6 +3070,40 @@ mod tests {
         assert_eq!(
             prediction_bits(&pair_predictions),
             prediction_bits(&instant_predictions)
+=======
+        let weight = pair.instant_ensemble_weight();
+        let answers = crate::rwkv::precision_tests::reviews(21);
+        let (first, rest) = answers.split_at(14);
+        let pair_predictions = pair.warm_up_reviews(first.to_vec(), true).unwrap();
+        let release_predictions = release.warm_up_reviews(first.to_vec(), true).unwrap();
+        let instant_predictions = instant.warm_up_reviews(first.to_vec(), true).unwrap();
+        assert_eq!(
+            prediction_bits(&pair_predictions),
+            prediction_bits(&expected_predictions(
+                weight,
+                &instant_predictions,
+                &release_predictions
+            ))
+        );
+        // The history predictions of the stats graphs, from a fresh worker.
+        let mut ignore = |_: u32, _: u32| Ok(());
+        assert_eq!(
+            prediction_bits(
+                &pair
+                    .forecast_history_predictions(first.to_vec(), &mut ignore)
+                    .unwrap()
+            ),
+            prediction_bits(&expected_predictions(
+                weight,
+                &instant
+                    .forecast_history_predictions(first.to_vec(), &mut ignore)
+                    .unwrap(),
+                &release
+                    .forecast_history_predictions(first.to_vec(), &mut ignore)
+                    .unwrap(),
+            )),
+            "{label}: history predictions"
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         );
         let queries: Vec<_> = answers[..7]
             .iter()
@@ -1814,6 +3116,7 @@ mod tests {
         let pair_review = review_with_state(&mut pair, &answer);
         let release_review = review_with_state(&mut release, &answer);
         let instant_review = review_with_state(&mut instant, &answer);
+<<<<<<< HEAD
         assert_eq!(
             pair_review.retrievability.to_bits(),
             instant_review.retrievability.to_bits()
@@ -1821,6 +3124,20 @@ mod tests {
         assert_eq!(
             pair_review.button_probabilities.map(f32::to_bits),
             instant_review.button_probabilities.map(f32::to_bits)
+=======
+        let (expected_r, expected_buttons) = paired_instant_outputs(
+            weight,
+            (
+                instant_review.retrievability,
+                instant_review.button_probabilities,
+            ),
+            release_review.retrievability,
+        );
+        assert_eq!(pair_review.retrievability.to_bits(), expected_r.to_bits());
+        assert_eq!(
+            pair_review.button_probabilities.map(f32::to_bits),
+            expected_buttons.map(f32::to_bits)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         );
         assert_eq!(
             pair_review.current_interval,
@@ -1844,7 +3161,16 @@ mod tests {
         let instant_query = review_with_state(&mut instant, &query);
         assert_eq!(
             pair_query.retrievability.to_bits(),
+<<<<<<< HEAD
             instant_query.retrievability.to_bits()
+=======
+            expected_values(
+                weight,
+                &[instant_query.retrievability],
+                &[release_query.retrievability]
+            )[0]
+            .to_bits()
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         );
         assert!(pair_query.intervals.iter().all(Option::is_some));
         assert_eq!(
@@ -1858,16 +3184,27 @@ mod tests {
 
         // The other replay paths advance both models.
         let post = rest[1..4].to_vec();
+<<<<<<< HEAD
         assert_eq!(
             prediction_bits(&pair.warm_up_reviews_post(post.clone()).unwrap()),
             prediction_bits(&instant.warm_up_reviews_post(post.clone()).unwrap())
         );
         release.warm_up_reviews(post, false).unwrap();
+=======
+        let pair_post = pair.warm_up_reviews_post(post.clone()).unwrap();
+        let instant_post = instant.warm_up_reviews_post(post.clone()).unwrap();
+        let release_post = release.warm_up_reviews_post(post).unwrap();
+        assert_eq!(
+            prediction_bits(&pair_post),
+            prediction_bits(&expected_predictions(weight, &instant_post, &release_post))
+        );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let replay = rest[4..].to_vec();
         let replay_queries: Vec<_> = replay.iter().map(|answer| query_of(answer, 1)).collect();
         assert!(pair
             .warm_up_reviews_query(replay.clone(), replay_queries[..1].to_vec(), false)
             .is_err());
+<<<<<<< HEAD
         assert_eq!(
             prediction_bits(
                 &pair
@@ -1881,6 +3218,25 @@ mod tests {
             )
         );
         release.warm_up_reviews(replay, false).unwrap();
+=======
+        let pair_replay = pair
+            .warm_up_reviews_query(replay.clone(), replay_queries.clone(), true)
+            .unwrap();
+        let instant_replay = instant
+            .warm_up_reviews_query(replay.clone(), replay_queries.clone(), true)
+            .unwrap();
+        let release_replay = release
+            .warm_up_reviews_query(replay, replay_queries, true)
+            .unwrap();
+        assert_eq!(
+            prediction_bits(&pair_replay),
+            prediction_bits(&expected_predictions(
+                weight,
+                &instant_replay,
+                &release_replay
+            ))
+        );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         check_paired_outputs(
             &mut pair,
             &mut release,
@@ -1902,6 +3258,7 @@ mod tests {
             }
         };
         let future = |engine: &RwkvRuntime| {
+<<<<<<< HEAD
             bits(
                 &engine
                     .predict_retrievability_many_after_reviews(
@@ -1914,6 +3271,44 @@ mod tests {
             )
         };
         assert_eq!(future(&pair), future(&instant), "{label}: future R");
+=======
+            engine
+                .predict_retrievability_many_after_reviews(
+                    vec![later(&answers[0])],
+                    vec![query_of(&later(&answers[0]), 4)],
+                    simulation_snapshot(engine),
+                )
+                .unwrap()
+                .concat()
+        };
+        assert_eq!(
+            bits(&future(&pair)),
+            bits(&expected_values(
+                weight,
+                &future(&instant),
+                &future(&release)
+            )),
+            "{label}: future R"
+        );
+        let future_one = |engine: &RwkvRuntime| {
+            engine
+                .predict_retrievability_many_after_review(
+                    later(&answers[1]),
+                    vec![query_of(&later(&answers[1]), 5)],
+                    simulation_snapshot(engine),
+                )
+                .unwrap()
+        };
+        assert_eq!(
+            bits(&future_one(&pair)),
+            bits(&expected_values(
+                weight,
+                &future_one(&instant),
+                &future_one(&release)
+            )),
+            "{label}: future R after one answer"
+        );
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     /// The instant-only model alone (a profile with RWKV-Instant and no
@@ -1942,6 +3337,11 @@ mod tests {
                 StatePrecision::F32,
                 StatePrecision::Int8,
                 StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+                StatePrecision::CompactCardsInt8,
+                StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ]
             .map(|p| (model, p))
         }) {
@@ -1960,10 +3360,13 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn instant_forecast_pulls_future_card_for_daily_minimum() {
         if super::super::SMALL_MODEL {
             check_instant_forecast_pulls_future_card(load(ModelKind::Sm57, StatePrecision::F32));
@@ -2101,7 +3504,42 @@ mod tests {
                     .unwrap()
             )
         );
+<<<<<<< HEAD
         assert!(!alone.has_answer_time_head());
+=======
+        // An instant-only model alone answers with its own head, if any,
+        // exactly as the plain engine of the same weights.
+        assert_eq!(alone.has_answer_time_head(), raw.has_answer_time_head());
+        if raw.has_answer_time_head() {
+            let mut history = super::super::AnswerTimeHistory::new();
+            for answer in &answers {
+                history.push(
+                    answer.card_id,
+                    answer.ease.unwrap() as i64,
+                    answer.duration_millis.unwrap(),
+                );
+            }
+            let mut later = answers[0].clone();
+            later.is_query = true;
+            later.ease = None;
+            later.duration_millis = None;
+            later.current_elapsed_days = Some(3);
+            later.current_elapsed_seconds = Some(3 * 86_400);
+            let features = history.features(later.card_id, 3);
+            let times = |engine: &mut RwkvRuntime| {
+                let request = ReviewPredictionRequest {
+                    input: later.clone(),
+                    state: engine.warm_up_state(&later).unwrap(),
+                };
+                engine
+                    .predict_answer_times(vec![request], vec![features])
+                    .unwrap()
+            };
+            let (alone_times, raw_times) = (times(&mut alone), times(&mut raw));
+            assert!(alone_times[0].is_some());
+            assert_eq!(alone_times, raw_times);
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let config = || RwkvWorkloadSimulationConfig {
             min_dr: 80,
             max_dr: 90,
@@ -2207,7 +3645,11 @@ mod tests {
             .is_err());
             return;
         }
+<<<<<<< HEAD
         let precision = StatePrecision::Int4CardsInt8Notes;
+=======
+        let precision = StatePrecision::CompactCardsInt8;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         check_pair_state_round_trips(|| paired(precision), load(ModelKind::Sm72e25, precision));
     }
 
@@ -2382,10 +3824,13 @@ mod tests {
     /// Small pair runs on the small engine: only Legacy beside SM99, never
     /// a big model beside a small one or SM99 as the release side.
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_big_pair_accepts_only_the_big_models() {
         assert_eq!(ModelKind::parse("sm99").unwrap(), ModelKind::Sm99);
         assert!(ModelKind::Sm99.instant_only() && ModelKind::Sm99.leak_free_inputs());
@@ -2422,28 +3867,197 @@ mod tests {
         )
         .is_err());
         let pair = big_pair(StatePrecision::F32);
+<<<<<<< HEAD
         assert!(pair.is_paired() && pair.has_curve() && !pair.has_answer_time_head());
+=======
+        // Both big models have a head (SM117); the pair uses the instant
+        // model's (SM99).
+        assert!(pair.is_paired() && pair.has_curve() && pair.has_answer_time_head());
+        assert!(pair.answer_time_from_instant_model());
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         assert_eq!(
             matches!(pair, RwkvRuntime::AlternatePaired(_)),
             super::super::SMALL_MODEL
         );
     }
 
+<<<<<<< HEAD
     #[test]
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+    /// The Tiny instant ensemble (SM170) equals the formula of the
+    /// deploy-time ensemble test (SM160, `sm160_report.py`): float64,
+    /// probabilities clipped to [1e-7, 1 - 1e-7] before the logit. The
+    /// expected values use `sigmoid(w * logit(p_io) + (1 - w) * logit(p_th))`
+    /// at w = 0.69 on float32 inputs, including the clipped ends.
+    #[test]
+    fn rwkv_tiny_instant_ensemble_matches_the_python_formula() {
+        assert_eq!(TINY_INSTANT_ENSEMBLE_WEIGHT, 0.69);
+        for (p_io, p_th, expected) in [
+            (0.8999999761581421, 0.800000011920929, 0.8749918952582605),
+            (0.5, 0.5, 0.5),
+            (0.9700000286102295, 0.6000000238418579, 0.9258212176015327),
+            (0.20000000298023224, 0.75, 0.3506978175292828),
+            (0.9990000128746033, 0.949999988079071, 0.9965927805561264),
+            (
+                0.05000000074505806,
+                0.30000001192092896,
+                0.09159403693897153,
+            ),
+            (0.0, 0.8999999761581421, 2.9228227455277834e-05),
+            (1.0, 0.20000000298023224, 0.9999772684655834),
+            (9.999999717180685e-10, 1.0, 0.002182985854580942),
+            (0.8123000264167786, 0.8456000089645386, 0.8231770245135681),
+        ] {
+            let value = ensemble_instant(TINY_INSTANT_ENSEMBLE_WEIGHT, p_io as f32, p_th as f32);
+            assert!(
+                (f64::from(value) - expected).abs() < 1e-6,
+                "{p_io} {p_th}: {value} vs {expected}"
+            );
+        }
+        // w = 1 is the Instant-Only model alone, w = 0 the two-head model's
+        // instant head (within float32 rounding).
+        for p in [0.3f32, 0.7, 0.95] {
+            assert!((ensemble_instant(1.0, p, 0.5) - p).abs() < 1e-6);
+            assert!((ensemble_instant(0.0, 0.5, p) - p).abs() < 1e-6);
+        }
+        // The buttons follow the ensembled recall: Again is 1 - R, Hard,
+        // Good and Easy keep the Instant-Only model's shares.
+        let (r, buttons) = paired_instant_outputs(
+            Some(TINY_INSTANT_ENSEMBLE_WEIGHT),
+            (0.9, [0.1, 0.2, 0.6, 0.1]),
+            0.8,
+        );
+        assert_eq!(r, ensemble_instant(TINY_INSTANT_ENSEMBLE_WEIGHT, 0.9, 0.8));
+        assert_eq!(buttons[0], 1.0 - r);
+        assert!((buttons.iter().sum::<f32>() - 1.0).abs() < 1e-6);
+        assert!((buttons[2] / buttons[1] - 3.0).abs() < 1e-5);
+        assert!((buttons[3] / buttons[1] - 0.5).abs() < 1e-5);
+        // Without a weight the instant model's outputs pass unchanged.
+        assert_eq!(
+            paired_instant_outputs(None, (0.9, [0.1, 0.2, 0.6, 0.1]), 0.8),
+            (0.9, [0.1, 0.2, 0.6, 0.1])
+        );
+    }
+
+    /// Only the Tiny size's default two-model mode shows the Tiny instant
+    /// ensemble (SM170): the six-layer Tiny two-head model (SM130) beside
+    /// the six-layer Tiny Instant-Only model (SM130). Big, Small, the older
+    /// Tiny pairs and every one-model runtime (the one-model option, or an
+    /// Instant-Only model alone) keep their own instant outputs, and the
+    /// Tiny pair's curve outputs stay the two-head model's.
+    #[test]
+    fn rwkv_tiny_instant_ensemble_runs_only_in_tiny_default_mode() {
+        assert_eq!(
+            instant_ensemble_weight(ModelKind::Sm130Th, ModelKind::Sm130Io),
+            Some(0.69)
+        );
+        for (release, instant) in [
+            (ModelKind::Legacy, ModelKind::Sm99),
+            (ModelKind::Sm118, ModelKind::Sm113),
+            (ModelKind::Sm92, ModelKind::Sm113),
+            (ModelKind::Sm106, ModelKind::Sm115),
+            (ModelKind::Sm106, ModelKind::Sm101),
+            (ModelKind::Sm130Th, ModelKind::Sm115),
+            (ModelKind::Sm106, ModelKind::Sm130Io),
+        ] {
+            assert_eq!(instant_ensemble_weight(release, instant), None);
+        }
+        let precision = StatePrecision::parse("compact_lowrank").unwrap();
+        assert_eq!(big_pair(precision).instant_ensemble_weight(), None);
+        assert_eq!(
+            load(ModelKind::Legacy, precision).instant_ensemble_weight(),
+            None
+        );
+        if !super::super::SMALL_MODEL {
+            return;
+        }
+        let family_pair = |release: (ModelKind, &str), instant: (ModelKind, &str)| {
+            RwkvRuntime::load_paired(
+                model_path(release.1),
+                model_path(instant.1),
+                0.9,
+                36_500,
+                precision,
+                release.0,
+                instant.0,
+            )
+            .unwrap()
+        };
+        let small = family_pair((ModelKind::Sm118, "sm118"), (ModelKind::Sm113, "sm113"));
+        assert_eq!(small.instant_ensemble_weight(), None);
+        let mut tiny = family_pair(
+            (ModelKind::Sm130Th, "sm130th"),
+            (ModelKind::Sm130Io, "sm130io"),
+        );
+        assert_eq!(tiny.instant_ensemble_weight(), Some(0.69));
+        let mut two_head = load(ModelKind::Sm130Th, precision);
+        let mut instant_only = load(ModelKind::Sm130Io, precision);
+        assert_eq!(two_head.instant_ensemble_weight(), None);
+        assert_eq!(instant_only.instant_ensemble_weight(), None);
+
+        let answers = crate::rwkv::precision_tests::reviews(14);
+        for engine in [&mut tiny, &mut two_head, &mut instant_only] {
+            engine.warm_up_reviews(answers.clone(), false).unwrap();
+        }
+        let queries: Vec<_> = answers[..5]
+            .iter()
+            .map(|answer| query_of(answer, 3))
+            .collect();
+        let resident = |engine: &mut RwkvRuntime| {
+            engine
+                .predict_retrievability_many_from_warm_up(queries.clone())
+                .unwrap()
+        };
+        let pair_r = resident(&mut tiny);
+        let th_r = resident(&mut two_head);
+        let io_r = resident(&mut instant_only);
+        for ((pair, th), io) in pair_r.iter().zip(&th_r).zip(&io_r) {
+            assert_eq!(pair.to_bits(), ensemble_instant(0.69, *io, *th).to_bits());
+            assert_ne!(pair.to_bits(), io.to_bits());
+        }
+        let pair_out = tiny.predict_many(requests(&tiny, &queries)).unwrap();
+        let th_out = two_head
+            .predict_many(requests(&two_head, &queries))
+            .unwrap();
+        for ((pair, th), r) in pair_out.iter().zip(&th_out).zip(&pair_r) {
+            assert_eq!(pair.retrievability.to_bits(), r.to_bits());
+            assert_eq!(pair.button_probabilities[0], 1.0 - pair.retrievability);
+            assert_eq!(
+                pair.curve_retrievability.map(f32::to_bits),
+                th.curve_retrievability.map(f32::to_bits)
+            );
+            assert_eq!(
+                pair.intervals.map(|v| v.map(f32::to_bits)),
+                th.intervals.map(|v| v.map(f32::to_bits))
+            );
+        }
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_big_pair_matches_each_model_alone() {
         for precision in [
             StatePrecision::F32,
             StatePrecision::Int8,
             StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+            StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             let pair = big_pair(precision);
             let release = load(ModelKind::Legacy, precision);
             let instant = big_alone(precision, ModelKind::Sm99);
+<<<<<<< HEAD
             assert!(!release.is_paired() && !instant.has_answer_time_head());
+=======
+            assert!(!release.is_paired() && instant.has_answer_time_head());
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             check_pair_matches_models(pair, release, instant, format!("big {precision:?}"));
         }
     }
@@ -2451,15 +4065,23 @@ mod tests {
     /// The instant-only big model (SM99) alone (Big with RWKV-Instant and no
     /// RWKV-Curve) gives its instant outputs and never a curve output.
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_big_instant_only_runtime_serves_no_curve() {
         for precision in [
             StatePrecision::F32,
             StatePrecision::Int8,
             StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+            StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             let alone = load(ModelKind::Sm99, precision);
             assert!(!alone.is_paired() && !alone.has_curve());
@@ -2472,12 +4094,17 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
     fn rwkv_big_pair_state_round_trips() {
         let precision = StatePrecision::Int4CardsInt8Notes;
+=======
+    fn rwkv_big_pair_state_round_trips() {
+        let precision = StatePrecision::CompactCardsInt8;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         check_pair_state_round_trips(|| big_pair(precision), load(ModelKind::Legacy, precision));
     }
 
@@ -2489,12 +4116,17 @@ mod tests {
     /// restores the cache first), and every undo state of another engine or
     /// pairing.
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
     fn rwkv_switching_sizes_never_reuses_another_layout_state() {
         let precision = StatePrecision::Int4CardsInt8Notes;
+=======
+    fn rwkv_switching_sizes_never_reuses_another_layout_state() {
+        let precision = StatePrecision::CompactCardsInt8;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let answers = crate::rwkv::precision_tests::reviews(14);
         // (name, small architecture, runtime)
         let mut layouts = vec![
@@ -2538,6 +4170,27 @@ mod tests {
                 true,
                 load(ModelKind::Sm101, precision),
             ));
+<<<<<<< HEAD
+=======
+            layouts.push((
+                "six-layer tiny pair",
+                true,
+                family_pair(
+                    (ModelKind::Sm130Th, "sm130th"),
+                    (ModelKind::Sm130Io, "sm130io"),
+                ),
+            ));
+            layouts.push((
+                "six-layer tiny alone",
+                true,
+                load(ModelKind::Sm130Th, precision),
+            ));
+            layouts.push((
+                "six-layer tiny instant alone",
+                true,
+                load(ModelKind::Sm130Io, precision),
+            ));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         for (_, _, engine) in &mut layouts {
             engine.warm_up_reviews(answers.clone(), false).unwrap();
@@ -2591,16 +4244,24 @@ mod tests {
     /// big model (the pair header plus two big states), the stored state the
     /// desktop keeps per card and note.
     #[test]
+<<<<<<< HEAD
     #[cfg_attr(
         not(rwkv_models),
         ignore = "needs RWKV model files in qt/aqt/rwkv_inference"
     )]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_big_pair_stores_two_big_states_per_card_and_note() {
         let answers = crate::rwkv::precision_tests::reviews(14);
         for precision in [
             StatePrecision::F32,
             StatePrecision::Int8,
             StatePrecision::Int4CardsInt8Notes,
+<<<<<<< HEAD
+=======
+            StatePrecision::CompactCardsInt8,
+            StatePrecision::CompactCardsInt4,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ] {
             let sizes = |mut engine: RwkvRuntime| {
                 engine.warm_up_reviews(answers.clone(), false).unwrap();

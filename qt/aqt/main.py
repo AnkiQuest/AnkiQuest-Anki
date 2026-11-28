@@ -13,7 +13,7 @@ import sys
 import traceback
 import weakref
 from argparse import Namespace
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from concurrent.futures import Future
 from typing import Any, Literal, TypeVar, cast
 
@@ -26,12 +26,10 @@ import aqt.sound
 from anki import hooks
 from anki._backend import RustBackend as _RustBackend
 from anki._legacy import deprecated
-from anki.buildinfo import version as version_str
 from anki.collection import (
     Collection,
     Config,
     ExperimentFlag,
-    GithubRelease,
     OpChanges,
     UndoStatus,
 )
@@ -49,7 +47,7 @@ from anki.utils import (
     is_win,
     split_fields,
 )
-from aqt import gui_hooks
+from aqt import execution_logs, gui_hooks
 from aqt.addons import DownloadLogEntry, check_and_prompt_for_updates, show_log_to_user
 from aqt.debug_console import show_debug_console
 from aqt.flags import FlagManager
@@ -61,7 +59,7 @@ from aqt.operations.deck import set_current_deck
 from aqt.profiles import ProfileManager as ProfileManagerType
 from aqt.qt import *
 from aqt.qt import sip
-from aqt.sync import sync_collection, sync_login
+from aqt.sync import RemoteCollectionChanges, sync_collection, sync_login
 from aqt.taskman import TaskManager
 from aqt.theme import Theme, theme_manager
 from aqt.toolbar import BottomWebView, Toolbar, TopWebView
@@ -70,6 +68,7 @@ from aqt.utils import (
     HelpPage,
     KeyboardModifiersPressed,
     askUser,
+    askUserDialog,
     checkInvalidFilename,
     current_window,
     disallow_full_screen,
@@ -96,6 +95,100 @@ MainWindowState = Literal[
 
 
 T = TypeVar("T")
+
+OUTDATED_FSRS7_PREVIEW_PARAM_COUNT = 35
+OUTDATED_FSRS7_PREVIEW_WARNING_MAX_PRESETS = 8
+FSRS_FORK_FIELDS_KEY = "jschoreels.fsrs"
+CLEAR_OUTDATED_FSRS7_PREVIEW_PARAMS_BUTTON = "Clear Parameters"
+LATER_BUTTON = "Later"
+
+
+def _fsrs7_params_from_config(config: Mapping[str, Any]) -> object:
+    params = config.get("fsrsParams7") or config.get("fsrs_params_7")
+    if params:
+        return params
+
+    fsrs_other = config.get(FSRS_FORK_FIELDS_KEY)
+    if isinstance(fsrs_other, Mapping):
+        return fsrs_other.get("fsrs_params_7")
+
+    other = config.get("other")
+    if isinstance(other, Mapping):
+        fsrs_other = other.get(FSRS_FORK_FIELDS_KEY)
+        if isinstance(fsrs_other, Mapping):
+            return fsrs_other.get("fsrs_params_7")
+
+    return None
+
+
+def _is_outdated_fsrs7_preview_params(value: object) -> bool:
+    return isinstance(value, list) and len(value) == OUTDATED_FSRS7_PREVIEW_PARAM_COUNT
+
+
+def _clear_outdated_fsrs7_preview_params(config: MutableMapping[str, Any]) -> bool:
+    changed = False
+
+    for key in ("fsrsParams7", "fsrs_params_7"):
+        if _is_outdated_fsrs7_preview_params(config.get(key)):
+            config[key] = []
+            changed = True
+
+    fsrs_other = config.get(FSRS_FORK_FIELDS_KEY)
+    if isinstance(fsrs_other, MutableMapping) and _is_outdated_fsrs7_preview_params(
+        fsrs_other.get("fsrs_params_7")
+    ):
+        del fsrs_other["fsrs_params_7"]
+        changed = True
+
+    other = config.get("other")
+    if isinstance(other, MutableMapping):
+        fsrs_other = other.get(FSRS_FORK_FIELDS_KEY)
+        if isinstance(fsrs_other, MutableMapping) and _is_outdated_fsrs7_preview_params(
+            fsrs_other.get("fsrs_params_7")
+        ):
+            del fsrs_other["fsrs_params_7"]
+            changed = True
+
+    return changed
+
+
+def _outdated_fsrs7_preview_preset_names(
+    configs: Sequence[Mapping[str, Any]],
+) -> list[str]:
+    names: list[str] = []
+    for config in configs:
+        params = _fsrs7_params_from_config(config)
+        if not _is_outdated_fsrs7_preview_params(params):
+            continue
+
+        name = config.get("name")
+        if isinstance(name, str) and name:
+            names.append(name)
+            continue
+
+        config_id = config.get("id")
+        names.append(
+            f"Preset {config_id}" if config_id is not None else "Unnamed preset"
+        )
+
+    return names
+
+
+def _outdated_fsrs7_preview_warning_text(preset_names: Sequence[str]) -> str:
+    shown_presets = "\n".join(
+        f"- {preset_name}"
+        for preset_name in preset_names[:OUTDATED_FSRS7_PREVIEW_WARNING_MAX_PRESETS]
+    )
+    remaining = len(preset_names) - OUTDATED_FSRS7_PREVIEW_WARNING_MAX_PRESETS
+    remaining_text = f"\n- ...and {remaining} more" if remaining > 0 else ""
+
+    return (
+        "Some FSRS-7 parameters were produced by an older preview version and have "
+        "35 values. Final FSRS-7 uses 34 values.\n\n"
+        "Anki can clear those old parameters now, then open Deck Options so you can "
+        "run Optimize All Presets.\n\n"
+        f"Affected presets:\n{shown_presets}{remaining_text}"
+    )
 
 
 class MainWebView(AnkiWebView):
@@ -172,6 +265,8 @@ class AnkiQt(QMainWindow):
     pm: ProfileManagerType
     web: MainWebView
     bottomWeb: BottomWebView
+    # True while legacy reset() fans out its everything-changed notification.
+    _legacy_reset_in_progress = False
 
     def __init__(
         self,
@@ -186,6 +281,8 @@ class AnkiQt(QMainWindow):
         self.state: MainWindowState = "startup"
         self.opts = opts
         self.col: Collection | None = None
+        self._rwkv_builtin_sync_finishing = False
+        self._outdated_fsrs7_preview_warning_shown = False
         self.taskman = TaskManager(self)
         self.media_syncer = MediaSyncer(self)
         aqt.mw = self
@@ -500,7 +597,15 @@ class AnkiQt(QMainWindow):
         self.taskman.run_in_background(downgrade, on_done)
 
     def loadProfile(self, onsuccess: Callable | None = None) -> None:
+        from aqt import rwkv_scheduler
+        from aqt.donation_campaign import check_campaign
+
+        profile_ready: Future[None] = Future()
+        if not self.safeMode and not self.restoring_backup:
+            check_campaign(self, profile_ready=profile_ready)
+        rwkv_scheduler.begin_rwkv_state_cache_startup(self)
         if not self.loadCollection():
+            rwkv_scheduler.finish_rwkv_state_cache_startup(self)
             return
 
         self.setup_sound()
@@ -509,7 +614,7 @@ class AnkiQt(QMainWindow):
         restoreGeom(self, "mainWindow")
         restoreState(self, "mainWindow")
         # titlebar
-        self.setWindowTitle(f"{self.pm.name} - Anki")
+        self.setWindowTitle(f"{self.pm.name} - {aqt.application_name()}")
         # show and raise window for osx
         self.show()
         self.activateWindow()
@@ -524,10 +629,14 @@ class AnkiQt(QMainWindow):
             self.pendingImport = None
 
         def _onsuccess(synced: bool) -> None:
+            from aqt import rwkv_scheduler
+
+            rwkv_scheduler.finish_rwkv_state_cache_startup(self)
             if synced:
                 self._refresh_after_sync()
             if onsuccess:
                 onsuccess()
+            profile_ready.set_result(None)
             if self.safeMode:
                 # Disable all experiments in safe mode
                 self.col._experiments = {}
@@ -537,39 +646,45 @@ class AnkiQt(QMainWindow):
             # if self.col.experiment_enabled(ExperimentFlag.TEST_FLAG):
             #     showInfo('You have the "ping" experiment enabled')
 
-        last_day_cutoff = self.col.sched.day_cutoff
+        self._last_day_cutoff = self.col.sched.day_cutoff
+        self._check_day_rollover()
+        gui_hooks.profile_did_open()
 
-        def refresh_reviewer_on_day_rollover_change():
-            from aqt.reviewer import RefreshNeeded
+        self.maybe_auto_sync_on_open_close(
+            _onsuccess,
+            refresh_rwkv_state=False,
+        )
 
-            # need to refresh?
-            nonlocal last_day_cutoff
-            current_cutoff = self.col.sched.day_cutoff
-            if self.state == "review" and last_day_cutoff != current_cutoff:
-                last_day_cutoff = self.col.sched.day_cutoff
+    def _check_day_rollover(self) -> None:
+        """Refresh the reviewer and notify add-ons once per day rollover."""
+        from aqt.reviewer import RefreshNeeded
+
+        current_cutoff = self.col.sched.day_cutoff
+        if self._last_day_cutoff != current_cutoff:
+            self._last_day_cutoff = current_cutoff
+            if self.state == "review":
                 self.reviewer._refresh_needed = RefreshNeeded.QUEUES
                 self.reviewer.refresh_if_needed()
-            if last_day_cutoff != current_cutoff:
-                gui_hooks.day_did_change()
+            gui_hooks.day_did_change()
 
-            # schedule another check
-            secs_until_cutoff = current_cutoff - int_time()
-            self._reviewer_refresh_timer = self.progress.timer(
-                secs_until_cutoff * 1000,
-                refresh_reviewer_on_day_rollover_change,
-                repeat=False,
-                parent=self,
-            )
-
-        refresh_reviewer_on_day_rollover_change()
-        gui_hooks.profile_did_open()
-        self.maybe_auto_sync_on_open_close(_onsuccess)
+        secs_until_cutoff = current_cutoff - int_time()
+        self._reviewer_refresh_timer = self.progress.timer(
+            secs_until_cutoff * 1000,
+            self._check_day_rollover,
+            repeat=False,
+            parent=self,
+        )
 
     def unloadProfile(self, onsuccess: Callable) -> None:
         def callback() -> None:
             self._unloadProfile()
             onsuccess()
 
+        self.deckBrowser.cancel_rwkv_count_refresh()
+        from aqt import rwkv_scheduler
+
+        rwkv_scheduler.cancel_rwkv_memorised_history()
+        rwkv_scheduler.cancel_rwkv_workload()
         gui_hooks.profile_will_close()
         self.unloadCollection(callback)
 
@@ -606,6 +721,7 @@ class AnkiQt(QMainWindow):
         self.mediaServer.shutdown()
         # Rust background jobs are not awaited implicitly
         self.backend.await_backup_completion()
+        self.pm.close()
         self.toolbarWeb.cleanup()
         self.web.cleanup()
         self.bottomWeb.cleanup()
@@ -675,6 +791,7 @@ class AnkiQt(QMainWindow):
             gui_hooks.collection_did_load(self.col)
             self.apply_collection_options()
             self.moveToState("deckBrowser")
+            self._warn_if_outdated_fsrs7_preview_params()
         except Exception:
             # dump error to stderr so it gets picked up by errors.py
             traceback.print_exc()
@@ -684,7 +801,50 @@ class AnkiQt(QMainWindow):
     def _loadCollection(self) -> None:
         cpath = self.pm.collectionPath()
         self.col = Collection(cpath, backend=self.backend)
+        self._outdated_fsrs7_preview_warning_shown = False
         self.setEnabled(True)
+
+    def _warn_if_outdated_fsrs7_preview_params(self) -> None:
+        if getattr(self, "_outdated_fsrs7_preview_warning_shown", False):
+            return
+
+        configs = self.col.decks.all_config()
+        preset_names = _outdated_fsrs7_preview_preset_names(configs)
+        if not preset_names:
+            return
+
+        self._outdated_fsrs7_preview_warning_shown = True
+        dialog = askUserDialog(
+            _outdated_fsrs7_preview_warning_text(preset_names),
+            [CLEAR_OUTDATED_FSRS7_PREVIEW_PARAMS_BUTTON, LATER_BUTTON],
+            parent=self,
+        )
+        dialog.setDefault(1)
+        dialog.exec()
+        clicked_button = dialog.clickedButton()
+        clicked_text = (
+            clicked_button.text().replace("&", "") if clicked_button else LATER_BUTTON
+        )
+        if clicked_text == CLEAR_OUTDATED_FSRS7_PREVIEW_PARAMS_BUTTON:
+            self._clear_outdated_fsrs7_preview_params_and_open_deck_options(configs)
+
+    def _clear_outdated_fsrs7_preview_params_and_open_deck_options(
+        self, configs: Sequence[MutableMapping[str, Any]]
+    ) -> None:
+        changed_count = 0
+        for config in configs:
+            if _clear_outdated_fsrs7_preview_params(config):
+                self.col.decks.update_config(dict(config))
+                changed_count += 1
+
+        if changed_count:
+            tooltip(
+                f"Cleared outdated FSRS-7 parameters from {changed_count} preset(s)."
+            )
+
+        from aqt.deckoptions import display_options_for_deck
+
+        display_options_for_deck(self.col.decks.current())
 
     def reopen(self, after_full_sync: bool = False) -> None:
         self.col.reopen(after_full_sync=after_full_sync)
@@ -700,7 +860,9 @@ class AnkiQt(QMainWindow):
 
         def before_sync() -> None:
             self.setEnabled(False)
-            self.maybe_auto_sync_on_open_close(after_sync)
+            # The next profile open reconciles RWKV state (finish_rwkv_state_cache_startup);
+            # a refresh here only delays closing and runs UI work after the collection closes.
+            self.maybe_auto_sync_on_open_close(after_sync, refresh_rwkv_state=False)
 
         self.closeAllWindows(before_sync)
 
@@ -847,12 +1009,48 @@ class AnkiQt(QMainWindow):
         for field in op.DESCRIPTOR.fields:
             if field.name != "kind":
                 setattr(op, field.name, True)
-        gui_hooks.operation_did_execute(op, None)
+        self._legacy_reset_in_progress = True
+        try:
+            gui_hooks.operation_did_execute(op, None)
+        finally:
+            self._legacy_reset_in_progress = False
+        from aqt import rwkv_scheduler
+
+        rwkv_scheduler.revalidate_rwkv_state_after_legacy_reset(self)
 
     def on_operation_did_execute(
         self, changes: OpChanges, handler: object | None
     ) -> None:
         "Notify current screen of changes."
+        if changes.study_queues:
+            from aqt import rwkv_scheduler
+
+            rwkv_scheduler.study_queues_did_change(self, handler, changes)
+        elif changes.deck or changes.deck_config or changes.notetype or changes.config:
+            from aqt import rwkv_scheduler
+
+            rwkv_scheduler.fsrs_preset_resolution_did_change(self)
+        elif changes.card or changes.note or changes.tag:
+            from aqt import rwkv_scheduler
+
+            rwkv_scheduler.collection_content_did_change(self, handler)
+
+        # A legacy reset() flags every change, including deck and preset ones,
+        # even when an add-on only added a note. Leave recovery to the overview
+        # or reviewer instead of popping a progress dialog on each add-on call.
+        if (changes.deck or changes.deck_config) and not self._legacy_reset_in_progress:
+            from aqt import rwkv_scheduler
+
+            if changes.deck_config:
+                # An instant-only runtime gets a curve model once a preset
+                # uses RWKV-Curve; the recovery below rebuilds its state.
+                rwkv_scheduler.refresh_rwkv_runtime_models_after_preset_change(self)
+            rwkv_scheduler.request_rwkv_state_cache_recovery(
+                self,
+                reason="deck or preset change",
+                allow_during_review=True,
+            )
+
         focused = current_window() == self
         if self.state == "review":
             dirty = self.reviewer.op_executed(changes, handler, focused)
@@ -1065,6 +1263,7 @@ title="{}" {}>{}</button>""".format(
     def setupThreads(self) -> None:
         self._mainThread = QThread.currentThread()
         self._background_op_count = 0
+        self._unload_profile_and_exit_pending = False
 
     def inMainThread(self) -> bool:
         return self._mainThread == QThread.currentThread()
@@ -1104,23 +1303,95 @@ title="{}" {}>{}</button>""".format(
         self.toolbar.redraw()
         self.flags.require_refresh()
 
-    def _sync_collection_and_media(self, after_sync: Callable[[], None]) -> None:
+    def _sync_collection_and_media(
+        self,
+        after_sync: Callable[[], None],
+        *,
+        refresh_rwkv_state: bool = True,
+    ) -> None:
         "Caller should ensure auth available."
 
+        remote_collection_changes = RemoteCollectionChanges()
+
+        def note_remote_collection_changes(changes: RemoteCollectionChanges) -> None:
+            nonlocal remote_collection_changes
+            remote_collection_changes = changes
+
         def on_collection_sync_finished() -> None:
+            from aqt import rwkv_scheduler
+
             self.col.models._clear_cache()
-            gui_hooks.sync_did_finish()
+            self._rwkv_builtin_sync_finishing = True
+            try:
+                gui_hooks.sync_did_finish()
+            finally:
+                self._rwkv_builtin_sync_finishing = False
             self.reset()
 
-            after_sync()
+            def finish_sync() -> None:
+                after_sync()
+
+            if refresh_rwkv_state and (
+                remote_collection_changes.collection_changed
+                or getattr(self.col, "_rwkv_sync_changes_pending", False)
+            ):
+                rwkv_scheduler.refresh_rwkv_state_after_sync(
+                    self,
+                    finish_sync,
+                )
+            else:
+                finish_sync()
 
         gui_hooks.sync_will_start()
-        sync_collection(self, on_done=on_collection_sync_finished)
+        sync_collection(
+            self,
+            on_done=on_collection_sync_finished,
+            on_remote_collection_changes=note_remote_collection_changes,
+        )
 
-    def maybe_auto_sync_on_open_close(self, after_sync: Callable[[bool], None]) -> None:
+    def _rwkv_sync_will_start(self) -> None:
+        if self.col is not None:
+            self.col._last_sync_remote_collection_changed = None
+
+    def _rwkv_sync_did_finish(self) -> None:
+        # The built-in sync already coordinates its own refresh and callback.
+        # Add-ons may call Collection.sync_collection directly instead.
+        if self._rwkv_builtin_sync_finishing:
+            return
+        col = self.col
+        if col is None or col.db is None:
+            return
+        if getattr(col, "_last_sync_remote_collection_changed", None) is False and not (
+            getattr(col, "_rwkv_sync_changes_pending", False)
+        ):
+            return
+
+        from aqt import rwkv_scheduler
+
+        def refresh_reviewer() -> None:
+            if (
+                self.col is col
+                and self.state == "review"
+                and rwkv_scheduler._rwkv_resident_state_ready(self)
+            ):
+                self.reviewer.op_executed(
+                    OpChanges(study_queues=True), None, focused=True
+                )
+
+        rwkv_scheduler.refresh_rwkv_state_after_sync(self, refresh_reviewer)
+
+    def maybe_auto_sync_on_open_close(
+        self,
+        after_sync: Callable[[bool], None],
+        *,
+        refresh_rwkv_state: bool = True,
+    ) -> None:
         "If disabled, after_sync() is called immediately."
         if self.can_auto_sync():
-            self._sync_collection_and_media(lambda: after_sync(True))
+            self._sync_collection_and_media(
+                lambda: after_sync(True),
+                refresh_rwkv_state=refresh_rwkv_state,
+            )
         else:
             after_sync(False)
 
@@ -1256,7 +1527,22 @@ title="{}" {}>{}</button>""".format(
         else:
             # ignore the event for now, as we need time to clean up
             event.ignore()
-            self.unloadProfileAndExit()
+            self._unloadProfileAndExitWhenIdle()
+
+    def _unloadProfileAndExitWhenIdle(self) -> None:
+        if self._unload_profile_and_exit_pending:
+            return
+
+        self._unload_profile_and_exit_pending = True
+        self._unloadProfileAndExitWhenIdleOnce()
+
+    def _unloadProfileAndExitWhenIdleOnce(self) -> None:
+        if self._background_op_count:
+            self.progress.single_shot(100, self._unloadProfileAndExitWhenIdleOnce)
+            return
+
+        self._unload_profile_and_exit_pending = False
+        self.unloadProfileAndExit()
 
     # Undo & autosave
     ##########################################################################
@@ -1338,21 +1624,9 @@ title="{}" {}>{}</button>""".format(
         aqt.dialogs.open("Preferences", self)
 
     def on_check_for_updates(self) -> None:
-        from packaging.version import Version
+        from aqt.update import check_for_update
 
-        from aqt.update import get_latest_release_op, prompt_and_install_github_update
-
-        version = Version(version_str)
-
-        def on_success(release: GithubRelease) -> None:
-            if Version(release.tag_name) > version:
-                prompt_and_install_github_update(self, release)
-            else:
-                tooltip(tr.addons_no_updates_available(), parent=self)
-
-        get_latest_release_op(
-            parent=self, include_prerelease=version.is_prerelease, on_success=on_success
-        ).with_progress().run_in_background()
+        check_for_update(parent=self, manual=True)
 
     def onNoteTypes(self) -> None:
         import aqt.models
@@ -1438,8 +1712,20 @@ title="{}" {}>{}</button>""".format(
         qconnect(m.action_open_backup.triggered, self.onOpenBackup)
         qconnect(m.actionExit.triggered, self.close)
 
+        from aqt.donation_campaign import setup_support_menu
+
+        setup_support_menu(self)
+
         # Help
         qconnect(m.actionDocumentation.triggered, self.onDocumentation)
+        qconnect(
+            m.actionExportExecutionLog.triggered,
+            lambda: execution_logs.export_log(self, self.app.execution_log),
+        )
+        qconnect(
+            m.actionPostLogs.triggered,
+            lambda: execution_logs.post_logs(self, self.app.execution_log),
+        )
         qconnect(m.actionDonate.triggered, self.onDonate)
         qconnect(m.actionAbout.triggered, self.onAbout)
         m.actionAbout.setText(tr.qt_accel_about_mac())
@@ -1476,7 +1762,7 @@ title="{}" {}>{}</button>""".format(
         m.actionFullScreen.setShortcutContext(Qt.ShortcutContext.ApplicationShortcut)
 
     def updateTitleBar(self) -> None:
-        self.setWindowTitle("Anki")
+        self.setWindowTitle(aqt.application_name())
 
     # View
     ##########################################################################
@@ -1521,7 +1807,7 @@ title="{}" {}>{}</button>""".format(
         from aqt.update import check_for_update
 
         if aqt.mw.pm.check_for_updates():
-            check_for_update()
+            check_for_update(parent=self, manual=False)
 
     # Timers
     ##########################################################################
@@ -1635,6 +1921,8 @@ title="{}" {}>{}</button>""".format(
         gui_hooks.av_player_did_end_playing.append(self.on_av_player_did_end_playing)
         gui_hooks.operation_did_execute.append(self.on_operation_did_execute)
         gui_hooks.focus_did_change.append(self.on_focus_did_change)
+        gui_hooks.sync_will_start.append(self._rwkv_sync_will_start)
+        gui_hooks.sync_did_finish.append(self._rwkv_sync_did_finish)
 
         self._activeWindowOnPlay: QWidget | None = None
 

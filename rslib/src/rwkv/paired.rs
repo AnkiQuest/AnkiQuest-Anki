@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Byte layouts of a paired runtime: the release model (curve, intervals,
@@ -279,6 +287,49 @@ pub fn simulation_snapshot_half(
     })
 }
 
+<<<<<<< HEAD
+=======
+/// Splits a simulation snapshot into the release's half and the instant
+/// model's half.
+pub fn simulation_snapshot_halves(
+    snapshot: RwkvWorkloadSimulationSnapshot,
+) -> io::Result<(
+    RwkvWorkloadSimulationSnapshot,
+    RwkvWorkloadSimulationSnapshot,
+)> {
+    let (card_r, card_i) = split_map(&snapshot.card_states)?;
+    let (note_r, note_i) = split_map(&snapshot.note_states)?;
+    let (deck_r, deck_i) = split_map(&snapshot.deck_states)?;
+    let (preset_r, preset_i) = split_map(&snapshot.preset_states)?;
+    let (global_r, global_i) = split_optional(snapshot.global_state.as_deref())?;
+    let (runtime_r, runtime_i) = match snapshot.runtime_state.as_deref() {
+        Some(bytes) => {
+            let (release, instant) = split_cache(bytes)?;
+            (Some(release.to_vec()), Some(instant.to_vec()))
+        }
+        None => (None, None),
+    };
+    Ok((
+        RwkvWorkloadSimulationSnapshot {
+            card_states: card_r,
+            note_states: note_r,
+            deck_states: deck_r,
+            preset_states: preset_r,
+            global_state: global_r,
+            runtime_state: runtime_r,
+        },
+        RwkvWorkloadSimulationSnapshot {
+            card_states: card_i,
+            note_states: note_i,
+            deck_states: deck_i,
+            preset_states: preset_i,
+            global_state: global_i,
+            runtime_state: runtime_i,
+        },
+    ))
+}
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[cfg(test)]
 mod tests {
     use super::*;

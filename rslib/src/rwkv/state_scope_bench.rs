@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Offline shared-state precision POC. Production scope selection is unchanged.
@@ -141,7 +149,11 @@ fn rwkv_state_scope_metrics_score_only_selected_interday_answers() {
 pub(super) fn scope_sizes(inference: &RwkvInference) -> serde_json::Value {
     let mut scopes = serde_json::Map::new();
     for (name, states) in [
+<<<<<<< HEAD
         ("card", &inference.warm_up_states.card as &dyn StateMap),
+=======
+        ("card", &inference.warm_up_states.card),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         ("note", &inference.warm_up_states.note),
         ("deck", &inference.warm_up_states.deck),
         ("preset", &inference.warm_up_states.preset),
@@ -149,8 +161,13 @@ pub(super) fn scope_sizes(inference: &RwkvInference) -> serde_json::Value {
         scopes.insert(
             name.into(),
             json!({
+<<<<<<< HEAD
                 "states": states.count(),
                 "serialized_bytes": states.ids().iter().filter_map(|id| states.serialized_len(id)).sum::<usize>(),
+=======
+                "states": states.len(),
+                "serialized_bytes": states.values().map(serialized_module_state_len).sum::<usize>(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             }),
         );
     }

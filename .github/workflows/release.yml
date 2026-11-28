@@ -9,7 +9,7 @@ on:
         required: true
         type: string
       skip-ci-check:
-        description: "Skip the CI status check (for hotfix releases from non-main branches)"
+        description: "Skip the CI status check for a release run without a draft"
         default: false
         required: false
         type: boolean
@@ -19,7 +19,7 @@ on:
         required: false
         type: boolean
       draft-release:
-        description: "Create a draft GitHub release (requires sign)"
+        description: "Create a draft GitHub release"
         default: false
         required: false
         type: boolean
@@ -54,6 +54,7 @@ jobs:
     outputs:
       public_release: ${{ steps.validate.outputs.public_release }}
       pep440_version: ${{ steps.validate.outputs.pep440_version }}
+      app_version: ${{ steps.validate.outputs.app_version }}
       tag_name: ${{ steps.validate.outputs.tag_name }}
       release_name: ${{ steps.validate.outputs.release_name }}
       is_prerelease: ${{ steps.validate.outputs.is_prerelease }}
@@ -64,16 +65,6 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Reject incompatible inputs
-        run: |
-          if [ "$DRAFT_RELEASE" = "true" ] && [ "$SIGN" != "true" ]; then
-            echo "::error::Draft releases must be signed"
-            exit 1
-          fi
-        env:
-          DRAFT_RELEASE: ${{ inputs['draft-release'] }}
-          SIGN: ${{ inputs.sign }}
-
       - name: Validate version and compute metadata
         id: validate
         run: |
@@ -83,6 +74,10 @@ jobs:
           public_release=false
           if [ "$DRAFT_RELEASE" = "true" ] || [ "$PUBLISH_PYPI" = "true" ]; then
             public_release=true
+          fi
+          unsigned_draft_release=false
+          if [ "$DRAFT_RELEASE" = "true" ] && [ "$SIGN" != "true" ] && [ "$PUBLISH_PYPI" != "true" ]; then
+            unsigned_draft_release=true
           fi
 
           if [ "$public_release" = "true" ] && [ "$file_version" != "$INPUT_VERSION" ]; then
@@ -97,12 +92,50 @@ jobs:
             version="$file_version"
           fi
 
+          if [ "$unsigned_draft_release" = "true" ]; then
+            if [[ "$version" != *+* ]]; then
+              echo "::error::Unsigned draft auto-increment requires a local version suffix, like '+fsrs7'"
+              exit 1
+            fi
+
+            git fetch --tags origin
+            base_version="$version"
+            version="${base_version}.build.${GITHUB_RUN_NUMBER}"
+
+            if git rev-parse "refs/tags/$version" >/dev/null 2>&1 || gh release view "$version" >/dev/null 2>&1; then
+              suffix="${GITHUB_RUN_ATTEMPT:-1}"
+              version="${base_version}.build.${GITHUB_RUN_NUMBER}.${suffix}"
+            fi
+
+            while git rev-parse "refs/tags/$version" >/dev/null 2>&1 || gh release view "$version" >/dev/null 2>&1; do
+              suffix=$((suffix + 1))
+              version="${base_version}.build.${GITHUB_RUN_NUMBER}.${suffix}"
+            done
+
+            echo "::notice::Unsigned draft release version resolved to '$version'"
+          fi
+
+          app_version="$version"
+          if [[ "$app_version" == *+*.build.* ]]; then
+            app_version="${app_version%%.build.*}"
+          fi
+
           # "0.0" skips the ordering check — non-release builds only need format validation
           is_prerelease=$(python3 tools/validate_version.py "$version" "0.0")
           echo "Version check passed: $version (prerelease=$is_prerelease)"
 
           {
+            echo "### Release version"
+            echo
+            echo "- Input version: \`$INPUT_VERSION\`"
+            echo "- Resolved version: \`$version\`"
+            echo "- App version: \`$app_version\`"
+            echo "- GitHub run number: \`$GITHUB_RUN_NUMBER\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
             echo "pep440_version=$version"
+            echo "app_version=$app_version"
             echo "tag_name=$version"
             echo "release_name=$version"
             echo "public_release=$public_release"
@@ -112,27 +145,23 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           DRAFT_RELEASE: ${{ inputs['draft-release'] }}
           PUBLISH_PYPI: ${{ inputs['publish-pypi'] }}
+          SIGN: ${{ inputs.sign }}
+          GH_TOKEN: ${{ github.token }}
 
       - name: Check CI passed
-        if: ${{ steps.validate.outputs.public_release == 'true' && inputs.skip-ci-check != true }}
+        if: ${{ inputs['draft-release'] || (steps.validate.outputs.public_release == 'true' && inputs.skip-ci-check != true) }}
         run: |
-          conclusion=$(gh run list \
-            --workflow=ci.yml \
-            --commit "$COMMIT_SHA" \
-            --limit 5 \
-            --json conclusion,event \
-            --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch")][0].conclusion')
-
-          if [[ -z "$conclusion" ]]; then
-            echo "::error::Could not determine CI status for commit $COMMIT_SHA"
-            exit 1
-          elif [[ "$conclusion" != "success" ]]; then
-            echo "::error::CI for commit $COMMIT_SHA concluded with '$conclusion'"
-            exit 1
+          matrix_args=()
+          if [ "$DRAFT_RELEASE" = "true" ]; then
+            matrix_args+=(--full-matrix)
           fi
+          python3 .github/scripts/wait_for_ci.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --commit "$COMMIT_SHA" "${matrix_args[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SHA: ${{ github.sha }}
+          DRAFT_RELEASE: ${{ inputs['draft-release'] }}
 
       - name: Check for duplicate tag or release
         if: ${{ inputs['draft-release'] == true }}
@@ -158,13 +187,27 @@ jobs:
   build-and-sign-mac:
     needs: prepare
     runs-on: macos-15
+<<<<<<< HEAD
+<<<<<<< HEAD
     timeout-minutes: 90
+=======
+    timeout-minutes: 120
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    timeout-minutes: 120
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     environment: ${{ inputs.sign == true && 'release' || '' }}
+    env:
+      ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -183,6 +226,11 @@ jobs:
 
       - name: Build installer
         run: ./tools/build-installer
+        env:
+          SIGN_IDENTITY: ${{ inputs.sign == true && secrets.APPLE_SIGNING_IDENTITY || '' }}
+
+      - name: Build portable app
+        run: just portable
         env:
           SIGN_IDENTITY: ${{ inputs.sign == true && secrets.APPLE_SIGNING_IDENTITY || '' }}
 
@@ -199,10 +247,33 @@ jobs:
           name: logs-installer-macos
           path: out/installer/logs/
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+        if: always()
+        with:
+          name: logs-portable-macos
+          path: out/portable/logs/
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-macos
           path: out/installer/dist/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        with:
+          name: portable-macos
+          path: out/portable/dist/
 
       - name: Build wheels
         run: ./ninja wheels:anki
@@ -215,13 +286,19 @@ jobs:
   build-and-sign-mac-intel:
     needs: prepare
     runs-on: macos-15-intel
-    timeout-minutes: 90
+    timeout-minutes: 120
     environment: ${{ inputs.sign == true && 'release' || '' }}
+    env:
+      ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -243,6 +320,11 @@ jobs:
         env:
           SIGN_IDENTITY: ${{ inputs.sign == true && secrets.APPLE_SIGNING_IDENTITY || '' }}
 
+      - name: Build portable app
+        run: just portable
+        env:
+          SIGN_IDENTITY: ${{ inputs.sign == true && secrets.APPLE_SIGNING_IDENTITY || '' }}
+
       - name: Clean up signing credentials
         if: always()
         run: |
@@ -256,10 +338,33 @@ jobs:
           name: logs-installer-macos-intel
           path: out/installer/logs/
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+        if: always()
+        with:
+          name: logs-portable-macos-intel
+          path: out/portable/logs/
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-macos-intel
           path: out/installer/dist/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        with:
+          name: portable-macos-intel
+          path: out/portable/dist/
 
       - name: Build wheels
         run: ./ninja wheels:anki
@@ -272,13 +377,19 @@ jobs:
   build-and-sign-windows:
     needs: prepare
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     environment: ${{ inputs.sign == true && 'release' || '' }}
+    env:
+      ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -359,6 +470,46 @@ jobs:
           name: installer-windows
           path: out/installer/dist/
 
+      - name: Build portable app
+        run: just portable-build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        if: always()
+        with:
+          name: logs-portable-windows
+          path: out/portable/logs/
+
+      - name: Sign portable app binary
+        if: inputs.sign == true
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 #v2.0.0
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: anki-signing
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          files: ${{ github.workspace }}\out\portable\build\anki\windows\visualstudio\x64\Release\Anki Portable.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify portable app binary signature
+        if: inputs.sign == true
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature "out\portable\build\anki\windows\visualstudio\x64\Release\Anki Portable.exe"
+          if ($sig.Status -ne "Valid") {
+            Write-Error "Portable EXE signature status: $($sig.Status)"
+            exit 1
+          }
+          Write-Host "Portable EXE signed successfully: $($sig.SignerCertificate.Subject)"
+
+      - name: Package portable app
+        run: just portable-archive ${{ needs.prepare.outputs.pep440_version }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        with:
+          name: portable-windows
+          path: out/portable/dist/
+
       - name: Build wheels
         run: tools\ninja wheels:anki
 
@@ -368,16 +519,28 @@ jobs:
           path: out/wheels/anki-*.whl
 
   # Windows ARM uses a 4-job chain because azure/artifact-signing-action does not
+<<<<<<< HEAD
+<<<<<<< HEAD
   # support ARM runners: build on ARM → sign binaries on x64 → package MSI on ARM → sign MSI on x64.
+=======
+  # support ARM runners: build on ARM → sign EXEs on x64 → package on ARM → sign MSI on x64.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+  # support ARM runners: build on ARM → sign binaries on x64 → package MSI on ARM → sign MSI on x64.
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
   build-windows-arm:
     needs: prepare
     runs-on: windows-11-vs2026-arm
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -385,18 +548,52 @@ jobs:
       - name: Build app
         run: tools\ninja installer:build
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - name: Build portable app
+        run: just portable-build
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Build portable app
+        run: just portable-build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-windows-arm-build
           path: out/installer/logs/
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+        if: always()
+        with:
+          name: logs-portable-windows-arm-build
+          path: out/portable/logs/
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: build-windows-arm
           path: |
             out/installer/
+            out/portable/
             !out/installer/logs/
+            !out/portable/logs/
 
       - name: Build wheels
         run: tools\ninja wheels:anki
@@ -421,7 +618,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8.0.2
         with:
           name: build-windows-arm
-          path: out/installer/
+          path: out/
 
       - name: Azure login
         if: inputs.sign == true
@@ -453,20 +650,62 @@ jobs:
         run: |
           .github/scripts/VerifySignatures.ps1 ARM64
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+      - name: Sign portable app binary
+        if: inputs.sign == true
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 #v2.0.0
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: anki-signing
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          files: ${{ github.workspace }}\out\portable\build\anki\windows\visualstudio\ARM64\Release\Anki Portable.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify portable app binary signature
+        if: inputs.sign == true
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature "out\portable\build\anki\windows\visualstudio\ARM64\Release\Anki Portable.exe"
+          if ($sig.Status -ne "Valid") {
+            Write-Error "Portable EXE signature status: $($sig.Status)"
+            exit 1
+          }
+          Write-Host "Portable EXE signed successfully: $($sig.SignerCertificate.Subject)"
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: signed-build-windows-arm
-          path: out/installer/
+          path: |
+            out/installer/
+            out/portable/
 
   package-windows-arm:
     needs: [prepare, build-windows-arm, sign-exe-windows-arm]
     runs-on: windows-11-vs2026-arm
-    timeout-minutes: 30
+    timeout-minutes: 45
+    env:
+      ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -474,16 +713,30 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8.0.2
         with:
           name: signed-build-windows-arm
-          path: out/installer/
+          path: out/
 
       - name: Package installer
         env:
           PEP440_VERSION: ${{ needs.prepare.outputs.pep440_version }}
         run: |
+<<<<<<< HEAD
           tools\ninja pyenv
           out\pyenv\scripts\python.exe qt\tools\build_installer.py --version $env:PEP440_VERSION package
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+          tools\ninja pyenv pylib:anki
+          out\pyenv\scripts\python.exe qt\tools\build_installer.py --version ${{ needs.prepare.outputs.pep440_version }} package
+
+      - name: Package portable app
+        run: just portable-archive ${{ needs.prepare.outputs.pep440_version }}
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-windows-arm-package
@@ -493,6 +746,11 @@ jobs:
         with:
           name: unsigned-installer-windows-arm
           path: out/installer/dist/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        with:
+          name: portable-windows-arm
+          path: out/portable/dist/
 
   sign-msi-windows-arm:
     needs: [prepare, package-windows-arm]
@@ -547,12 +805,18 @@ jobs:
   build-linux-x86:
     needs: prepare
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
+    env:
+      ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -591,16 +855,53 @@ jobs:
       - name: Build installer
         run: ./tools/build-installer
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - name: Build portable app
+        run: just portable
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Build portable app
+        run: just portable
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-linux-x86
           path: out/installer/logs/
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+        if: always()
+        with:
+          name: logs-portable-linux-x86
+          path: out/portable/logs/
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-linux-x86
           path: out/installer/dist/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        with:
+          name: portable-linux-x86
+          path: out/portable/dist/
 
       # Upload both anki and aqt wheels; the pure-Python aqt wheel is the same on all platforms
       - name: Build wheels
@@ -620,6 +921,10 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -641,12 +946,18 @@ jobs:
     # glibc, the resulting installer requires glibc 2.39+ at runtime —
     # higher than the x86 installer (built on 22.04, glibc 2.35).
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 90
+    timeout-minutes: 120
+    env:
+      ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Use app version
+        shell: bash
+        run: printf '%s\n' '${{ needs.prepare.outputs.app_version }}' > .version
 
       - name: Setup build environment
         uses: ./.github/actions/setup-anki
@@ -660,16 +971,53 @@ jobs:
       - name: Build installer
         run: ./tools/build-installer
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - name: Build portable app
+        run: just portable
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Build portable app
+        run: just portable
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-linux-arm
           path: out/installer/logs/
 
+<<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+=======
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+        if: always()
+        with:
+          name: logs-portable-linux-arm
+          path: out/portable/logs/
+
+<<<<<<< HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-linux-arm
           path: out/installer/dist/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+        with:
+          name: portable-linux-arm
+          path: out/portable/dist/
 
   release:
     needs: [prepare, build-and-sign-mac, build-and-sign-mac-intel, build-and-sign-windows, sign-msi-windows-arm, build-linux-x86, build-linux-arm-wheels, build-linux-arm-installer]
@@ -686,10 +1034,16 @@ jobs:
       && needs.sign-msi-windows-arm.result == 'success'
       }}
     runs-on: ubuntu-latest
+<<<<<<< HEAD
     environment: release
     permissions:
       contents: write # creates the draft release
       actions: read
+=======
+    environment: ${{ inputs.sign == true && 'release' || '' }}
+    permissions:
+      contents: write
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
@@ -702,6 +1056,12 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8.0.2
+        with:
+          pattern: portable-*
+          path: dist
+          merge-multiple: true
+
       - name: Create draft release
         run: |
           prerelease_flag=""
@@ -710,17 +1070,19 @@ jobs:
           fi
 
           notes_start_tag=$(gh release list --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // empty')
+          python3 .github/scripts/release_notes.py --version "$TAG_NAME" --output release-notes.md
 
           gh release create "$TAG_NAME" \
             dist/* \
             --draft \
             --target "$RELEASE_SHA" \
             --title "$RELEASE_NAME" \
+            --notes-file release-notes.md \
             --generate-notes \
             ${notes_start_tag:+--notes-start-tag "$notes_start_tag"} \
             ${prerelease_flag:+"$prerelease_flag"}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
           RELEASE_NAME: ${{ needs.prepare.outputs.release_name }}
           IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}

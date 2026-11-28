@@ -53,6 +53,18 @@ impl RevlogEntryPartial {
         }
     }
 
+<<<<<<< HEAD
+=======
+    pub(super) fn set_review_steps(&mut self, current: Option<u32>, next: Option<u32>) {
+        if let Some(secs) = current {
+            self.last_interval = IntervalKind::InSecs(secs);
+        }
+        if let Some(secs) = next {
+            self.interval = IntervalKind::InSecs(secs);
+        }
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(super) fn set_review_kind(&mut self, review_kind: RevlogReviewKind) {
         self.review_kind = review_kind;
     }

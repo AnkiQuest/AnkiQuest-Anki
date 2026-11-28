@@ -87,10 +87,14 @@ pub struct DeckConfSchema11 {
     fsrs_params_6: Vec<f32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     fsrs_params_7: Vec<f32>,
+<<<<<<< HEAD
     #[serde(
         default = "default_fsrs_minimum_interval_secs",
         skip_serializing_if = "is_default_fsrs_minimum_interval_secs"
     )]
+=======
+    #[serde(default, skip_serializing_if = "is_default_fsrs_minimum_interval_secs")]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fsrs_minimum_interval_secs: u32,
     #[serde(default, skip_serializing_if = "is_false")]
     fsrs_dynamic_desired_retention_enabled: bool,
@@ -175,6 +179,11 @@ pub struct DeckConfSchema11 {
     rwkv_review_enforce_grade_order: bool,
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     rwkv_review_minimum_reviews_per_day: u32,
+<<<<<<< HEAD
+=======
+    #[serde(default, skip_serializing_if = "is_false")]
+    rwkv_review_new_cards_ignore_minimum_reviews: bool,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[serde(default)]
     easy_days_percentages: Vec<f32>,
     #[serde(default)]
@@ -211,6 +220,7 @@ fn is_false(value: &bool) -> bool {
     !value
 }
 
+<<<<<<< HEAD
 const DEFAULT_FSRS_MINIMUM_INTERVAL_SECS: u32 = 1;
 
 fn default_fsrs_minimum_interval_secs() -> u32 {
@@ -219,6 +229,10 @@ fn default_fsrs_minimum_interval_secs() -> u32 {
 
 fn is_default_fsrs_minimum_interval_secs(value: &u32) -> bool {
     *value == DEFAULT_FSRS_MINIMUM_INTERVAL_SECS
+=======
+fn is_default_fsrs_minimum_interval_secs(value: &u32) -> bool {
+    *value == 1
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 fn default_rwkv_review_batch_size() -> u32 {
@@ -536,6 +550,10 @@ impl Default for DeckConfSchema11 {
                 DEFAULT_RWKV_REVIEW_FIRST_REVIEW_ELAPSED_FROM_CARD_CREATION,
             rwkv_review_enforce_grade_order: DEFAULT_RWKV_REVIEW_ENFORCE_GRADE_ORDER,
             rwkv_review_minimum_reviews_per_day: 0,
+<<<<<<< HEAD
+=======
+            rwkv_review_new_cards_ignore_minimum_reviews: false,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             easy_days_percentages: vec![1.0; 7],
         }
     }
@@ -600,6 +618,13 @@ impl From<DeckConfSchema11> for DeckConfig {
             rwkv_review_refresh_on_exit: c.rwkv_review_refresh_on_exit,
             rwkv_review_allow_same_day_review: c.rwkv_review_allow_same_day_review,
             same_day_reviews_ignore_review_limit: c.same_day_reviews_ignore_review_limit,
+<<<<<<< HEAD
+=======
+            // Restored from the preset's extra data below.
+            include_suspended_cards_in_learnable_pool: false,
+            suspended_card_order: 0,
+            new_card_gather_field: String::new(),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             rwkv_review_min_intervening_reviews: c.rwkv_review_min_intervening_reviews,
             rwkv_review_min_elapsed_secs: c.rwkv_review_min_elapsed_secs,
             rwkv_review_instant_order_enabled: c.rwkv_review_instant_order_enabled,
@@ -610,6 +635,11 @@ impl From<DeckConfSchema11> for DeckConfig {
                 .rwkv_review_first_review_elapsed_from_card_creation,
             rwkv_review_enforce_grade_order: c.rwkv_review_enforce_grade_order,
             rwkv_review_minimum_reviews_per_day: c.rwkv_review_minimum_reviews_per_day,
+<<<<<<< HEAD
+=======
+            rwkv_review_new_cards_ignore_minimum_reviews: c
+                .rwkv_review_new_cards_ignore_minimum_reviews,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             disable_autoplay: !c.autoplay,
             cap_answer_time_to_secs: c.max_taken.max(0) as u32,
             show_timer: c.timer != 0,
@@ -674,6 +704,11 @@ impl From<DeckConfig> for DeckConfSchema11 {
         let same_day_reviews_ignore_review_limit = c.inner.same_day_reviews_ignore_review_limit;
         let rwkv_review_enforce_grade_order = c.inner.rwkv_review_enforce_grade_order;
         let rwkv_review_minimum_reviews_per_day = c.inner.rwkv_review_minimum_reviews_per_day;
+<<<<<<< HEAD
+=======
+        let rwkv_review_new_cards_ignore_minimum_reviews =
+            c.inner.rwkv_review_new_cards_ignore_minimum_reviews;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let i = deck_config_inner_for_storage(&c.inner);
         // split extra json up
         let mut top_other: HashMap<String, Value>;
@@ -812,6 +847,10 @@ impl From<DeckConfig> for DeckConfSchema11 {
                 .rwkv_review_first_review_elapsed_from_card_creation,
             rwkv_review_enforce_grade_order,
             rwkv_review_minimum_reviews_per_day,
+<<<<<<< HEAD
+=======
+            rwkv_review_new_cards_ignore_minimum_reviews,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             easy_days_percentages: i.easy_days_percentages,
         }
     }
@@ -869,6 +908,10 @@ static RESERVED_DECKCONF_KEYS: Set<&'static str> = phf_set! {
     "rwkvReviewCandidateRefreshEnabled",
     "rwkvReviewEnforceGradeOrder",
     "rwkvReviewMinimumReviewsPerDay",
+<<<<<<< HEAD
+=======
+    "rwkvReviewNewCardsIgnoreMinimumReviews",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     "rwkvReviewPresetTagStateEnabled",
     "rwkvReviewJapaneseFeatureStateEnabled",
     "rwkvReviewJapaneseKanjiField",
@@ -910,6 +953,12 @@ mod test {
         ] {
             let metadata = json!({
                 "intraday_learning_mix": mix as i32,
+<<<<<<< HEAD
+=======
+                "include_suspended_cards_in_learnable_pool": true,
+                "suspended_card_order": 1,
+                "new_card_gather_field": "Frequency",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 "future_option": "preserve",
             });
             let mut wire = serde_json::to_value(DeckConfSchema11::default())?;
@@ -929,6 +978,13 @@ mod test {
                     .encode_to_vec()
                     .as_slice(),
             )?;
+<<<<<<< HEAD
+=======
+            restore_fork_fields_from_other(&mut restored.inner);
+            assert!(restored.inner.include_suspended_cards_in_learnable_pool);
+            assert_eq!(restored.inner.suspended_card_order, 1);
+            assert_eq!(restored.inner.new_card_gather_field, "Frequency");
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             assert_eq!(restored.intraday_learning_mix(), mix);
             assert_eq!(restored.name, "Edited on another client");
             assert_eq!(restored.inner.reviews_per_day, 123);
@@ -1165,6 +1221,30 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn rwkv_new_cards_ignore_minimum_reviews_omits_default_and_serializes_enabled() -> Result<()> {
+        let serialized = serde_json::to_value(DeckConfSchema11::default())?;
+        assert!(serialized
+            .get("rwkvReviewNewCardsIgnoreMinimumReviews")
+            .is_none());
+
+        let mut config = DeckConfig::default();
+        config.inner.rwkv_review_new_cards_ignore_minimum_reviews = true;
+        let schema11 = DeckConfSchema11::from(config);
+        let serialized = serde_json::to_value(&schema11)?;
+        assert_eq!(
+            serialized["rwkvReviewNewCardsIgnoreMinimumReviews"],
+            json!(true)
+        );
+        let restored = DeckConfig::from(schema11);
+        assert!(restored.inner.rwkv_review_new_cards_ignore_minimum_reviews);
+
+        Ok(())
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_dynamic_preset_replay_omits_default_and_serializes_enabled() -> Result<()> {
         let serialized = serde_json::to_value(DeckConfSchema11::default())?;
         assert!(serialized.get("rwkvReviewDynamicPresetReplay").is_none());

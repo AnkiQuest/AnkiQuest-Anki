@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use anki_proto::stats::CardMemoryMetrics;
@@ -57,6 +65,7 @@ impl Collection {
         if stateful.is_empty() {
             return Ok(entries);
         }
+<<<<<<< HEAD
         let presets = self.fsrs_presets_for_cards(&stateful)?;
         let now = self.timing_today()?.now;
         for (card, entry) in cards.iter().zip(entries.iter_mut()) {
@@ -70,6 +79,18 @@ impl Collection {
                 };
                 let elapsed_days =
                     now.elapsed_secs_since_clamped(last_review_time) as f32 / 86_400.0;
+=======
+        let presets = self.fsrs_metric_presets_for_cards(&stateful)?;
+        let timing = self.timing_today()?;
+        for (card, entry) in cards.iter().zip(entries.iter_mut()) {
+            if let Some(state) = card.memory_state {
+                let elapsed_days = timing.fsrs_elapsed_seconds(
+                    self.last_review_time_for_stats(card)?,
+                    card.original_or_current_due(),
+                    card.interval,
+                ) as f32
+                    / 86_400.0;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 entry.fsrs_retrievability = Some(fsrs_current_retrievability_for_state(
                     &presets[&card.id].params,
                     state,

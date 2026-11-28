@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Use the live queue's eligibility and deck-limit rules in Instant forecasts.
@@ -33,11 +41,22 @@ pub(super) struct InstantCandidate {
     pub reviewed_today: bool,
     pub elapsed_seconds: Option<u32>,
     pub intervening_reviews: Option<u32>,
+<<<<<<< HEAD
+=======
+    pub review_step_due: Option<bool>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 #[derive(Clone, Copy)]
 pub(super) struct InstantReviewPolicy {
     pub study_deck_id: DeckId,
+<<<<<<< HEAD
+=======
+    /// The study preset's "New cards ignore minimum reviews" with Instant on:
+    /// new cards are selected before minimum reviews, which are returned
+    /// separately.
+    pub new_cards_ignore_minimum_reviews: bool,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub same_day_allowed: bool,
     pub min_intervening: u32,
     pub min_elapsed_seconds: u32,
@@ -48,14 +67,26 @@ pub(super) struct InstantReviewPolicy {
 
 pub(super) struct InstantStudyCandidates {
     pub learning: Vec<usize>,
+<<<<<<< HEAD
     pub review: Vec<usize>,
+=======
+    /// Due reviews, plus minimum reviews unless new cards ignore the minimum.
+    pub review: Vec<usize>,
+    /// Reviews pulled only to reach the daily minimum when new cards ignore
+    /// it, in review order; empty otherwise.
+    pub minimum_review: Vec<usize>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub new: Vec<usize>,
     pub precomputed_allowed: bool,
 }
 
 pub(super) fn instant_due(card: &InstantCandidate, policy: InstantReviewPolicy) -> bool {
     if !card.instant_enabled {
+<<<<<<< HEAD
         return card.due_day <= policy.day;
+=======
+        return card.review_step_due.unwrap_or(card.due_day <= policy.day);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
     let metadata = RwkvReviewCandidateMetadata {
         target_retention: card.target,
@@ -65,6 +96,10 @@ pub(super) fn instant_due(card: &InstantCandidate, policy: InstantReviewPolicy) 
         current_deck_id: DeckId(card.deck_id),
         source_deck_id: DeckId(card.deck_id),
         fsrs_due_today: false,
+<<<<<<< HEAD
+=======
+        review_step_due: card.review_step_due,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     };
     rwkv_review_score_eligibility(
         card.score,
@@ -99,7 +134,13 @@ pub(super) fn instant_review_candidates(
 }
 
 /// Build the queues in the same limit-reservation order as Anki: interday
+<<<<<<< HEAD
 /// learning, reviews, then new cards. Returned indices refer to each input.
+=======
+/// learning, due reviews, minimum reviews, then new cards (new cards before
+/// minimum reviews when new cards ignore the minimum). Returned indices refer
+/// to each input.
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 #[allow(clippy::too_many_arguments)]
 pub(super) fn instant_study_candidates(
     reviews: &[InstantCandidate],
@@ -158,7 +199,40 @@ pub(super) fn instant_study_candidates(
             }
         }
     }
+<<<<<<< HEAD
     let review = select_reviews(reviews, decks, configs, &mut limits, policy)?;
+=======
+    let order = ReviewOrder::new(reviews, decks, policy);
+    let (eligible, above_target) = classify_reviews(reviews, policy);
+    let mut review = reserve_due_reviews(reviews, eligible, &order, decks, configs, &mut limits)?;
+    let new;
+    let mut minimum_review = Vec::new();
+    if policy.new_cards_ignore_minimum_reviews {
+        // Like the live queue: new cards take their share of the daily limits
+        // before reviews pulled only to reach the minimum, and those minimum
+        // reviews are returned separately so they can be queued last.
+        new = select_new_cards(new_decks, &mut limits)?;
+        minimum_review = pull_minimum_reviews(reviews, above_target, decks, configs, &mut limits)?;
+        minimum_review.sort_by(|left, right| order.cmp(left, right));
+    } else {
+        let pulled = pull_minimum_reviews(reviews, above_target, decks, configs, &mut limits)?;
+        if !pulled.is_empty() {
+            review.extend(pulled);
+            review.sort_by(|left, right| order.cmp(left, right));
+        }
+        new = select_new_cards(new_decks, &mut limits)?;
+    }
+    Ok(InstantStudyCandidates {
+        learning,
+        review,
+        minimum_review,
+        new,
+        precomputed_allowed,
+    })
+}
+
+fn select_new_cards(new_decks: &[i64], limits: &mut LimitTreeMap) -> io::Result<Vec<usize>> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut new = Vec::new();
     for (index, deck) in new_decks.iter().copied().enumerate() {
         // Once the root limit is exhausted no descendant can reserve a new
@@ -175,6 +249,7 @@ pub(super) fn instant_study_candidates(
             limits.reserve_new_card(deck).map_err(map_error)?;
         }
     }
+<<<<<<< HEAD
     Ok(InstantStudyCandidates {
         learning,
         review,
@@ -183,6 +258,13 @@ pub(super) fn instant_study_candidates(
     })
 }
 
+=======
+    Ok(new)
+}
+
+/// Due and minimum reviews together, sorted in review order.
+#[cfg(test)]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn select_reviews(
     cards: &[InstantCandidate],
     decks: &[Deck],
@@ -190,11 +272,38 @@ fn select_reviews(
     limits: &mut LimitTreeMap,
     policy: InstantReviewPolicy,
 ) -> io::Result<Vec<usize>> {
+<<<<<<< HEAD
+=======
+    let order = ReviewOrder::new(cards, decks, policy);
+    let (eligible, above_target) = classify_reviews(cards, policy);
+    let mut selected = reserve_due_reviews(cards, eligible, &order, decks, configs, limits)?;
+    selected.extend(pull_minimum_reviews(
+        cards,
+        above_target,
+        decks,
+        configs,
+        limits,
+    )?);
+    selected.sort_by(|left, right| order.cmp(left, right));
+    Ok(selected)
+}
+
+/// Splits reviews into those RWKV considers due and those only blocked by
+/// their retention target (candidates for the daily minimum).
+fn classify_reviews(
+    cards: &[InstantCandidate],
+    policy: InstantReviewPolicy,
+) -> (Vec<usize>, Vec<usize>) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut eligible = Vec::new();
     let mut above_target = Vec::new();
     for (index, card) in cards.iter().enumerate() {
         if !card.instant_enabled {
+<<<<<<< HEAD
             if card.due_day <= policy.day {
+=======
+            if card.review_step_due.unwrap_or(card.due_day <= policy.day) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 eligible.push(index);
             }
             continue;
@@ -207,6 +316,10 @@ fn select_reviews(
             current_deck_id: DeckId(card.deck_id),
             source_deck_id: DeckId(card.deck_id),
             fsrs_due_today: false,
+<<<<<<< HEAD
+=======
+            review_step_due: card.review_step_due,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         };
         let allowed = rwkv_review_score_eligibility(
             card.score,
@@ -229,6 +342,7 @@ fn select_reviews(
             above_target.push(index);
         }
     }
+<<<<<<< HEAD
     let deck_order = decks
         .iter()
         .enumerate()
@@ -247,6 +361,50 @@ fn select_reviews(
         let a = &cards[*left];
         let b = &cards[*right];
         let scores = match policy.order {
+=======
+    (eligible, above_target)
+}
+
+/// The configured review sort.
+struct ReviewOrder<'a> {
+    cards: &'a [InstantCandidate],
+    deck_order: HashMap<i64, i64>,
+    policy: InstantReviewPolicy,
+}
+
+impl<'a> ReviewOrder<'a> {
+    fn new(cards: &'a [InstantCandidate], decks: &[Deck], policy: InstantReviewPolicy) -> Self {
+        let deck_order = decks
+            .iter()
+            .enumerate()
+            .map(|(index, deck)| (deck.id.0, index as i64))
+            .collect();
+        Self {
+            cards,
+            deck_order,
+            policy,
+        }
+    }
+
+    fn priority(&self, index: usize) -> (i64, i64, i64) {
+        let card = &self.cards[index];
+        let rank = self
+            .deck_order
+            .get(&card.deck_id)
+            .copied()
+            .unwrap_or(i64::MAX);
+        match self.policy.order {
+            ReviewCardOrder::DeckThenDay => (rank, card.due_day, card.card_id),
+            ReviewCardOrder::DayThenDeck => (card.due_day, rank, card.card_id),
+            _ => instant_review_priority(card, self.policy),
+        }
+    }
+
+    fn cmp(&self, left: &usize, right: &usize) -> std::cmp::Ordering {
+        let a = &self.cards[*left];
+        let b = &self.cards[*right];
+        let scores = match self.policy.order {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ReviewCardOrder::RetrievabilityAscending => Some(a.score.total_cmp(&b.score)),
             ReviewCardOrder::RetrievabilityDescending => Some(b.score.total_cmp(&a.score)),
             ReviewCardOrder::RelativeOverdueness => {
@@ -256,9 +414,26 @@ fn select_reviews(
         };
         scores
             .map(|order| order.then_with(|| a.card_id.cmp(&b.card_id)))
+<<<<<<< HEAD
             .unwrap_or_else(|| priority(left).cmp(&priority(right)))
     };
     eligible.sort_by(compare);
+=======
+            .unwrap_or_else(|| self.priority(*left).cmp(&self.priority(*right)))
+    }
+}
+
+/// Reserves due reviews in review order; the result keeps that order.
+fn reserve_due_reviews(
+    cards: &[InstantCandidate],
+    mut eligible: Vec<usize>,
+    order: &ReviewOrder,
+    decks: &[Deck],
+    configs: &HashMap<DeckConfigId, DeckConfig>,
+    limits: &mut LimitTreeMap,
+) -> io::Result<Vec<usize>> {
+    eligible.sort_by(|left, right| order.cmp(left, right));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut selected = Vec::new();
     for index in eligible {
         let card = &cards[index];
@@ -276,6 +451,22 @@ fn select_reviews(
             }
         }
     }
+<<<<<<< HEAD
+=======
+    Ok(selected)
+}
+
+/// Pulls the lowest-recall above-target reviews into the remaining review
+/// capacity until each deck's daily minimum is met, in pull order.
+fn pull_minimum_reviews(
+    cards: &[InstantCandidate],
+    mut above_target: Vec<usize>,
+    decks: &[Deck],
+    configs: &HashMap<DeckConfigId, DeckConfig>,
+    limits: &mut LimitTreeMap,
+) -> io::Result<Vec<usize>> {
+    let mut selected = Vec::new();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     if !limits.any_rwkv_review_minimum_remaining() || limits.root_limit_reached(LimitKind::Review) {
         return Ok(selected);
     }
@@ -305,7 +496,10 @@ fn select_reviews(
             }
         }
     }
+<<<<<<< HEAD
     selected.sort_by(compare);
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     Ok(selected)
 }
 
@@ -378,6 +572,10 @@ mod tests {
             reviewed_today: false,
             elapsed_seconds: Some(86_400),
             intervening_reviews: Some(10),
+<<<<<<< HEAD
+=======
+            review_step_due: None,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
     }
 
@@ -403,6 +601,10 @@ mod tests {
     fn policy() -> InstantReviewPolicy {
         InstantReviewPolicy {
             study_deck_id: DeckId(1),
+<<<<<<< HEAD
+=======
+            new_cards_ignore_minimum_reviews: false,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             same_day_allowed: false,
             min_intervening: 5,
             min_elapsed_seconds: 30,
@@ -752,6 +954,123 @@ mod tests {
         assert!(check(2, repeated));
     }
 
+<<<<<<< HEAD
+=======
+    fn study(
+        reviews: &[InstantCandidate],
+        new_decks: &[i64],
+        configs: &HashMap<DeckConfigId, DeckConfig>,
+        new_cards_ignore_review_limit: bool,
+        policy: InstantReviewPolicy,
+    ) -> InstantStudyCandidates {
+        instant_study_candidates(
+            reviews,
+            &[],
+            new_decks,
+            None,
+            &[deck(1, "Parent", 1)],
+            configs,
+            0,
+            new_cards_ignore_review_limit,
+            policy,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn new_cards_take_review_capacity_before_minimum_when_they_ignore_it() {
+        // Maximum = minimum = 4, and new cards count toward the review limit.
+        let mut preset = config(1, 4, 4);
+        preset.inner.new_per_day = 3;
+        let configs = HashMap::from([(DeckConfigId(1), preset)]);
+        let reviews = [
+            card(1, 1, 0.70),
+            card(2, 1, 0.91),
+            card(3, 1, 0.92),
+            card(4, 1, 0.93),
+            card(5, 1, 0.94),
+        ];
+        let mut ignore = policy();
+        ignore.new_cards_ignore_minimum_reviews = true;
+
+        // Off: the minimum fills the review limit, leaving nothing for new
+        // cards.
+        let off = study(&reviews, &[1, 1], &configs, false, policy());
+        assert_eq!(off.review, vec![0, 1, 2, 3]);
+        assert!(off.minimum_review.is_empty());
+        assert!(off.new.is_empty());
+
+        // On: new cards take their share first; the minimum fills only the
+        // one slot left.
+        let on = study(&reviews, &[1, 1], &configs, false, ignore);
+        assert_eq!(on.review, vec![0]);
+        assert_eq!(on.new, vec![0, 1]);
+        assert_eq!(on.minimum_review, vec![1]);
+
+        // With three new cards no capacity remains for the minimum.
+        let on = study(&reviews, &[1, 1, 1], &configs, false, ignore);
+        assert_eq!(on.review, vec![0]);
+        assert_eq!(on.new, vec![0, 1, 2]);
+        assert!(on.minimum_review.is_empty());
+    }
+
+    #[test]
+    fn minimum_reviews_are_returned_separately_when_new_cards_ignore_it() {
+        let mut preset = config(1, 4, 20);
+        preset.inner.new_per_day = 3;
+        let configs = HashMap::from([(DeckConfigId(1), preset)]);
+        let reviews = [
+            card(1, 1, 0.70),
+            card(2, 1, 0.95),
+            card(3, 1, 0.50),
+            card(4, 1, 0.93),
+            card(5, 1, 0.92),
+        ];
+        for order in [
+            ReviewCardOrder::RetrievabilityAscending,
+            ReviewCardOrder::RetrievabilityDescending,
+            ReviewCardOrder::Day,
+        ] {
+            for new_cards_ignore_review_limit in [false, true] {
+                let mut off_policy = policy();
+                off_policy.order = order;
+                let mut on_policy = off_policy;
+                on_policy.new_cards_ignore_minimum_reviews = true;
+                let off = study(
+                    &reviews,
+                    &[1, 1, 1],
+                    &configs,
+                    new_cards_ignore_review_limit,
+                    off_policy,
+                );
+                let on = study(
+                    &reviews,
+                    &[1, 1, 1],
+                    &configs,
+                    new_cards_ignore_review_limit,
+                    on_policy,
+                );
+                let order = ReviewOrder::new(&reviews, &[deck(1, "Parent", 1)], off_policy);
+                let mut due = vec![0, 2];
+                due.sort_by(|a, b| order.cmp(a, b));
+                // The two lowest above-target cards fill the minimum; new
+                // cards never count toward it.
+                let mut minimum = vec![3, 4];
+                minimum.sort_by(|a, b| order.cmp(a, b));
+                assert_eq!(on.review, due);
+                assert_eq!(on.minimum_review, minimum);
+                assert_eq!(on.new, vec![0, 1, 2]);
+                assert_eq!(off.new, on.new);
+                assert!(off.minimum_review.is_empty());
+                let mut combined = due.clone();
+                combined.extend(&minimum);
+                combined.sort_by(|a, b| order.cmp(a, b));
+                assert_eq!(off.review, combined);
+            }
+        }
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[test]
     fn normal_decks_use_due_dates_instead_of_instant_thresholds() {
         let decks = [deck(1, "Parent", 1)];

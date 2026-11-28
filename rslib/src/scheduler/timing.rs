@@ -19,6 +19,23 @@ pub struct SchedTimingToday {
 }
 
 impl SchedTimingToday {
+<<<<<<< HEAD
+=======
+    pub(crate) fn fsrs_elapsed_seconds(
+        &self,
+        last_review: Option<TimestampSecs>,
+        due: i32,
+        interval: u32,
+    ) -> u32 {
+        let seconds = match last_review {
+            Some(last) => self.now.elapsed_secs_since(last),
+            None if due > 365_000 => self.now.elapsed_secs_since(TimestampSecs(i64::from(due))),
+            None => (i64::from(self.days_elapsed) - i64::from(due) + i64::from(interval)) * 86_400,
+        };
+        seconds.clamp(0, i64::from(u32::MAX)) as u32
+    }
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     pub(crate) fn is_today(self, timestamp: TimestampSecs) -> bool {
         let today_start = self.next_day_at.0.saturating_sub(86_400);
         timestamp.0 >= today_start && timestamp.0 < self.next_day_at.0

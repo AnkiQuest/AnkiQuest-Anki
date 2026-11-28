@@ -33,6 +33,8 @@ const IGNORED_FOLDERS: &[&str] = &[
     "./qt/aqt/forms",
     "./tools/workspace-hack",
     "./target",
+    "./tmp",
+    "./.local",
     ".mypy_cache",
     "./extra",
     "./ts/.svelte-kit",
@@ -40,6 +42,7 @@ const IGNORED_FOLDERS: &[&str] = &[
     "./.venv",
     "./qt/installer/windows-template",
     "./qt/installer/mac-template",
+    "./.claude/worktrees",
 ];
 
 fn main() -> Result<()> {

@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Shared interval handling for FSRS-7 and external schedulers such as
@@ -8,6 +16,7 @@ use super::fsrs_interval_as_secs;
 use super::fuzz::minimum_review_fuzz_interval;
 use super::StateContext;
 
+<<<<<<< HEAD
 /// When same-day reviews and learning queues are enabled, intervals below
 /// 12 hours use the intraday queue. Intervals at or above this boundary are
 /// stored in whole days.
@@ -17,6 +26,18 @@ pub(crate) const SUB_DAY_LIMIT_DAYS: f32 = 0.5;
 pub(crate) enum ButtonInterval {
     Secs(u32),
     Days { days: u32, fuzz_delta_days: i32 },
+=======
+/// The learning queues switch to whole days at the rounding boundary. Timed
+/// reviews can keep the full interval up to one day, including across rollover.
+const LEARNING_SUB_DAY_LIMIT: f32 = 0.5;
+
+pub(crate) type ButtonInterval = super::interval_kind::IntervalKind<FuzzedDays>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FuzzedDays {
+    pub days: u32,
+    pub fuzz_delta_days: i32,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,7 +53,16 @@ pub(crate) fn button_intervals(
     unrounded: [Option<f32>; 4],
     rule: DayRule,
 ) -> [Option<ButtonInterval>; 4] {
+<<<<<<< HEAD
     let sub_day_allowed = ctx.fsrs_uses_short_term_learning_queue();
+=======
+    let sub_day_allowed = ctx.allows_short_term_model_intervals();
+    let sub_day_limit = if ctx.uses_review_queue_for_steps() {
+        1.0
+    } else {
+        LEARNING_SUB_DAY_LIMIT
+    };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut previous_secs = 0;
     let mut previous_days: Option<u32> = None;
     let mut out = [None; 4];
@@ -41,11 +71,19 @@ pub(crate) fn button_intervals(
         let Some(interval) = interval else {
             continue;
         };
+<<<<<<< HEAD
         if sub_day_allowed && interval < SUB_DAY_LIMIT_DAYS {
             let secs =
                 fsrs_interval_as_secs(interval, ctx.fsrs_minimum_interval_secs).max(previous_secs);
             previous_secs = secs;
             out[index] = Some(ButtonInterval::Secs(secs));
+=======
+        if sub_day_allowed && interval < sub_day_limit {
+            let secs =
+                fsrs_interval_as_secs(interval, ctx.fsrs_minimum_interval_secs).max(previous_secs);
+            previous_secs = secs;
+            out[index] = Some(ButtonInterval::InSecs(secs));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             continue;
         }
 
@@ -77,10 +115,17 @@ pub(crate) fn button_intervals(
             }
         };
         previous_days = Some(days);
+<<<<<<< HEAD
         out[index] = Some(ButtonInterval::Days {
             days,
             fuzz_delta_days,
         });
+=======
+        out[index] = Some(ButtonInterval::InDays(FuzzedDays {
+            days,
+            fuzz_delta_days,
+        }));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     out
@@ -107,6 +152,7 @@ mod test {
     }
 
     fn days(days: u32) -> Option<ButtonInterval> {
+<<<<<<< HEAD
         Some(ButtonInterval::Days {
             days,
             fuzz_delta_days: 0,
@@ -115,6 +161,16 @@ mod test {
 
     fn secs(secs: u32) -> Option<ButtonInterval> {
         Some(ButtonInterval::Secs(secs))
+=======
+        Some(ButtonInterval::InDays(FuzzedDays {
+            days,
+            fuzz_delta_days: 0,
+        }))
+    }
+
+    fn secs(secs: u32) -> Option<ButtonInterval> {
+        Some(ButtonInterval::InSecs(secs))
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     #[test]
@@ -178,7 +234,11 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
     fn disabled_learning_queues_round_sub_day_intervals_up() {
+=======
+    fn review_queue_keeps_model_intervals_below_one_day() {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut ctx = ctx();
         ctx.fsrs_learning_queues_disabled = true;
         let item = ItemState {
@@ -196,8 +256,13 @@ mod test {
             easy: item,
         });
         assert_eq!(
+<<<<<<< HEAD
             button_intervals(&ctx, all(0.2, 0.3, 0.4, 0.6), DayRule::Graduating),
             [days(1), days(2), days(3), days(4)]
+=======
+            button_intervals(&ctx, all(0.125, 0.5, 0.75, 1.0), DayRule::Graduating),
+            [secs(10_800), secs(43_200), secs(64_800), days(1)]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         );
     }
 
@@ -248,7 +313,11 @@ mod test {
             },
         );
         assert_eq!(out[0], days(3));
+<<<<<<< HEAD
         let Some(ButtonInterval::Days { days: hard, .. }) = out[1] else {
+=======
+        let Some(ButtonInterval::InDays(FuzzedDays { days: hard, .. })) = out[1] else {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             panic!("hard should be in days");
         };
         assert!(hard >= 4);

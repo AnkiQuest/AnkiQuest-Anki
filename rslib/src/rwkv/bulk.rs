@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Bulk sequence-mode historical replay.
@@ -25,6 +33,7 @@
 //! replay to the same states as one large call.
 
 use std::collections::HashMap;
+<<<<<<< HEAD
 use std::sync::Mutex;
 
 use super::*;
@@ -36,6 +45,15 @@ use super::*;
 /// per-chunk work dominated at 2,048 rows: a 203k-review rebuild on a Pixel 8a
 /// took 130 s, at 16,384 rows 50 s.
 const BULK_CHUNK_ROWS: usize = if SMALL_MODEL { 16_384 } else { 2_048 };
+=======
+use std::collections::HashSet;
+use std::sync::Mutex;
+
+use super::*;
+
+/// Default limit for an internal chunk of replay scratch buffers.
+const BULK_CHUNK_ROWS: usize = 8_192;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
 #[derive(Clone, Copy)]
 #[cfg_attr(not(test), allow(dead_code))]
@@ -61,14 +79,31 @@ pub(super) fn warm_up_reviews_bulk(
     reviews: Vec<ReviewInput>,
     record_predictions: bool,
 ) -> io::Result<Vec<(usize, f32)>> {
+    let chunk_rows = warm_up_chunk_rows(reviews.len(), record_predictions);
     warm_up_reviews_bulk_impl(
         inference,
         reviews,
         record_predictions,
-        BULK_CHUNK_ROWS,
+        chunk_rows,
         QueryRecurrence::Fast,
         None,
     )
+}
+
+fn warm_up_chunk_rows(rows: usize, record_predictions: bool) -> usize {
+    // Big's multicore state-only wavefront is faster with a full desktop batch
+    // on Apple Silicon. Its larger scratch buffers are useful only for long
+    // replays.
+    if cfg!(all(target_arch = "aarch64", target_os = "macos"))
+        && !SMALL_MODEL
+        && !record_predictions
+        && rows > BULK_CHUNK_ROWS
+        && rayon::current_num_threads() > 1
+    {
+        16_384
+    } else {
+        BULK_CHUNK_ROWS
+    }
 }
 
 /// Advance a simulation's private state without computing unused answer heads.
@@ -77,10 +112,18 @@ pub(super) fn replay_simulation_background(
     inference: &mut RwkvInference,
     states: &mut ReviewStateMaps,
     inputs: &[ReviewInput],
+<<<<<<< HEAD
 ) {
     if inputs.is_empty() {
         return;
     }
+=======
+) -> io::Result<()> {
+    if inputs.is_empty() {
+        return Ok(());
+    }
+    validate_stream_states(states, inputs.iter())?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut features = Vec::with_capacity(inputs.len() * CARD_FEATURES);
     for input in inputs {
         features.extend(inference.features.features_for(input));
@@ -97,9 +140,15 @@ pub(super) fn replay_simulation_background(
             None,
             BULK_CHUNK_ROWS,
             QueryRecurrence::Exact,
+<<<<<<< HEAD
         );
     } else {
         run_state_only_module_wavefront(&model, inputs, states, x, BULK_CHUNK_ROWS);
+=======
+        )
+    } else {
+        run_state_only_module_wavefront(&model, inputs, states, x, BULK_CHUNK_ROWS).map(|_| ())
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 }
 
@@ -215,6 +264,13 @@ fn warm_up_reviews_bulk_impl(
     query_recurrence: QueryRecurrence,
     custom_queries: Option<&[ReviewInput]>,
 ) -> io::Result<Vec<(usize, f32)>> {
+<<<<<<< HEAD
+=======
+    validate_stream_states(
+        &inference.warm_up_states,
+        reviews.iter().filter(|input| input.ease.is_some()),
+    )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     // Feature prepass, in review order. Query features are assigned before
     // answer features for each review so first-seen ID encodings keep the
     // same benchmark-compatible order as the per-review path.
@@ -276,7 +332,11 @@ fn warm_up_reviews_bulk_impl(
             x_query.as_deref_mut(),
             chunk_size,
             query_recurrence,
+<<<<<<< HEAD
         );
+=======
+        )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     } else if record_predictions {
         for (module_id, module) in model.modules.iter().enumerate() {
             #[cfg(test)]
@@ -290,7 +350,11 @@ fn warm_up_reviews_bulk_impl(
                 x_query.as_deref_mut(),
                 chunk_size,
                 query_recurrence,
+<<<<<<< HEAD
             );
+=======
+            )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             #[cfg(test)]
             rwkv_warmup_profile_record(module_profile_bucket(module_id), profile_started);
         }
@@ -301,7 +365,11 @@ fn warm_up_reviews_bulk_impl(
             &mut inference.warm_up_states,
             x,
             chunk_size,
+<<<<<<< HEAD
         );
+=======
+        )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     // Recall curves: the per-review path stores one curve per answered
@@ -355,7 +423,11 @@ fn warm_up_reviews_bulk_impl(
 }
 
 #[cfg(test)]
+<<<<<<< HEAD
 pub(super) fn module_profile_bucket(module_id: usize) -> RwkvWarmupProfileBucket {
+=======
+fn module_profile_bucket(module_id: usize) -> RwkvWarmupProfileBucket {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     match module_id {
         0 => RwkvWarmupProfileBucket::ModuleCard,
         1 => RwkvWarmupProfileBucket::ModuleDeck,
@@ -375,7 +447,11 @@ fn run_interleaved(
     mut x_query: Option<&mut [f32]>,
     chunk_size: usize,
     query_recurrence: QueryRecurrence,
+<<<<<<< HEAD
 ) {
+=======
+) -> io::Result<()> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let rows = inputs.len();
     let plans: Vec<_> = model
         .modules
@@ -401,9 +477,15 @@ fn run_interleaved(
                         model.modules[id].layers.len(),
                     )
                 })
+<<<<<<< HEAD
                 .collect()
         })
         .collect();
+=======
+                .collect::<io::Result<Vec<_>>>()
+        })
+        .collect::<io::Result<_>>()?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     let mut v0: [Vec<f32>; 5] = std::array::from_fn(|_| vec![0.0; rows * D_MODEL]);
     let mut v0_query: [Option<Vec<f32>>; 5] =
         std::array::from_fn(|_| x_query.as_ref().map(|_| vec![0.0; rows * D_MODEL]));
@@ -444,6 +526,10 @@ fn run_interleaved(
             v0_query[id] = None;
         }
     }
+<<<<<<< HEAD
+=======
+    Ok(())
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 fn feature_mlp_rows(model: &SrsModel, features: &[f32], rows: usize) -> Vec<f32> {
@@ -471,7 +557,11 @@ fn run_state_only_module_wavefront(
     states: &mut ReviewStateMaps,
     mut x: Vec<f32>,
     chunk_size: usize,
+<<<<<<< HEAD
 ) -> Vec<f32> {
+=======
+) -> io::Result<Vec<f32>> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     debug_assert_eq!(model.modules.len(), 5);
     let chunk_size = chunk_size.max(1);
     let chunks: Vec<Mutex<&mut [f32]>> =
@@ -479,6 +569,10 @@ fn run_state_only_module_wavefront(
     let module_states: Vec<Mutex<ReviewStateMaps>> = (0..model.modules.len())
         .map(|module_id| Mutex::new(take_module_states(states, module_id)))
         .collect();
+<<<<<<< HEAD
+=======
+    let failure: Mutex<Option<io::Error>> = Mutex::new(None);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
     for diagonal in 0..chunks.len() + model.modules.len() - 1 {
         (0..model.modules.len())
@@ -490,6 +584,16 @@ fn run_state_only_module_wavefront(
                 if chunk_index >= chunks.len() {
                     return;
                 }
+<<<<<<< HEAD
+=======
+                if failure
+                    .lock()
+                    .expect("RWKV replay failure lock poisoned")
+                    .is_some()
+                {
+                    return;
+                }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
                 let input_start = chunk_index * chunk_size;
                 let input_end = (input_start + chunk_size).min(inputs.len());
@@ -501,7 +605,11 @@ fn run_state_only_module_wavefront(
                     .expect("RWKV replay chunk lock poisoned");
                 #[cfg(test)]
                 let profile_started = rwkv_warmup_profile_start();
+<<<<<<< HEAD
                 run_module(
+=======
+                if let Err(err) = run_module(
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     &model.modules[module_id],
                     module_id,
                     &inputs[input_start..input_end],
@@ -510,7 +618,16 @@ fn run_state_only_module_wavefront(
                     None,
                     chunk_size,
                     QueryRecurrence::Exact,
+<<<<<<< HEAD
                 );
+=======
+                ) {
+                    failure
+                        .lock()
+                        .expect("RWKV replay failure lock poisoned")
+                        .get_or_insert(err);
+                }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 #[cfg(test)]
                 rwkv_warmup_profile_record(module_profile_bucket(module_id), profile_started);
             });
@@ -527,7 +644,17 @@ fn run_state_only_module_wavefront(
     }
 
     drop(chunks);
+<<<<<<< HEAD
     x
+=======
+    match failure
+        .into_inner()
+        .expect("RWKV replay failure lock poisoned")
+    {
+        Some(err) => Err(err),
+        None => Ok(x),
+    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 fn take_module_states(states: &mut ReviewStateMaps, module_id: usize) -> ReviewStateMaps {
@@ -577,9 +704,15 @@ fn take_stream_state(
     key: i64,
 ) -> Option<ModuleState> {
     match module_id {
+<<<<<<< HEAD
         0 => states.card.take(&key),
         1 => states.deck.remove(&key),
         2 => states.note.take(&key),
+=======
+        0 => states.card.remove(&key),
+        1 => states.deck.remove(&key),
+        2 => states.note.remove(&key),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         3 => states.preset.remove(&key),
         _ => states.global.take(),
     }
@@ -588,13 +721,21 @@ fn take_stream_state(
 fn put_stream_state(states: &mut ReviewStateMaps, module_id: usize, key: i64, state: ModuleState) {
     match module_id {
         0 => {
+<<<<<<< HEAD
             states.card.put(key, state);
+=======
+            states.card.insert(key, state);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         1 => {
             states.deck.insert(key, state);
         }
         2 => {
+<<<<<<< HEAD
             states.note.put(key, state);
+=======
+            states.note.insert(key, state);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
         3 => {
             states.preset.insert(key, state);
@@ -655,10 +796,54 @@ impl ModulePlan {
     }
 }
 
+<<<<<<< HEAD
 fn layer_states(initial: Option<ModuleState>, layer_count: usize) -> Vec<LayerState> {
     let mut layers = initial
         .map(|state| state.into_decoded().layers)
         .unwrap_or_default();
+=======
+/// Decodes every stored state a replay will read before anything changes, so
+/// a state that cannot be decoded fails the call without advancing features
+/// or states. The caller then discards the cache and replays from scratch.
+fn validate_stream_states<'a>(
+    states: &ReviewStateMaps,
+    inputs: impl Iterator<Item = &'a ReviewInput>,
+) -> io::Result<()> {
+    let mut seen: [HashSet<i64>; 5] = Default::default();
+    for input in inputs {
+        for (module_id, seen) in seen.iter_mut().enumerate() {
+            let Some(key) = stream_key(module_id, input) else {
+                continue;
+            };
+            if !seen.insert(key) {
+                continue;
+            }
+            let state = match module_id {
+                0 => states.card.get(&key),
+                1 => states.deck.get(&key),
+                2 => states.note.get(&key),
+                3 => states.preset.get(&key),
+                _ => states.global.as_ref(),
+            };
+            if let Some(state) = state {
+                state.try_decoded().map_err(|err| {
+                    io::Error::new(
+                        err.kind(),
+                        format!("{err} (RWKV module {module_id} state of id {key})"),
+                    )
+                })?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn layer_states(initial: Option<ModuleState>, layer_count: usize) -> io::Result<Vec<LayerState>> {
+    let mut layers = match initial {
+        Some(state) => state.try_into_decoded()?.layers,
+        None => Vec::new(),
+    };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     layers.truncate(layer_count);
     while layers.len() < layer_count {
         layers.push(LayerState {
@@ -666,6 +851,7 @@ fn layer_states(initial: Option<ModuleState>, layer_count: usize) -> Vec<LayerSt
             channel_shift: None,
         });
     }
+<<<<<<< HEAD
     layers
 }
 
@@ -748,6 +934,9 @@ impl ModuleWork {
             }
         }
     }
+=======
+    Ok(layers)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -760,6 +949,7 @@ fn run_module(
     mut x_query: Option<&mut [f32]>,
     chunk_size: usize,
     query_recurrence: QueryRecurrence,
+<<<<<<< HEAD
 ) {
     let mut work = ModuleWork::take(module, module_id, inputs, states, x_query.is_some());
     for (layer_id, layer) in module.layers.iter().enumerate() {
@@ -773,6 +963,59 @@ fn run_module(
         );
     }
     work.put(module_id, states);
+=======
+) -> io::Result<()> {
+    let rows = inputs.len();
+    let mut plan = ModulePlan::build(module_id, inputs);
+    plan.precision = module.precision;
+    let layer_count = module.layers.len();
+
+    let mut stream_layers: Vec<Vec<LayerState>> = plan
+        .streams
+        .iter()
+        .map(|stream| {
+            let initial = stream
+                .key
+                .and_then(|key| take_stream_state(states, module_id, key));
+            layer_states(initial, layer_count)
+        })
+        .collect::<io::Result<_>>()?;
+
+    let mut v0 = vec![0.0; rows * D_MODEL];
+    let mut v0_query = x_query.as_ref().map(|_| vec![0.0; rows * D_MODEL]);
+
+    for (layer_id, layer) in module.layers.iter().enumerate() {
+        run_layer_chunks(LayerChunks {
+            layer,
+            layer_id,
+            plan: &plan,
+            stream_layers: &mut stream_layers,
+            rows,
+            chunk_size,
+            x,
+            v0: &mut v0,
+            x_query: x_query.as_deref_mut(),
+            v0_query: v0_query.as_deref_mut(),
+            query_recurrence,
+        });
+    }
+
+    for (stream, layers) in plan.streams.iter().zip(stream_layers) {
+        if let Some(key) = stream.key {
+            put_stream_state(
+                states,
+                module_id,
+                key,
+                ModuleState {
+                    layers,
+                    packed: None,
+                }
+                .compact(module.precision),
+            );
+        }
+    }
+    Ok(())
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 struct LayerChunks<'a> {
@@ -1082,6 +1325,7 @@ fn finish_layer_time_stage(output: LayerTimeStageOutput<'_>) {
     let mut recurrence_query = parts_query
         .as_ref()
         .map(|_| vec![0.0; chunk_rows * D_MODEL]);
+<<<<<<< HEAD
     let sweep_outs: Vec<Option<(Vec<f32>, Vec<f32>)>> = stream_layers
         .par_iter_mut()
         .enumerate()
@@ -1131,6 +1375,179 @@ fn finish_layer_time_stage(output: LayerTimeStageOutput<'_>) {
                             &mut query_next_matrix,
                         ),
                         QueryRecurrence::Fast | QueryRecurrence::FastAfter => {
+=======
+    // A low-rank state steps several streams together
+    // (`lowrank::batch_writes`, the longest of the chunk first), so each
+    // step's writes are factored in one batched solve
+    // (`round_written_matrices`). Per stream every operation and its order
+    // stay those of one stream at a time.
+    let group_size = if plan.precision.is_lowrank() {
+        lowrank::batch_writes()
+    } else {
+        1
+    };
+    let mut order = chunk_layout.streams.clone();
+    if group_size > 1 {
+        order.sort_by_key(|&stream_index| {
+            std::cmp::Reverse(chunk_layout.rows_by_stream[stream_index].len())
+        });
+    }
+    let stream_count = stream_layers.len();
+    let mut slots: Vec<Option<&mut Vec<LayerState>>> = stream_layers.iter_mut().map(Some).collect();
+    let mut groups: Vec<Vec<(usize, &mut Vec<LayerState>)>> = order
+        .chunks(group_size)
+        .map(|group| {
+            group
+                .iter()
+                .map(|&stream_index| {
+                    let layers = slots[stream_index].take().expect("stream in one group");
+                    (stream_index, layers)
+                })
+                .collect()
+        })
+        .collect();
+    drop(slots);
+    let group_outs: Vec<_> = groups
+        .par_iter_mut()
+        .map(|group| {
+            struct Sweep<'s> {
+                stream_index: usize,
+                rows: &'s [u32],
+                layer_state: &'s mut LayerState,
+                matrix: Vec<f32>,
+                packed_matrix: Option<precision::PackedMatrix>,
+                next_matrix: Vec<f32>,
+                query_next_matrix: Vec<f32>,
+                outs: Vec<f32>,
+                outs_query: Vec<f32>,
+            }
+            let mut sweeps: Vec<Sweep<'_>> = group
+                .iter_mut()
+                .map(|(stream_index, layers)| {
+                    let stream_rows = chunk_layout.rows_by_stream[*stream_index];
+                    let layer_state = &mut layers[layer_id];
+                    let (matrix, packed_matrix) = match layer_state.time.take() {
+                        // A low-rank write needs the previous write's factors.
+                        Some(time) => (
+                            time.matrix,
+                            time.packed_matrix.filter(|_| plan.precision.is_lowrank()),
+                        ),
+                        None => (vec![0.0; HEADS * HEAD_SIZE * HEAD_SIZE], None),
+                    };
+                    Sweep {
+                        stream_index: *stream_index,
+                        rows: stream_rows,
+                        layer_state,
+                        matrix,
+                        packed_matrix,
+                        // Separate source/destination matrices let the
+                        // recurrence kernel vectorize, while swapping reuses
+                        // both allocations per stream.
+                        next_matrix: vec![0.0; HEADS * HEAD_SIZE * HEAD_SIZE],
+                        query_next_matrix: if parts_query.is_some()
+                            && matches!(query_recurrence, QueryRecurrence::Exact)
+                        {
+                            vec![0.0; HEADS * HEAD_SIZE * HEAD_SIZE]
+                        } else {
+                            Vec::new()
+                        },
+                        outs: vec![0.0; stream_rows.len() * D_MODEL],
+                        outs_query: if parts_query.is_some() {
+                            vec![0.0; stream_rows.len() * D_MODEL]
+                        } else {
+                            Vec::new()
+                        },
+                    }
+                })
+                .collect();
+            let steps = sweeps
+                .iter()
+                .map(|sweep| sweep.rows.len())
+                .max()
+                .unwrap_or(0);
+            for position in 0..steps {
+                for sweep in sweeps
+                    .iter_mut()
+                    .filter(|sweep| position < sweep.rows.len())
+                {
+                    let index = sweep.rows[position] as usize - chunk_start;
+                    let out = &mut sweep.outs[position * D_MODEL..(position + 1) * D_MODEL];
+                    if let Some(parts_query) =
+                        parts_query.as_ref().filter(|_| !query_recurrence.after())
+                    {
+                        let out_query =
+                            &mut sweep.outs_query[position * D_MODEL..(position + 1) * D_MODEL];
+                        match query_recurrence {
+                            QueryRecurrence::Exact => single_timestep_into(
+                                row(&parts_query.r, index),
+                                row(&parts_query.k, index),
+                                row(&parts_query.v, index),
+                                row(&parts_query.w, index),
+                                row(&parts_query.a, index),
+                                row(&parts_query.k_deformed, index),
+                                &sweep.matrix,
+                                out_query,
+                                &mut sweep.query_next_matrix,
+                            ),
+                            QueryRecurrence::Fast | QueryRecurrence::FastAfter => {
+                                single_timestep_query_fast_into(
+                                    row(&parts_query.r, index),
+                                    row(&parts_query.k, index),
+                                    row(&parts_query.v, index),
+                                    row(&parts_query.w, index),
+                                    row(&parts_query.a, index),
+                                    row(&parts_query.k_deformed, index),
+                                    Some(&sweep.matrix),
+                                    out_query,
+                                )
+                            }
+                        }
+                    }
+                    single_timestep_into(
+                        row(&parts.r, index),
+                        row(&parts.k, index),
+                        row(&parts.v, index),
+                        row(&parts.w, index),
+                        row(&parts.a, index),
+                        row(&parts.k_deformed, index),
+                        &sweep.matrix,
+                        out,
+                        &mut sweep.next_matrix,
+                    );
+                    std::mem::swap(&mut sweep.matrix, &mut sweep.next_matrix);
+                }
+                if let [sweep] = sweeps.as_mut_slice() {
+                    // One stream: no batch to build.
+                    let index = sweep.rows[position] as usize - chunk_start;
+                    plan.precision.round_written_matrix(
+                        &mut sweep.matrix,
+                        &mut sweep.packed_matrix,
+                        &sweep.next_matrix,
+                        row(&parts.v, index),
+                    );
+                } else {
+                    let mut writes: Vec<precision::WrittenMatrix<'_>> = sweeps
+                        .iter_mut()
+                        .filter(|sweep| position < sweep.rows.len())
+                        .map(|sweep| precision::WrittenMatrix {
+                            v: row(&parts.v, sweep.rows[position] as usize - chunk_start),
+                            values: &mut sweep.matrix,
+                            packed: &mut sweep.packed_matrix,
+                            previous: &sweep.next_matrix,
+                        })
+                        .collect();
+                    plan.precision.round_written_matrices(&mut writes);
+                }
+                if query_recurrence.after() {
+                    if let Some(parts_query) = &parts_query {
+                        for sweep in sweeps
+                            .iter_mut()
+                            .filter(|sweep| position < sweep.rows.len())
+                        {
+                            let index = sweep.rows[position] as usize - chunk_start;
+                            let out_query =
+                                &mut sweep.outs_query[position * D_MODEL..(position + 1) * D_MODEL];
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                             single_timestep_query_fast_into(
                                 row(&parts_query.r, index),
                                 row(&parts_query.k, index),
@@ -1138,6 +1555,7 @@ fn finish_layer_time_stage(output: LayerTimeStageOutput<'_>) {
                                 row(&parts_query.w, index),
                                 row(&parts_query.a, index),
                                 row(&parts_query.k_deformed, index),
+<<<<<<< HEAD
                                 Some(&matrix),
                                 out_query,
                             )
@@ -1185,6 +1603,39 @@ fn finish_layer_time_stage(output: LayerTimeStageOutput<'_>) {
             Some((outs, outs_query))
         })
         .collect();
+=======
+                                plan.streams[sweep.stream_index]
+                                    .key
+                                    .map(|_| sweep.matrix.as_slice()),
+                                out_query,
+                            );
+                        }
+                    }
+                }
+            }
+            sweeps
+                .into_iter()
+                .map(|sweep| {
+                    if plan.streams[sweep.stream_index].key.is_some() {
+                        let last = *sweep.rows.last().unwrap() as usize - chunk_start;
+                        sweep.layer_state.time = Some(TimeState {
+                            x_shift: row(&x_norm, last).to_vec(),
+                            matrix: sweep.matrix,
+                            packed_matrix: sweep.packed_matrix,
+                        });
+                    }
+                    (sweep.stream_index, sweep.outs, sweep.outs_query)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    drop(groups);
+    let mut sweep_outs: Vec<Option<(Vec<f32>, Vec<f32>)>> = Vec::with_capacity(stream_count);
+    sweep_outs.resize_with(stream_count, || None);
+    for (stream_index, outs, outs_query) in group_outs.into_iter().flatten() {
+        sweep_outs[stream_index] = Some((outs, outs_query));
+    }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     for &stream_index in &chunk_layout.streams {
         let Some((outs, outs_query)) = &sweep_outs[stream_index] else {
             continue;
@@ -1786,5 +2237,28 @@ fn fill_time_mixed(
             x_shift[channel],
             lerp_values[lerp_offset + channel],
         );
+    }
+}
+
+#[cfg(all(test, target_arch = "aarch64", target_os = "macos"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn larger_chunks_are_limited_to_multicore_big_state_rebuilds() {
+        for (threads, expected) in [
+            (1, BULK_CHUNK_ROWS),
+            (2, if SMALL_MODEL { BULK_CHUNK_ROWS } else { 16_384 }),
+        ] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            pool.install(|| {
+                assert_eq!(warm_up_chunk_rows(BULK_CHUNK_ROWS, false), BULK_CHUNK_ROWS);
+                assert_eq!(warm_up_chunk_rows(16_384, true), BULK_CHUNK_ROWS);
+                assert_eq!(warm_up_chunk_rows(16_384, false), expected);
+            });
+        }
     }
 }

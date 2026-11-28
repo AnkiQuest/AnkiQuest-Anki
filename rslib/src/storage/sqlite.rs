@@ -18,6 +18,10 @@ use rusqlite::functions::FunctionFlags;
 use rusqlite::params;
 use rusqlite::trace::TraceEvent;
 use rusqlite::types::FromSqlError;
+<<<<<<< HEAD
+=======
+use rusqlite::types::Value as SqlValue;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use rusqlite::types::ValueRef;
 use rusqlite::Connection;
 use serde_json::Value;
@@ -34,6 +38,7 @@ use crate::prelude::*;
 use crate::scheduler::timing::local_minutes_west_for_stamp;
 use crate::scheduler::timing::v1_creation_date;
 use crate::storage::card::data::CardData;
+use crate::text::strip_html_preserving_media_filenames;
 use crate::text::without_combining;
 use crate::text::CowMapping;
 
@@ -81,12 +86,25 @@ fn open_or_create_collection_db(
     db.set_prepared_statement_cache_capacity(50);
 
     add_field_index_function(&db)?;
+    add_field_sort_value_function(&db)?;
     add_regexp_function(&db)?;
     add_regexp_fields_function(&db)?;
     add_regexp_tags_function(&db)?;
     add_process_text_function(&db)?;
     add_fnvhash_function(&db)?;
     add_extract_original_position_function(&db)?;
+    db.create_scalar_function(
+        "review_step_due_at",
+        1,
+        FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| {
+            let data: CardData = ctx.get(0)?;
+            Ok(
+                crate::card::review_step_due_at(data.last_review_time, data.review_step_secs)
+                    .map(|due| due.0),
+            )
+        },
+    )?;
     add_extract_custom_data_function(&db)?;
     add_extract_fsrs_variable(&db)?;
     add_extract_fsrs_retrievability(&db)?;
@@ -129,7 +147,11 @@ fn relocate_retrievability_cache(collection_path: &Path, cache_path: &Path) -> R
         // Checkpoint before moving: committed predictions may still be in the WAL.
         // Switching journal mode also refuses relocation while another reader is busy.
         let mode = (|| -> rusqlite::Result<String> {
+<<<<<<< HEAD
             let old_db = Connection::open(sqlite_path(&old_path))?;
+=======
+            let old_db = Connection::open(&old_path)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             old_db.query_row("PRAGMA journal_mode = DELETE", [], |row| row.get(0))
         })();
         match mode {
@@ -150,6 +172,7 @@ fn relocate_retrievability_cache(collection_path: &Path, cache_path: &Path) -> R
     Ok(())
 }
 
+<<<<<<< HEAD
 /// The path SQLite opens for a cache file. On Windows, SQLite passes paths
 /// to the Win32 API, which rejects those of 260 characters (MAX_PATH) or more
 /// unless they are verbatim (`\\?\`). The cache paths are longer than the
@@ -174,6 +197,8 @@ fn sqlite_path(path: &Path) -> PathBuf {
     path.to_owned()
 }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn retrievability_cache_is_busy(err: &rusqlite::Error) -> bool {
     matches!(
         err.sqlite_error_code(),
@@ -191,7 +216,11 @@ fn attach_retrievability_cache_db(db: &Connection, collection_path: Option<&Path
     let attach = || -> rusqlite::Result<()> {
         db.execute(
             &format!("ATTACH DATABASE ? AS {RETRIEVABILITY_CACHE_DB_SCHEMA}"),
+<<<<<<< HEAD
             [sqlite_path(&cache_path).to_string_lossy().as_ref()],
+=======
+            [cache_path.to_string_lossy().as_ref()],
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         )?;
         db.pragma_update(Some(RETRIEVABILITY_CACHE_DB_SCHEMA), "journal_mode", "wal")
     };
@@ -269,6 +298,37 @@ fn add_field_index_function(db: &Connection) -> rusqlite::Result<()> {
             let mut fields = ctx.get_raw(0).as_str()?.split('\x1f');
             let idx: u16 = ctx.get(1)?;
             Ok(fields.nth(idx as usize).unwrap_or("").to_string())
+        },
+    )
+}
+
+/// Return a SQLite number, text, or NULL so ORDER BY can compare field values
+/// without treating a partial number like "10a" as numeric.
+fn add_field_sort_value_function(db: &Connection) -> rusqlite::Result<()> {
+    db.create_scalar_function(
+        "field_sort_value",
+        2,
+        FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| {
+            if ctx.get_raw(0) == ValueRef::Null {
+                return Ok(SqlValue::Null);
+            }
+            let raw = ctx.get_raw(0).as_str()?;
+            let field = if ctx.get::<bool>(1)? {
+                strip_html_preserving_media_filenames(raw)
+            } else {
+                Cow::Borrowed(raw)
+            };
+            let value = field.trim();
+            Ok(if value.is_empty() {
+                SqlValue::Null
+            } else if let Ok(number) = value.parse::<i64>() {
+                SqlValue::Integer(number)
+            } else if let Some(number) = value.parse::<f64>().ok().filter(|n| n.is_finite()) {
+                SqlValue::Real(number)
+            } else {
+                SqlValue::Text(value.into())
+            })
         },
     )
 }
@@ -487,6 +547,21 @@ fn add_extract_fsrs_variable(db: &Connection) -> rusqlite::Result<()> {
     )
 }
 
+/// The scalar SQL functions have no model parameters. Anchor their legacy
+/// forgetting curve at the card's public S90.
+fn legacy_curve_retrievability(
+    state: crate::card::FsrsMemoryState,
+    seconds: u32,
+    decay: f32,
+) -> f32 {
+    let scalar_state = fsrs::MemoryState {
+        stability: state.stability,
+        stability_fast: state.stability,
+        difficulty: state.difficulty,
+    };
+    current_retrievability(scalar_state, seconds as f32 / 86_400.0, decay)
+}
+
 /// eg. extract_fsrs_retrievability(card.data, card.due, card.ivl,
 /// timing.days_elapsed, timing.next_day_at, timing.now) -> float | null
 fn add_extract_fsrs_retrievability(db: &Connection) -> rusqlite::Result<()> {
@@ -536,9 +611,15 @@ fn add_extract_fsrs_retrievability(db: &Connection) -> rusqlite::Result<()> {
                 (today as u32).saturating_sub(review_day) * 86_400
             };
             let decay = card_data.decay.unwrap_or(FSRS5_DEFAULT_DECAY);
+<<<<<<< HEAD
             let retrievability = card_data.memory_state().map(|state| {
                 current_retrievability(state.into(), seconds_elapsed as f32 / 86_400.0, decay)
             });
+=======
+            let retrievability = card_data
+                .memory_state()
+                .map(|state| legacy_curve_retrievability(state, seconds_elapsed, decay));
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             Ok(retrievability)
         },
     )
@@ -606,12 +687,17 @@ fn add_extract_fsrs_relative_retrievability(db: &Connection) -> rusqlite::Result
                                 secs_elapsed
                             };
 
+<<<<<<< HEAD
                         let current_retrievability = current_retrievability(
                             state.into(),
                             seconds_elapsed as f32 / 86_400.0,
                             decay,
                         )
                         .max(0.0001);
+=======
+                        let current_retrievability =
+                            legacy_curve_retrievability(state, seconds_elapsed, decay).max(0.0001);
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
                         return Ok(Some(
                             -(current_retrievability.powf(-1.0 / decay) - 1.)
@@ -1162,6 +1248,121 @@ mod test {
                 |row| row.get(0),
             )?;
             assert_eq!(matched, expected, "pattern={pattern}, indices={indices}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn collection_open_recreates_corrupt_retrievability_cache() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let collection_path = dir.path().join("collection.anki2");
+        let cache_path = retrievability_cache_path(&collection_path);
+        std::fs::create_dir_all(cache_path.parent().unwrap())?;
+        std::fs::write(&cache_path, b"not a database")?;
+
+        let col = crate::collection::CollectionBuilder::new(&collection_path).build()?;
+        let count: i64 = col.storage.db.query_row(
+            "SELECT count(*) FROM retrievability_cache.search_stats_rwkv_review_retrievability",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn collection_open_preserves_corrupt_legacy_retrievability_cache() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let collection_path = dir.path().join("collection.anki2");
+        let old_path = collection_path.with_extension("retrievability-cache.sqlite");
+        std::fs::write(&old_path, b"not a database")?;
+
+        let col = crate::collection::CollectionBuilder::new(&collection_path).build()?;
+        let count: i64 = col.storage.db.query_row(
+            "SELECT count(*) FROM retrievability_cache.search_stats_rwkv_review_retrievability",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 0);
+        assert_eq!(std::fs::read(old_path)?, b"not a database");
+        Ok(())
+    }
+
+    #[test]
+    fn collection_open_preserves_busy_retrievability_caches() -> Result<()> {
+        for legacy in [false, true] {
+            let dir = tempfile::tempdir()?;
+            let collection_path = dir.path().join("collection.anki2");
+            let cache_path = if legacy {
+                collection_path.with_extension("retrievability-cache.sqlite")
+            } else {
+                retrievability_cache_path(&collection_path)
+            };
+            std::fs::create_dir_all(cache_path.parent().unwrap())?;
+            let cache = Connection::open(&cache_path)?;
+            cache.execute_batch(
+                "CREATE TABLE sentinel (value); INSERT INTO sentinel VALUES (42); BEGIN EXCLUSIVE",
+            )?;
+
+            let err = crate::collection::CollectionBuilder::new(&collection_path)
+                .build()
+                .err()
+                .unwrap();
+            assert!(
+                matches!(err, AnkiError::DbError { source } if source.kind == DbErrorKind::Locked)
+            );
+            assert_eq!(
+                cache.query_row("SELECT value FROM sentinel", [], |row| row.get::<_, i64>(0))?,
+                42
+            );
+            assert!(cache_path.is_file());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn regexp_fields_matches_only_selected_fields() -> rusqlite::Result<()> {
+        let db = Connection::open_in_memory()?;
+        add_regexp_fields_function(&db)?;
+        let fields = "猫\x1f\x1fかな\x1fカナ\x1fignored";
+        for (pattern, indices, expected) in [
+            ("^かな$", "", true),
+            ("^かな$", ", 0", false),
+            ("^かな$", ", 2", true),
+            ("^$", ", 1", true),
+            ("^かな$", ", 3, 2, 0, 2", true),
+            ("^ignored$", ", 0, 2", false),
+            ("^ignored$", ", 4", true),
+            ("^$", ", 5", false),
+        ] {
+            let matched: bool = db.query_row(
+                &format!("select regexp_fields(?1, ?2{indices})"),
+                [pattern, fields],
+                |row| row.get(0),
+            )?;
+            assert_eq!(matched, expected, "pattern={pattern}, indices={indices}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_retrievability_sql_uses_public_stability() -> rusqlite::Result<()> {
+        let db = Connection::open_in_memory()?;
+        add_extract_fsrs_retrievability(&db)?;
+        add_extract_fsrs_relative_retrievability(&db)?;
+        // At the public S90, both cards are exactly due for a 90% target.
+        for data in [
+            r#"{"s":20,"s_int":40,"s_fast":3,"d":5,"decay":0.2,"dr":0.9}"#,
+            r#"{"s":20,"d":5,"decay":0.2,"dr":0.9}"#,
+        ] {
+            let (r, relative): (f32, f32) = db.query_row(
+                "select extract_fsrs_retrievability(?1, 20, 20, 20, 0, 0),
+                        extract_fsrs_relative_retrievability(?1, 20, 20, 20, 0, 0)",
+                [data],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?;
+            assert!((r - 0.9).abs() < 1e-5, "{r}");
+            assert!((relative + 1.0).abs() < 1e-5, "{relative}");
         }
         Ok(())
     }

@@ -371,6 +371,7 @@ impl crate::services::SchedulerService for Collection {
         .map(Into::into)
     }
 
+<<<<<<< HEAD
     fn get_deck_queue(&mut self, input: anki_proto::decks::DeckId) -> Result<scheduler::DeckQueue> {
         let queue = self.deck_queue(DeckId(input.did))?;
         Ok(scheduler::DeckQueue {
@@ -382,6 +383,8 @@ impl crate::services::SchedulerService for Collection {
         })
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rebuild_queued_cards_preserving_current_card(
         &mut self,
         input: cards::CardId,
@@ -631,11 +634,20 @@ impl crate::services::SchedulerService for Collection {
             memory_state: None,
         }
         .next_states(&ctx);
+<<<<<<< HEAD
         let base = self.describe_next_states(&states)?;
         let again_followup_labels =
             self.describe_next_states(&next_followup_states(&states.again)?)?;
         let good_followup_labels =
             self.describe_next_states(&next_followup_states(&states.good)?)?;
+=======
+        let describe = |col: &mut Collection, states: &SchedulingStates| {
+            col.describe_next_states_with_timing(states, fsrs_learning_queues_disabled)
+        };
+        let base = describe(self, &states)?;
+        let again_followup_labels = describe(self, &next_followup_states(&states.again)?)?;
+        let good_followup_labels = describe(self, &next_followup_states(&states.good)?)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(generic::StringList {
             vals: vec![
                 base[0].clone(),
@@ -1014,7 +1026,11 @@ impl crate::services::SchedulerService for Collection {
                 },
             );
         }
+<<<<<<< HEAD
         self.set_rwkv_stats_graph_score_entries(input.search, scores)
+=======
+        self.set_rwkv_stats_graph_score_entries(input.search, scores, input.instant_due)
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     fn set_rwkv_card_info_score(&mut self, input: RwkvCardInfoScoreRequest) -> Result<()> {
@@ -1193,6 +1209,7 @@ impl crate::services::SchedulerService for Collection {
         Collection::rwkv_historical_review_inputs(self, input)
     }
 
+<<<<<<< HEAD
     fn rwkv_prepare_offline(
         &mut self,
         input: anki_proto::scheduler::RwkvPrepareOfflineRequest,
@@ -1266,6 +1283,8 @@ impl crate::services::SchedulerService for Collection {
         Ok(Collection::rwkv_offline_workload_available(self).into())
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_answer_time_history_features(
         &mut self,
         input: anki_proto::scheduler::RwkvAnswerTimeHistoryFeaturesRequest,
@@ -1378,6 +1397,7 @@ fn fsrs_calibration_search_for_config(
         .map(|deck| deck.id.to_string())
         .collect::<Vec<_>>();
     (!deck_ids.is_empty()).then(|| SearchNode::DeckIdsWithoutChildren(deck_ids.join(",")))
+<<<<<<< HEAD
 }
 
 impl Backend {
@@ -1428,15 +1448,58 @@ impl Backend {
         }
         Ok(generic::UInt32 { val: count })
     }
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl crate::services::BackendSchedulerService for Backend {
     fn rebuild_fsrs_review_retrievability_cache(&self) -> Result<generic::UInt32> {
+<<<<<<< HEAD
         self.rebuild_fsrs_review_retrievability_cache_with(true)
     }
 
     fn fsrs_calibration_final_fit(&self) -> Result<generic::UInt32> {
         self.rebuild_fsrs_review_retrievability_cache_with(false)
+=======
+        let (requests, session) = self.with_col(|col| {
+            let decks = col.storage.get_all_decks()?;
+            let mut requests = Vec::new();
+            for config in col.storage.all_deck_config()? {
+                let Some(search) = fsrs_calibration_search_for_config(&decks, config.id) else {
+                    continue;
+                };
+                requests.push(
+                    scheduler::ComputeFsrsReviewRetrievabilityCalibrationRequest {
+                        search: search.try_into_search()?.to_string(),
+                        params: config.fsrs_params().to_vec(),
+                        ignore_revlogs_before_ms: ignore_revlogs_before_ms_from_config(&config)?.0,
+                        num_of_relearning_steps: config.inner.relearn_steps.len() as u32,
+                        include_same_day_reviews: fsrs7_optimize_include_same_day_reviews(&config),
+                        fsrs_version: Some(config.inner.fsrs_version),
+                        include_validation_folds: true,
+                        enable_scheduling_penalties: Some(fsrs7_enable_scheduling_penalties(
+                            &config,
+                        )),
+                    },
+                );
+            }
+            Ok((requests, col.session_id.clone()))
+        })?;
+        let mut count = 0;
+        for request in requests {
+            self.with_col(|col| {
+                require!(
+                    Arc::ptr_eq(&col.session_id, &session),
+                    "collection changed during cache rebuild"
+                );
+                Ok(())
+            })?;
+            count += self
+                .compute_fsrs_review_retrievability_calibration(request)?
+                .val;
+        }
+        Ok(generic::UInt32 { val: count })
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     fn compute_fsrs_six_comparison(

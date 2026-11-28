@@ -104,6 +104,79 @@ fn build_generated_sources(build: &mut Build) -> Result<()> {
             output: "qt/_aqt/py.typed",
         },
     )?;
+    // The bundled RWKV weights are not under the code's license.
+    build.add_action(
+        "qt:aqt:rwkv_weights_notice",
+        CopyFile {
+            input: "qt/aqt/rwkv_inference/WEIGHTS-NOTICE.md".into(),
+            output: "qt/_aqt/rwkv_inference/WEIGHTS-NOTICE.md",
+        },
+    )?;
+    build.add_action(
+        "qt:aqt:rwkv_legacy",
+        CopyFile {
+            input: "qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin".into(),
+            output: "qt/_aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin",
+        },
+    )?;
+    // Every model folder also gets a copy of the weights notice, so the
+    // notice sits beside every shipped weights file.
+    for model in [
+        "sm40v2", "sm36", "sm55", "sm56", "sm72", "sm72e20", "sm72e25", "sm92", "sm57", "sm98",
+        "sm101", "sm99", "sm106", "sm113", "sm115", "sm118", "sm130th", "sm130io",
+    ] {
+        build.add_action(
+            format!("qt:aqt:rwkv_{model}_weights_notice"),
+            CopyFile {
+                input: "qt/aqt/rwkv_inference/WEIGHTS-NOTICE.md".into(),
+                output: &format!("qt/_aqt/rwkv_inference/{model}/WEIGHTS-NOTICE.md"),
+            },
+        )?;
+        for name in ["weights.f32.bin", "architecture.json", "manifest.json"] {
+            let output = format!("qt/_aqt/rwkv_inference/{model}/{name}");
+            build.add_action(
+                format!("qt:aqt:rwkv_{model}_{name}"),
+                CopyFile {
+                    input: format!("qt/aqt/rwkv_inference/{model}/{name}").into(),
+                    output: &output,
+                },
+            )?;
+        }
+    }
+    // The optional answer-time head is read from the folder of the weights
+    // (the time heads for the family (SM117): every two-head model and the
+    // show-time instant-only big model (SM99), and the heads of the longer
+    // Small and Tiny Instant-Only models (SM113, SM115) and the show-time
+    // two-head cool-down for Small (SM118) from the SM119 run, the six-layer
+    // Tiny (SM130) heads from the SM138 run).
+    for model in [
+        "sm72e25", "sm92", "sm106", "sm99", "sm113", "sm115", "sm118", "sm130th", "sm130io",
+    ] {
+        for name in ["time_head.f32.bin", "time_head.json"] {
+            let output = format!("qt/_aqt/rwkv_inference/{model}/{name}");
+            build.add_action(
+                format!("qt:aqt:rwkv_{model}_{name}"),
+                CopyFile {
+                    input: format!("qt/aqt/rwkv_inference/{model}/{name}").into(),
+                    output: &output,
+                },
+            )?;
+        }
+    }
+    // The show-time big model (SM91s2)'s weights file has no folder: its
+    // head sits beside it as `<weights name>.time_head.f32.bin`.
+    for name in [
+        "RWKV_trained_on_5000_10000.time_head.f32.bin",
+        "RWKV_trained_on_5000_10000.time_head.json",
+    ] {
+        build.add_action(
+            format!("qt:aqt:rwkv_legacy_{name}"),
+            CopyFile {
+                input: format!("qt/aqt/rwkv_inference/{name}").into(),
+                output: &format!("qt/_aqt/rwkv_inference/{name}"),
+            },
+        )?;
+    }
     Ok(())
 }
 
@@ -364,6 +437,8 @@ fn check_python(build: &mut Build) -> Result<()> {
 
     python_format(build, "qt", py_inputs.clone())?;
 
+<<<<<<< HEAD
+<<<<<<< HEAD
     build.add_action(
         "check:pytest:aqt",
         PythonTest {
@@ -371,6 +446,26 @@ fn check_python(build: &mut Build) -> Result<()> {
             deps: inputs![":pylib:anki", ":qt:aqt", glob!["qt/tests/**"]],
         },
     )?;
+=======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+    for (target, ignore) in [
+        ("check:pytest:aqt", None),
+        ("check-local:pytest:aqt", Some("qt/tests/test_installer.py")),
+    ] {
+        build.add_action(
+            target,
+            PythonTest {
+                folder: "qt/tests",
+                ignore,
+                deps: inputs![":pylib:anki", ":qt:aqt", glob!["qt/tests/**"]],
+            },
+        )?;
+    }
+<<<<<<< HEAD
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
     check_complexity(build, "qt", "qt", py_inputs)?;
 

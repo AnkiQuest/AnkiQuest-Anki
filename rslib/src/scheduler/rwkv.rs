@@ -1,7 +1,17 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use std::collections::hash_map::Entry;
+=======
+// Copyright: Ankitects Pty Ltd and contributors
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
+// License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -12,9 +22,12 @@ use anki_proto::scheduler::RwkvReviewInputRowsForCardsRequest;
 use anki_proto::scheduler::RwkvReviewInputRowsForCardsResponse;
 use anki_proto::scheduler::RwkvReviewInputRowsForDeckReviewQueueRequest;
 use anki_proto::scheduler::RwkvReviewInputRowsForSearchRequest;
+<<<<<<< HEAD
 use blake2::digest::consts::U8;
 use blake2::digest::Digest as Blake2Digest;
 use blake2::Blake2b;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use sha2::Digest;
 use sha2::Sha256;
 
@@ -28,9 +41,13 @@ use crate::decks::Deck;
 use crate::decks::DeckId;
 use crate::ops::Op;
 use crate::prelude::*;
+<<<<<<< HEAD
 use crate::scheduler::addon_desired_retention::AddonRetentionRules;
 use crate::scheduler::fsrs::memory_state::fsrs_memory_state_for_s90;
 use crate::scheduler::fsrs::preset::FsrsPreset;
+=======
+use crate::scheduler::fsrs::memory_state::fsrs_memory_state_for_s90;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 use crate::scheduler::fsrs::preset::FsrsPresetId;
 use crate::scheduler::timing::SchedTimingToday;
 use crate::search::parse_search;
@@ -42,11 +59,14 @@ use crate::search::StateKind;
 use crate::storage::RwkvHistoricalReviewRow;
 
 mod history;
+<<<<<<< HEAD
 mod offline;
 mod offline_engine;
 mod offline_state;
 
 pub(crate) use offline::RwkvOfflineRuntime;
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
 const RWKV_HISTORY_HASH_DOMAIN: &[u8] = b"anki-rwkv-state-cache-history-v1\0";
 
@@ -55,8 +75,11 @@ struct RwkvHistoricalReplayOptions {
     preserved_learning_start_cutoffs: HashMap<i64, i64>,
     first_review_uses_creation: Option<bool>,
     recovery_checkpoint_max_age_millis: Option<i64>,
+<<<<<<< HEAD
     /// Visit only this card's reviews (the hash then covers only those).
     card_id: Option<CardId>,
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 pub(crate) struct RwkvReviewRescheduleItem {
@@ -83,6 +106,7 @@ impl Collection {
         &mut self,
         input: RwkvHistoricalReviewFingerprintRequest,
         options: RwkvHistoricalReplayOptions,
+<<<<<<< HEAD
         visit: impl FnMut(RwkvHistoricalFingerprintReview, [u8; 32], bool),
     ) -> Result<RwkvHistoricalReviewFingerprintResponse> {
         self.read_rwkv_historical_reviews(input, options)?
@@ -98,11 +122,19 @@ impl Collection {
         options: RwkvHistoricalReplayOptions,
     ) -> Result<RwkvHistoricalReviews> {
         let mut ignored_review_ids = std::mem::take(&mut input.ignored_review_ids)
+=======
+        mut visit: impl FnMut(RwkvHistoricalFingerprintReview, [u8; 32], bool),
+    ) -> Result<RwkvHistoricalReviewFingerprintResponse> {
+        let started = std::time::Instant::now();
+        let mut ignored_review_ids = input
+            .ignored_review_ids
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .into_iter()
             .map(RevlogId)
             .collect::<Vec<_>>();
         ignored_review_ids.sort_unstable();
         ignored_review_ids.dedup();
+<<<<<<< HEAD
         let (rows, active_ignored_review_ids, revlog_scan) =
             self.storage.rwkv_historical_review_rows_with_cutoffs(
                 &ignored_review_ids,
@@ -201,6 +233,13 @@ impl RwkvHistoricalReviews {
             decks_by_id,
             configs_by_id,
         } = self;
+=======
+        let (rows, active_ignored_review_ids) =
+            self.storage.rwkv_historical_review_rows_with_cutoffs(
+                &ignored_review_ids,
+                &options.preserved_learning_start_cutoffs,
+            )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let queried_review_count = rows.len() as u64;
         let checkpoint_review_count = options.recovery_checkpoint_max_age_millis.and_then(|age| {
             let cutoff = rows.last()?.review_id - age;
@@ -209,9 +248,38 @@ impl RwkvHistoricalReviews {
             let count = rows.partition_point(|row| row.review_id <= cutoff).max(1);
             (count < rows.len()).then_some(count)
         });
+<<<<<<< HEAD
 
         let mut previous_review_id_by_card = HashMap::new();
         let mut stable_preset_ids_by_deck = HashMap::new();
+=======
+        let timing = self.timing_today()?;
+
+        let card_ids = rows
+            .iter()
+            .map(|row| CardId(row.card_id))
+            .collect::<HashSet<_>>();
+        let cards = self.all_cards_for_ids(&card_ids.iter().copied().collect::<Vec<_>>(), false)?;
+        let presets_by_card = self.fsrs_presets_for_cards(&cards)?;
+        let stable_preset_ids_by_card = presets_by_card
+            .into_iter()
+            .map(|(card_id, preset)| {
+                Ok((
+                    card_id,
+                    rwkv_stable_preset_id(&preset.id, &input.stable_preset_ids)?,
+                ))
+            })
+            .collect::<Result<HashMap<_, _>>>()?;
+        let preset_routes = if input.dynamic_preset_replay {
+            self.rwkv_historical_preset_routes(&card_ids, &input.stable_preset_ids)?
+        } else {
+            Vec::new()
+        };
+        let decks_by_id = self.storage.get_decks_map()?;
+        let configs_by_id = self.storage.get_deck_config_map()?;
+
+        let mut previous_review_id_by_card = HashMap::new();
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut previous_interval_days_by_card = HashMap::new();
         let mut review_count_by_card = HashMap::new();
         let mut history_hash = rwkv_empty_history_hash();
@@ -257,6 +325,7 @@ impl RwkvHistoricalReviews {
             let review_count_so_far = *review_count_by_card.get(&card_id).unwrap_or(&0);
             let previous_interval_days =
                 *previous_interval_days_by_card.get(&card_id).unwrap_or(&0);
+<<<<<<< HEAD
             let stable_preset_id = match preset_routes
                 .iter()
                 .find(|route| route.matches(card_id, review_count_so_far, previous_interval_days))
@@ -278,6 +347,14 @@ impl RwkvHistoricalReviews {
                     },
                 },
             };
+=======
+            let stable_preset_id = preset_routes
+                .iter()
+                .find(|route| route.matches(card_id, review_count_so_far, previous_interval_days))
+                .map(|route| route.stable_preset_id)
+                .or_else(|| stable_preset_ids_by_card.get(&card_id).copied())
+                .or_invalid("missing stable RWKV preset id")?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
             previous_interval_days_by_card.insert(card_id, row.interval_days);
             review_count_by_card.insert(card_id, review_count_so_far + 1);
@@ -331,9 +408,13 @@ impl RwkvHistoricalReviews {
             history_prefix_is_valid,
         })
     }
+<<<<<<< HEAD
 }
 
 impl Collection {
+=======
+
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn rwkv_historical_preset_routes(
         &mut self,
         included_card_ids: &HashSet<CardId>,
@@ -437,6 +518,7 @@ impl Collection {
         &mut self,
         input: RwkvReviewInputRowsForCardsRequest,
     ) -> Result<RwkvReviewInputRowsForCardsResponse> {
+<<<<<<< HEAD
         let mut card_ids: Vec<CardId> = input.card_ids.into_iter().map(Into::into).collect();
         if card_ids.is_empty() {
             return Ok(RwkvReviewInputRowsForCardsResponse::default());
@@ -445,6 +527,12 @@ impl Collection {
         // is also among an approximate update's top cards) would fail the query
         let mut seen = HashSet::new();
         card_ids.retain(|id| seen.insert(*id));
+=======
+        let card_ids: Vec<CardId> = input.card_ids.into_iter().map(Into::into).collect();
+        if card_ids.is_empty() {
+            return Ok(RwkvReviewInputRowsForCardsResponse::default());
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 
         let timing = self.timing_today()?;
         let decks_by_id = self.storage.get_decks_map()?;
@@ -525,13 +613,37 @@ impl Collection {
         let configs_by_id = self.storage.get_deck_config_map()?;
         let enabled_deck_ids = (!input.include_disabled_decks)
             .then(|| rwkv_enabled_deck_ids(&decks_by_id, &configs_by_id));
+<<<<<<< HEAD
         let (searched_cards, cards) = self
+=======
+        let suspended_filter = if input.include_new_cards {
+            crate::storage::card::learnable::learnable_suspended_filter(
+                deck_ids.iter().copied(),
+                &decks_by_id,
+                &configs_by_id,
+                timing,
+            )
+        } else {
+            None
+        };
+        let (searched_cards, mut cards) = self
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .storage
             .rwkv_review_input_candidate_cards_for_deck_review_queue(
                 &deck_ids,
                 enabled_deck_ids.as_ref(),
                 input.include_new_cards,
+<<<<<<< HEAD
             )?;
+=======
+                suspended_filter.as_deref(),
+            )?;
+        for card in &mut cards {
+            if card.queue == CardQueue::Suspended {
+                card.restore_queue_from_type();
+            }
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut response = self.rwkv_review_input_rows_from_cards(
             cards,
             timing,
@@ -605,11 +717,14 @@ impl Collection {
             .map(|partial| partial.card.clone())
             .collect();
         let presets_by_card = self.fsrs_presets_for_cards(&preset_cards)?;
+<<<<<<< HEAD
         let addon_targets = if let Some(rules) = AddonRetentionRules::from_collection(self) {
             rules.matches(self, &preset_cards)?
         } else {
             HashMap::new()
         };
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let rows = eligible
             .into_iter()
             .filter_map(|partial| {
@@ -634,12 +749,17 @@ impl Collection {
                     current_elapsed_since_secs: partial.state.elapsed_since.map(|time| time.0),
                     remaining_steps: Some(partial.card.remaining_steps()),
                     in_filtered_deck: partial.card.original_deck_id.0 != 0,
+<<<<<<< HEAD
                     target_retention: valid_rwkv_target_retention(
                         addon_targets
                             .get(&partial.card.id)
                             .map(|result| result.retention)
                             .unwrap_or(partial.target_retention),
                     ),
+=======
+                    review_step_due_secs: partial.card.review_step_due_at().map(|due| due.0),
+                    target_retention: valid_rwkv_target_retention(partial.target_retention),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     batch_size: partial.batch_size,
                     enforce_grade_order: Some(partial.enforce_grade_order),
                     fsrs_memory_state: options
@@ -675,7 +795,17 @@ impl Collection {
         include_suspended_review: bool,
         first_review_elapsed_from_card_creation: bool,
     ) -> Result<Option<RwkvReviewInputState>> {
+<<<<<<< HEAD
         match (card.ctype, card.queue) {
+=======
+        let phase_queue = if card.queue == CardQueue::Review && card.review_step_due_at().is_some()
+        {
+            CardQueue::Learn
+        } else {
+            card.queue
+        };
+        match (card.ctype, phase_queue) {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             (CardType::New, CardQueue::New) => {
                 let elapsed_since =
                     first_review_elapsed_from_card_creation.then(|| card.id.as_secs());
@@ -727,7 +857,15 @@ impl Collection {
                     normal_state_kind: elapsed_seconds
                         .map(|_| "learning".to_string())
                         .unwrap_or_default(),
+<<<<<<< HEAD
                     elapsed_days: None,
+=======
+                    elapsed_days: elapsed_since.map(|last_review_time| {
+                        timing
+                            .next_day_at
+                            .elapsed_days_since_clamped(last_review_time)
+                    }),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                     elapsed_seconds,
                     elapsed_since,
                 }))
@@ -826,7 +964,11 @@ impl Collection {
         Ok(())
     }
 
+<<<<<<< HEAD
     pub(crate) fn populate_rwkv_last_review_times(&mut self, cards: &mut [Card]) -> Result<()> {
+=======
+    pub(crate) fn populate_rwkv_last_review_times(&self, cards: &mut [Card]) -> Result<()> {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         for card in cards.iter_mut() {
             self.storage.populate_rwkv_history_reset(card)?;
         }
@@ -837,6 +979,7 @@ impl Collection {
                         .is_some_and(|time| time.0.saturating_mul(1000) <= cutoff)
                 })
         };
+<<<<<<< HEAD
         // A review changes mtime and reps; a synced boundary can change
         // independently of either, so it must be part of the cache key.
         let key = |card: &Card| (card.mtime, card.reps, card.rwkv_history_reset_after);
@@ -859,6 +1002,22 @@ impl Collection {
                 _ => review_times.get(&card.id).copied(),
             };
             cache.insert(card.id, (key(card), card.last_review_time));
+=======
+        let missing_card_ids: Vec<_> = cards
+            .iter()
+            .filter(|card| needs_review_time(card))
+            .map(|card| card.id)
+            .collect();
+        if missing_card_ids.is_empty() {
+            return Ok(());
+        }
+
+        let review_times = self.storage.rwkv_times_of_last_review(&missing_card_ids)?;
+        for card in cards {
+            if needs_review_time(card) {
+                card.last_review_time = review_times.get(&card.id).copied();
+            }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
 
         Ok(())
@@ -885,9 +1044,17 @@ fn broaden_retrievability_properties(node: Node, negated: bool) -> Node {
             kind: PropertyKind::RwkvRetrievability(_) | PropertyKind::RwkvCurveRetrievability(_),
             ..
         })
+<<<<<<< HEAD
         | Node::Search(SearchNode::State(StateKind::RwkvDue | StateKind::RwkvCurveDue)) => {
             boolean_search_node(!negated)
         }
+=======
+        // `is:due` can follow RWKV-Instant, so cards not yet due by date need
+        // scores too.
+        | Node::Search(SearchNode::State(
+            StateKind::Due | StateKind::RwkvDue | StateKind::RwkvCurveDue,
+        )) => boolean_search_node(!negated),
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         other => other,
     }
 }
@@ -927,6 +1094,10 @@ pub(crate) struct RwkvReviewCandidateMetadata {
     pub(crate) current_deck_id: DeckId,
     pub(crate) source_deck_id: DeckId,
     pub(crate) fsrs_due_today: bool,
+<<<<<<< HEAD
+=======
+    pub(crate) review_step_due: Option<bool>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 pub(crate) fn rwkv_review_candidate_metadata(
@@ -946,6 +1117,14 @@ pub(crate) fn rwkv_review_candidate_metadata(
             continue;
         }
 
+<<<<<<< HEAD
+=======
+        let review_step_due = if card.is_filtered() {
+            None
+        } else {
+            card.review_step_due_at().map(|due| due <= timing.now)
+        };
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let partial = RwkvReviewCandidatePartial {
             reviewed_today: card_reviewed_today(&card, timing),
             elapsed_secs_since_last_review: card
@@ -953,7 +1132,12 @@ pub(crate) fn rwkv_review_candidate_metadata(
                 .map(|last_review_time| timing.now.elapsed_secs_since_clamped(last_review_time)),
             current_deck_id: card.deck_id,
             source_deck_id: card.original_deck_id.or(card.deck_id),
+<<<<<<< HEAD
             fsrs_due_today: card.due <= timing.days_elapsed as i32,
+=======
+            fsrs_due_today: review_step_due.unwrap_or(card.due <= timing.days_elapsed as i32),
+            review_step_due,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         };
         if let Some(desired_retention) = card_desired_retention(&card) {
             metadata.insert(
@@ -1068,11 +1252,25 @@ fn rwkv_review_score_eligibility_inner(
         RwkvReviewTarget::Ignore => false,
     };
 
+<<<<<<< HEAD
     if !score.is_finite()
         || score_above_target
         || (metadata.reviewed_today && !metadata.same_day_review_allowed)
     {
         return RwkvReviewScoreEligibility::Blocked;
+=======
+    match metadata.review_step_due {
+        Some(false) => return RwkvReviewScoreEligibility::Blocked,
+        Some(true) => {}
+        None => {
+            if !score.is_finite()
+                || score_above_target
+                || (metadata.reviewed_today && !metadata.same_day_review_allowed)
+            {
+                return RwkvReviewScoreEligibility::Blocked;
+            }
+        }
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     }
 
     rwkv_repeat_spacing_eligibility(
@@ -1121,6 +1319,10 @@ struct RwkvReviewCandidatePartial {
     current_deck_id: DeckId,
     source_deck_id: DeckId,
     fsrs_due_today: bool,
+<<<<<<< HEAD
+=======
+    review_step_due: Option<bool>,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 }
 
 impl RwkvReviewCandidatePartial {
@@ -1137,6 +1339,10 @@ impl RwkvReviewCandidatePartial {
             current_deck_id: self.current_deck_id,
             source_deck_id: self.source_deck_id,
             fsrs_due_today: self.fsrs_due_today,
+<<<<<<< HEAD
+=======
+            review_step_due: self.review_step_due,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         }
     }
 }
@@ -1176,6 +1382,7 @@ struct RwkvHistoricalFingerprintReview {
     elapsed_seconds: i64,
 }
 
+<<<<<<< HEAD
 /// The preset id `fsrs_presets_for_cards` gives a card of this home deck
 /// when no overlay rule moves it, with the same lookups and errors.
 fn rwkv_home_deck_stable_preset_id(
@@ -1193,6 +1400,8 @@ fn rwkv_home_deck_stable_preset_id(
     )
 }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn rwkv_stable_preset_id(
     preset_id: &FsrsPresetId,
     stable_preset_ids: &HashMap<String, i64>,
@@ -1203,11 +1412,15 @@ fn rwkv_stable_preset_id(
             .parse()
             .ok()
             .or_else(|| stable_preset_ids.get(id).copied())
+<<<<<<< HEAD
             .or_else(|| rwkv_stable_preset_id_from_string(id))
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             .or_invalid("missing stable id for add-on FSRS preset"),
     }
 }
 
+<<<<<<< HEAD
 /// Match desktop's `_stable_preset_id`: deck ids are decimal i64s, while
 /// add-on ids (which start with `addon:`) use an eight-byte BLAKE2b digest.
 /// This is BLAKE2b configured for an eight-byte output, not a truncated
@@ -1223,6 +1436,8 @@ fn rwkv_stable_preset_id_from_string(id: &str) -> Option<i64> {
     Some(i64::from_be_bytes(digest.into()) & i64::MAX)
 }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
 fn rwkv_first_review_uses_card_creation(
     deck_id: i64,
     decks_by_id: &HashMap<DeckId, Deck>,
@@ -1453,6 +1668,7 @@ mod test {
     use crate::revlog::RevlogReviewKind;
 
     #[test]
+<<<<<<< HEAD
     fn stable_preset_ids_match_desktop_blake2b_vectors() {
         // Generated with Python hashlib.blake2b(..., digest_size=8), including
         // a UTF-8 ID and a digest whose high bit must be cleared.
@@ -1530,6 +1746,8 @@ mod test {
     }
 
     #[test]
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn historical_fingerprint_matches_python_cache_encoding() {
         let row = RwkvHistoricalReviewRow {
             review_id: 1_700_000_000_123,
@@ -1720,6 +1938,7 @@ mod test {
         Ok(())
     }
 
+<<<<<<< HEAD
     /// Without overlay rules the fingerprint resolves preset ids per deck; it
     /// must give the per-card lookup's hash, and a rule that moves a card must
     /// still change it.
@@ -1796,6 +2015,8 @@ mod test {
         Ok(())
     }
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     #[test]
     fn apply_review_reschedule_does_not_write_revlog() -> Result<()> {
         let mut col = Collection::new();
@@ -2013,6 +2234,37 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn review_input_rows_give_learning_cards_calendar_elapsed_days() -> Result<()> {
+        let mut col = Collection::new();
+        col.update_default_deck_config(|config| {
+            config.rwkv_review_enabled = true;
+        });
+        let timing = col.timing_today()?;
+        let mut card = Card::new(NoteId(10), 0, DeckId(1), timing.days_elapsed as i32);
+        card.ctype = CardType::Learn;
+        card.queue = CardQueue::DayLearn;
+        card.last_review_time = Some(timing.next_day_at.adding_secs(-2 * 86_400 - 5));
+        col.add_card(&mut card)?;
+
+        let response =
+            col.rwkv_review_input_rows_for_cards(RwkvReviewInputRowsForCardsRequest {
+                card_ids: vec![card.id.0],
+                include_suspended_review: false,
+                include_disabled_decks: false,
+                include_new_cards: false,
+            })?;
+
+        assert_eq!(response.rows.len(), 1);
+        assert_eq!(response.rows[0].current_normal_state_kind, "learning");
+        assert_eq!(response.rows[0].current_elapsed_days, Some(2));
+        assert!(response.rows[0].current_elapsed_seconds.is_some());
+        Ok(())
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_input_rows_expose_normalized_learning_steps() -> Result<()> {
         let mut col = Collection::new();
         let timing = col.timing_today()?;
@@ -2117,6 +2369,7 @@ mod test {
         assert_eq!(included.loaded_cards, 1);
         assert_eq!(included.rows.len(), 1);
 
+<<<<<<< HEAD
         // kuma3: an approximate queue update can ask for an answered card twice
         let repeated =
             col.rwkv_review_input_rows_for_cards(RwkvReviewInputRowsForCardsRequest {
@@ -2127,6 +2380,8 @@ mod test {
             })?;
         assert_eq!(repeated.rows.len(), 1);
 
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         Ok(())
     }
 
@@ -2317,6 +2572,44 @@ mod test {
     }
 
     #[test]
+<<<<<<< HEAD
+=======
+    fn review_input_rows_for_search_score_cards_not_yet_due_for_is_due() -> Result<()> {
+        let mut col = Collection::new();
+        col.update_default_deck_config(|config| {
+            config.rwkv_review_instant_order_enabled = true;
+        });
+        let timing = col.timing_today()?;
+        let mut card = Card::new(NoteId(10), 0, DeckId(1), timing.days_elapsed as i32 + 10);
+        card.ctype = CardType::Review;
+        card.queue = CardQueue::Review;
+        card.interval = 30;
+        card.last_review_time = Some(timing.now.adding_secs(-20 * 86_400));
+        col.add_card(&mut card)?;
+        let searched = |col: &mut Collection, search: String| -> Result<u32> {
+            Ok(col
+                .rwkv_review_input_rows_for_search(RwkvReviewInputRowsForSearchRequest {
+                    search,
+                    include_suspended_review: false,
+                    include_disabled_decks: false,
+                    include_new_cards: false,
+                    include_comparison_data: false,
+                })?
+                .searched_cards)
+        };
+
+        // `is:due` may follow RWKV-Instant, so the card needs a score.
+        assert_eq!(searched(&mut col, format!("cid:{} is:due", card.id.0))?, 1);
+        assert_eq!(searched(&mut col, format!("cid:{} -is:due", card.id.0))?, 1);
+        assert_eq!(
+            searched(&mut col, format!("cid:{} is:fsrs:due", card.id.0))?,
+            0
+        );
+        Ok(())
+    }
+
+    #[test]
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     fn review_input_rows_for_deck_review_queue_uses_child_decks() -> Result<()> {
         let mut col = Collection::new();
         col.update_default_deck_config(|config| {

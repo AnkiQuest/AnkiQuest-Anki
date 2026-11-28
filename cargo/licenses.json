@@ -80,6 +80,20 @@
     "repository": "https://github.com/dtolnay/anyhow"
   },
   {
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    "authors": "David Roundy <roundyd@physics.oregonstate.edu>",
+    "description": "Macros to take array references of slices",
+    "license": "BSD-2-Clause",
+    "license_file": null,
+    "name": "arrayref",
+    "repository": "https://github.com/droundy/arrayref"
+  },
+  {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "authors": "bluss",
     "description": "A vector with fixed capacity, backed by an array (it can be stored on the stack too). Implements fixed capacity ArrayVec and ArrayString.",
     "license": "Apache-2.0 OR MIT",
@@ -145,7 +159,7 @@
   },
   {
     "authors": null,
-    "description": "Web framework that focuses on ergonomics and modularity",
+    "description": "HTTP routing and request handling library that focuses on ergonomics and modularity",
     "license": "MIT",
     "license_file": null,
     "name": "axum",
@@ -321,7 +335,15 @@
   },
   {
     "authors": "Frank Denis <github@pureftpd.org>",
+<<<<<<< HEAD
+<<<<<<< HEAD
     "description": "Coarse monotonic clock, cached timestamps, and duration measurements for fast timekeeping",
+=======
+    "description": "Time and duration crate optimized for speed",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "description": "Coarse monotonic clock, cached timestamps, and duration measurements for fast timekeeping",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "license": "BSD-2-Clause",
     "license_file": null,
     "name": "coarsetime",
@@ -664,6 +686,17 @@
     "repository": "https://github.com/alexcrichton/filetime"
   },
   {
+<<<<<<< HEAD
+=======
+    "authors": null,
+    "description": "Find windows-specific tools, read MSVC versions from the registry and from COM interfaces",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "name": "find-msvc-tools",
+    "repository": "https://github.com/rust-lang/cc-rs"
+  },
+  {
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
     "authors": "bluss",
     "description": "FixedBitSet is a simple bitset collection",
     "license": "Apache-2.0 OR MIT",
@@ -698,7 +731,7 @@
   {
     "authors": "Zibi Braniecki <gandalf@mozilla.com>",
     "description": "A library for language and locale negotiation.",
-    "license": "Apache-2.0",
+    "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "fluent-langneg",
     "repository": "https://github.com/projectfluent/fluent-langneg-rs"
@@ -904,7 +937,15 @@
     "repository": "https://github.com/rust-lang/hashbrown"
   },
   {
+<<<<<<< HEAD
+<<<<<<< HEAD
     "authors": null,
+=======
+    "authors": "Amanieu d'Antras <amanieu@gmail.com>",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "authors": null,
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "description": "A Rust port of Google's SwissTable hash map",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -1453,7 +1494,7 @@
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "native-tls",
-    "repository": "https://github.com/sfackler/rust-native-tls"
+    "repository": "https://github.com/rust-native-tls/rust-native-tls"
   },
   {
     "authors": "Ulrik Sverdrup \"bluss\"|Jim Turner",
@@ -1585,11 +1626,11 @@
   },
   {
     "authors": "Alex Crichton <alex@alexcrichton.com>",
-    "description": "Tool for helping to find SSL certificate locations on the system for OpenSSL",
+    "description": "A library for helping to find system-wide trust anchor (\"root\") certificate locations based on paths typically used by `openssl`.",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "openssl-probe",
-    "repository": "https://github.com/alexcrichton/openssl-probe"
+    "repository": "https://github.com/rustls/openssl-probe"
   },
   {
     "authors": "Alex Crichton <alex@alexcrichton.com>|Steven Fackler <sfackler@gmail.com>",
@@ -1752,6 +1793,14 @@
     "repository": "https://github.com/rust-lang/pkg-config-rs"
   },
   {
+    "authors": "jzr",
+    "description": "A small Rust library that allows users to reinterpret data of certain types safely.",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "name": "plain",
+    "repository": "https://github.com/randomites/plain"
+  },
+  {
     "authors": null,
     "description": "Portable atomic types including support for 128-bit atomics, atomic float, etc.",
     "license": "Apache-2.0 OR MIT",
@@ -1765,7 +1814,7 @@
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "portable-atomic-util",
-    "repository": "https://github.com/taiki-e/portable-atomic"
+    "repository": "https://github.com/taiki-e/portable-atomic-util"
   },
   {
     "authors": "The ICU4X Project Developers",
@@ -1808,6 +1857,10 @@
     "repository": "https://github.com/dtolnay/prettyplease"
   },
   {
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "authors": "David Tolnay <dtolnay@gmail.com>",
     "description": "A minimal `syn` syntax tree pretty-printer",
     "license": "Apache-2.0 OR MIT",
@@ -1816,6 +1869,11 @@
     "repository": "https://github.com/dtolnay/prettyplease"
   },
   {
+<<<<<<< HEAD
+=======
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "authors": "Bastian Köcher <git@kchr.de>",
     "description": "Replacement for crate (macro_rules keyword) in proc-macros",
     "license": "Apache-2.0 OR MIT",
@@ -2040,6 +2098,14 @@
     "repository": "https://gitlab.redox-os.org/redox-os/syscall"
   },
   {
+    "authors": "Jeremy Soller <jackpot51@gmail.com>",
+    "description": "A Rust library to access raw Redox system calls",
+    "license": "MIT",
+    "license_file": null,
+    "name": "redox_syscall",
+    "repository": "https://gitlab.redox-os.org/redox-os/syscall"
+  },
+  {
     "authors": "Jose Narvaez <goyox86@gmail.com>|Wesley Hershberger <mggmugginsmc@gmail.com>",
     "description": "A Rust library to access Redox users and groups functionality",
     "license": "MIT",
@@ -2209,14 +2275,6 @@
   },
   {
     "authors": "Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>",
-    "description": "Security.framework bindings for macOS and iOS",
-    "license": "Apache-2.0 OR MIT",
-    "license_file": null,
-    "name": "security-framework",
-    "repository": "https://github.com/kornelski/rust-security-framework"
-  },
-  {
-    "authors": "Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>",
     "description": "Apple `Security.framework` low-level FFI bindings",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -2226,7 +2284,7 @@
   {
     "authors": "Lukas Bergdoll <lukas.bergdoll@gmail.com>",
     "description": "Safe-to-use proc-macro-free self-referential structs in stable Rust.",
-    "license": "Apache-2.0",
+    "license": "Apache-2.0 OR GPL-2.0",
     "license_file": null,
     "name": "self_cell",
     "repository": "https://github.com/Voultapher/self_cell"
@@ -2736,6 +2794,14 @@
     "repository": "https://github.com/toml-rs/toml"
   },
   {
+    "authors": null,
+    "description": "Yet another format-preserving TOML parser.",
+    "license": "Apache-2.0 OR MIT",
+    "license_file": null,
+    "name": "toml_parser",
+    "repository": "https://github.com/toml-rs/toml"
+  },
+  {
     "authors": "Tower Maintainers <team@tower-rs.com>",
     "description": "Tower is a library of modular and reusable components for building robust clients and servers.",
     "license": "MIT",
@@ -3064,14 +3130,6 @@
     "repository": "https://github.com/bytecodealliance/wasi"
   },
   {
-    "authors": "The Cranelift Project Developers",
-    "description": "WASI API bindings for Rust",
-    "license": "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT",
-    "license_file": null,
-    "name": "wasi",
-    "repository": "https://github.com/bytecodealliance/wasi-rs"
-  },
-  {
     "authors": null,
     "description": "WASIp2 API bindings for Rust",
     "license": "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT",
@@ -3125,7 +3183,15 @@
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "wasm-bindgen-macro-support",
+<<<<<<< HEAD
+<<<<<<< HEAD
     "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/main/crates/macro-support"
+=======
+    "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support"
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/main/crates/macro-support"
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
   },
   {
     "authors": "The wasm-bindgen Developers",
@@ -3229,14 +3295,6 @@
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "windows-collections",
-    "repository": "https://github.com/microsoft/windows-rs"
-  },
-  {
-    "authors": "Microsoft",
-    "description": "Core type support for COM and Windows",
-    "license": "Apache-2.0 OR MIT",
-    "license_file": null,
-    "name": "windows-core",
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
@@ -3352,14 +3410,6 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
-    "description": "Rust for Windows",
-    "license": "Apache-2.0 OR MIT",
-    "license_file": null,
-    "name": "windows-sys",
-    "repository": "https://github.com/microsoft/windows-rs"
-  },
-  {
     "authors": null,
     "description": "Rust for Windows",
     "license": "Apache-2.0 OR MIT",
@@ -3376,7 +3426,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import libs for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3400,7 +3450,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3416,7 +3466,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3432,7 +3482,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3448,7 +3498,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3464,7 +3514,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3480,7 +3530,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3496,7 +3546,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3512,7 +3562,7 @@
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
-    "authors": "Microsoft",
+    "authors": null,
     "description": "Import lib for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3534,14 +3584,6 @@
     "license_file": null,
     "name": "wiremock",
     "repository": "https://github.com/LukeMathWalker/wiremock-rs"
-  },
-  {
-    "authors": "Alex Crichton <alex@alexcrichton.com>",
-    "description": "Rust bindings generator and runtime support for WIT and the component model. Used when compiling Rust programs to the component model.",
-    "license": "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT",
-    "license_file": null,
-    "name": "wit-bindgen",
-    "repository": "https://github.com/bytecodealliance/wit-bindgen"
   },
   {
     "authors": "Alex Crichton <alex@alexcrichton.com>",
@@ -3669,7 +3711,7 @@
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "zeroize",
-    "repository": "https://github.com/RustCrypto/utils/tree/master/zeroize"
+    "repository": "https://github.com/RustCrypto/utils"
   },
   {
     "authors": "The ICU4X Project Developers",
@@ -3713,7 +3755,15 @@
   },
   {
     "authors": "David Tolnay <dtolnay@gmail.com>",
+<<<<<<< HEAD
+<<<<<<< HEAD
     "description": "A double-to-string conversion algorithm based on Schubfach and xjb",
+=======
+    "description": "A double-to-string conversion algorithm based on Schubfach and yy",
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "description": "A double-to-string conversion algorithm based on Schubfach and xjb",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "license": "MIT",
     "license_file": null,
     "name": "zmij",

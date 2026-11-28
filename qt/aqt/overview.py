@@ -5,12 +5,15 @@ from __future__ import annotations
 import html
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import aqt
 import aqt.operations
-from anki.collection import OpChanges
+import aqt.rwkv_scheduler
+from anki.collection import Collection, OpChanges
 from anki.scheduler import UnburyDeck
+from anki.scheduler.v3 import QueuedCards
+from anki.scheduler.v3 import Scheduler as V3Scheduler
 from aqt import gui_hooks
 from aqt.deckdescription import DeckDescriptionDialog
 from aqt.deckoptions import display_options_for_deck
@@ -20,6 +23,7 @@ from aqt.operations.scheduling import (
     rebuild_filtered_deck,
     unbury_deck,
 )
+from aqt.rwkv_review_potential import rwkv_review_potential_label
 from aqt.sound import av_player
 from aqt.toolbar import BottomBar
 from aqt.utils import askUserDialog, openLink, shortcut, tooltip, tr
@@ -56,6 +60,8 @@ class Overview:
         self.web = mw.web
         self.bottom = BottomBar(mw, mw.bottomWeb)
         self._refresh_needed = False
+        self._rwkv_count_generation = 0
+        self._rwkv_counts_pending = False
 
     def show(self) -> None:
         av_player.stop_and_clear_queue()
@@ -64,16 +70,61 @@ class Overview:
         self.refresh()
 
     def refresh(self) -> None:
-        def success(_counts: tuple) -> None:
+        self._rwkv_count_generation += 1
+        generation = self._rwkv_count_generation
+        collection = self.mw.col
+        rendered_pending = False
+
+        def is_current() -> bool:
+            return (
+                generation == self._rwkv_count_generation
+                and self.mw.state == "overview"
+                and self.mw.col is collection
+            )
+
+        def success(result: tuple[bool, bool]) -> None:
+            nonlocal rendered_pending
+            if not is_current():
+                return
+            scoring_busy, counts_pending = result
+            if scoring_busy:
+                self.mw.progress.single_shot(100, query_counts)
+            if rendered_pending and counts_pending:
+                return
+            rendered_pending = counts_pending
             self._refresh_needed = False
+            self._rwkv_counts_pending = counts_pending
             self._renderPage()
             self._renderBottom()
             self.mw.web.setFocus()
             gui_hooks.overview_did_refresh(self)
+            aqt.rwkv_scheduler.request_rwkv_state_cache_recovery(
+                self.mw,
+                reason="overview",
+            )
 
-        QueryOp(
-            parent=self.mw, op=lambda col: col.sched.counts(), success=success
-        ).run_in_background()
+        def get_counts(col: Collection) -> tuple[bool, bool]:
+            if not is_current():
+                return False, False
+            cache_loading = aqt.rwkv_scheduler.rwkv_state_cache_loading(self.mw)
+            scoring_busy = (
+                not aqt.rwkv_scheduler.prepare_current_deck_review_queue_scores(
+                    self.mw,
+                    reason="overview counts",
+                )
+            )
+            col.sched.counts()
+            return scoring_busy, scoring_busy or cache_loading or (
+                aqt.rwkv_scheduler.rwkv_state_cache_loading(self.mw)
+            )
+
+        def query_counts() -> None:
+            if is_current():
+                QueryOp(
+                    parent=self.mw, op=get_counts, success=success
+                ).run_in_background()
+
+        query_counts()
 
     def refresh_if_needed(self) -> None:
         if self._refresh_needed:
@@ -136,9 +187,22 @@ class Overview:
         return self.mw.col.decks.current()["dyn"]
 
     def rebuild_current_filtered_deck(self) -> None:
-        rebuild_filtered_deck(
-            parent=self.mw, deck_id=self.mw.col.decks.selected()
-        ).run_in_background()
+        from aqt.rwkv_filtered_deck import run_filtered_deck_op_with_rwkv_check
+
+        deck_id = self.mw.col.decks.selected()
+        if not self.mw.col.decks.is_filtered(deck_id):
+            # The "r" shortcut also fires on normal decks; let the op report it.
+            rebuild_filtered_deck(parent=self.mw, deck_id=deck_id).run_in_background()
+            return
+        config = self.mw.col.sched.get_or_create_filtered_deck(deck_id=deck_id).config
+        run_filtered_deck_op_with_rwkv_check(
+            mw=self.mw,
+            parent=self.mw,
+            config=config,
+            make_op=lambda policy: rebuild_filtered_deck(
+                parent=self.mw, deck_id=deck_id, rwkv_policy=policy
+            ),
+        )
 
     def empty_current_filtered_deck(self) -> None:
         empty_filtered_deck(
@@ -187,7 +251,7 @@ class Overview:
             shareLink = '<a class=smallLink href="review">Reviews and Updates</a>'
         else:
             shareLink = ""
-        if self.mw.col.sched._is_finished():
+        if not self._rwkv_counts_pending and self.mw.col.sched._is_finished():
             self._show_finished_screen()
             return
         content = OverviewContent(
@@ -226,28 +290,65 @@ class Overview:
         return f'<div class="descfont descmid description {dyn}">{desc}</div>'
 
     def _table(self) -> str:
-        counts = list(self.mw.col.sched.counts())
+        queued: QueuedCards | None = None
+        if self.mw.col.v3_scheduler():
+            # The same queue the reviewer shows, fetched once for counts and
+            # the RWKV-Instant review potential.
+            queued = cast(
+                V3Scheduler, self.mw.col.sched
+            ).get_queued_cards_without_states(fetch_limit=0)
+            new_count, learning_count, review_count = (
+                queued.new_count,
+                queued.learning_count,
+                queued.review_count,
+            )
+        else:
+            new_count, learning_count, review_count = self.mw.col.sched.counts()
+        counts: list[int | str] = [new_count, learning_count, review_count]
         current_did = self.mw.col.decks.get_current_id()
         deck_node = self.mw.col.sched.deck_due_tree(current_did)
 
         but = self.mw.button
-        if self.mw.col.v3_scheduler():
+        review_limit = ""
+        if queued is not None:
             assert deck_node is not None
-            buried_new = deck_node.new_count - counts[0]
-            buried_learning = deck_node.learn_count - counts[1]
-            buried_review = deck_node.review_count - counts[2]
+            buried_new = deck_node.new_count - new_count
+            buried_learning = deck_node.learn_count - learning_count
+            if self._rwkv_counts_pending:
+                counts[2] = "…"
+                buried_review = 0
+            else:
+                buried_review = deck_node.review_count - review_count
+                if self.mw.col.conf["dueCounts"] and (
+                    label := rwkv_review_potential_label(
+                        review_count,
+                        queued.rwkv_review_headroom,
+                        queued.rwkv_waiting_review_count,
+                    )
+                ):
+                    text, title = label
+                    review_limit = (
+                        f'<span class=review-limit title="'
+                        f'{html.escape(title, quote=True)}">{text}</span>'
+                    )
         else:
             buried_new = buried_learning = buried_review = 0
         buried_label = tr.studying_counts_differ()
 
-        def number_row(title: str, klass: str, count: int, buried_count: int) -> str:
+        def number_row(
+            title: str,
+            klass: str,
+            count: int | str,
+            buried_count: int,
+            limit: str = "",
+        ) -> str:
             buried = f"{buried_count:+}" if buried_count else ""
             return f"""
 <tr>
     <td>{title}:</td>
     <td>
         <b>
-            <span class={klass}>{count}</span>
+            <span class={klass}>{count}</span>{limit}
             <span class=bury-count title="{buried_label}">{buried}</span>
         </b>
     </td>
@@ -260,7 +361,7 @@ class Overview:
 <table cellspacing=5>
 {number_row(tr.actions_new(), "new-count", counts[0], buried_new)}
 {number_row(tr.scheduling_learning(), "learn-count", counts[1], buried_learning)}
-{number_row(tr.studying_to_review(), "review-count", counts[2], buried_review)}
+{number_row(tr.studying_to_review(), "review-count", counts[2], buried_review, review_limit)}
 </table>
 </td><td align=center>
 {but("study", tr.studying_study_now(), id="study", extra=" autofocus")}</td></tr></table>"""

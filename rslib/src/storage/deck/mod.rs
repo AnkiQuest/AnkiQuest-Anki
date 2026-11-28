@@ -279,6 +279,10 @@ impl SqliteStorage {
         &self,
         day_cutoff: u32,
         learn_cutoff: u32,
+<<<<<<< HEAD
+=======
+        now: TimestampSecs,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         review_day_start: TimestampSecs,
         review_day_end: TimestampSecs,
     ) -> Result<HashMap<DeckId, DueCounts>> {
@@ -288,6 +292,13 @@ impl SqliteStorage {
         let mut due_before = self.db.prepare_cached(
             "select count() from cards where did = ?1 and queue = ?2 and due < ?3",
         )?;
+<<<<<<< HEAD
+=======
+        let mut due_reviews = self.db.prepare_cached(&format!(
+            "select count() from cards where did = ?1 and queue = ?2 and {}",
+            crate::storage::card::due_day_or_review_step_sql("", "?3", "?4")
+        ))?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let mut groups = self
             .db
             .prepare_cached("select did, queue, count() from cards group by did, queue")?;
@@ -301,8 +312,15 @@ impl SqliteStorage {
             match row.get_ref(1)?.as_i64().ok() {
                 Some(queue) if queue == CardQueue::New as i64 => deck.new = cards,
                 Some(queue) if queue == CardQueue::Review as i64 => {
+<<<<<<< HEAD
                     deck.review =
                         due_cards(&mut due_on_or_before, did, CardQueue::Review, day_cutoff)?;
+=======
+                    deck.review = due_reviews.query_row(
+                        params![did, CardQueue::Review as i8, day_cutoff, now],
+                        |row| row.get(0),
+                    )?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 }
                 Some(queue) if queue == CardQueue::DayLearn as i64 => {
                     deck.interday_learning =
@@ -328,14 +346,28 @@ impl SqliteStorage {
         }
         // Keep same-day limit exemptions. Read today's distinct reviewed cards
         // once, rather than joining them to every card in the collection.
+<<<<<<< HEAD
         let mut reviewed = self
             .db
             .prepare_cached(include_str!("reviewed_today_counts.sql"))?;
+=======
+        let mut reviewed =
+            self.db
+                .prepare_cached(&include_str!("reviewed_today_counts.sql").replace(
+                    "DUE_PREDICATE",
+                    &crate::storage::card::due_day_or_review_step_sql("cards.", "?3", "?4"),
+                ))?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         for row in reviewed.query_and_then(
             params![
                 review_day_start.as_millis().0,
                 review_day_end.as_millis().0,
+<<<<<<< HEAD
                 day_cutoff
+=======
+                day_cutoff,
+                now,
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
             ],
             |row| -> Result<(DeckId, i64, u32)> { Ok((row.get(0)?, row.get(1)?, row.get(2)?)) },
         )? {
@@ -466,7 +498,15 @@ impl SqliteStorage {
 #[cfg(test)]
 pub(crate) mod test {
     use rand::rngs::StdRng;
+<<<<<<< HEAD
+<<<<<<< HEAD
     use rand::RngExt;
+=======
+    use rand::Rng;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    use rand::RngExt;
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     use rand::SeedableRng;
     use rusqlite::named_params;
 
@@ -584,7 +624,17 @@ pub(crate) mod test {
             add_cards_around_cutoffs(&mut col, &decks, DAY_CUTOFF, LEARN_CUTOFF, seed, count);
             let counts: HashMap<DeckId, Counts> = col
                 .storage
+<<<<<<< HEAD
                 .due_counts(DAY_CUTOFF, LEARN_CUTOFF, TimestampSecs(0), TimestampSecs(1))
+=======
+                .due_counts(
+                    DAY_CUTOFF,
+                    LEARN_CUTOFF,
+                    TimestampSecs(i64::from(LEARN_CUTOFF)),
+                    TimestampSecs(0),
+                    TimestampSecs(1),
+                )
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .unwrap()
                 .into_iter()
                 .map(|(did, c)| {
@@ -605,7 +655,17 @@ pub(crate) mod test {
         }
         assert_eq!(
             col.storage
+<<<<<<< HEAD
                 .due_counts(DAY_CUTOFF, LEARN_CUTOFF, TimestampSecs(0), TimestampSecs(1))
+=======
+                .due_counts(
+                    DAY_CUTOFF,
+                    LEARN_CUTOFF,
+                    TimestampSecs(i64::from(LEARN_CUTOFF)),
+                    TimestampSecs(0),
+                    TimestampSecs(1),
+                )
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
                 .unwrap()
                 .len(),
             decks.len()
@@ -661,7 +721,11 @@ pub(crate) mod test {
         }
         let counts = col
             .storage
+<<<<<<< HEAD
             .due_counts(DAY_CUTOFF, LEARN_CUTOFF, start, end)?;
+=======
+            .due_counts(DAY_CUTOFF, LEARN_CUTOFF, start, start, end)?;
+>>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
         let deck = &counts[&DeckId(1)];
         assert_eq!(deck.review_limit_exempt, 2);
         assert_eq!(deck.interday_learning_limit_exempt, 2);
