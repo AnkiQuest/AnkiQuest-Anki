@@ -5,6 +5,9 @@
 export const HelpPage = {
     DeckOptions: {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         maximumInterval: "https://docs.ankiweb.net/manual/deck-options#maximum-interval",
         startingEase: "https://docs.ankiweb.net/manual/deck-options#starting-ease",
         easyBonus: "https://docs.ankiweb.net/manual/deck-options#easy-bonus",
@@ -34,6 +37,7 @@ export const HelpPage = {
     Leeches: {
         leeches: "https://docs.ankiweb.net/manual/leeches",
         waiting: "https://docs.ankiweb.net/manual/leeches#waiting",
+<<<<<<< HEAD
 =======
         maximumInterval: "https://docs.ankiweb.net/deck-options.html#maximum-interval",
         startingEase: "https://docs.ankiweb.net/deck-options.html#starting-ease",
@@ -65,6 +69,8 @@ export const HelpPage = {
         leeches: "https://docs.ankiweb.net/manual/leeches",
         waiting: "https://docs.ankiweb.net/leeches.html#waiting",
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     },
     Studying: {
         siblingsAndBurying: "https://docs.ankiweb.net/manual/studying#siblings-and-burying",

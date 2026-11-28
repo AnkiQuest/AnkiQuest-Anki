@@ -51,12 +51,13 @@ from pathlib import Path
 
 import anki.lang
 from anki._backend import RustBackend
+from anki.buildinfo import buildhash
 from anki.buildinfo import version as _version
 from anki.collection import Collection
 from anki.consts import HELP_SITE
 from anki.utils import checksum, is_gnome, is_lin, is_mac
 from aqt import gui_hooks
-from aqt.log import setup_logging
+from aqt.log import ExecutionLog, setup_logging
 from aqt.qt import *
 from aqt.qt import sip
 from aqt.utils import TR, tr
@@ -340,6 +341,8 @@ class AnkiApp(QApplication):
     ##################################################
 
     appMsg = pyqtSignal(str)
+
+    execution_log: ExecutionLog
 
     KEY = (
         os.environ.get("ANKI_SINGLE_INSTANCE_KEY")
@@ -750,6 +753,9 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
         pm = None
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     # Safe mode forces software rendering, which must be set up before the app is
     # created, so Shift has to be checked without relying on Qt
     safe_mode = opts.safemode or shift_held_before_app()
@@ -758,9 +764,12 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
         driver = VideoDriver.Software if safe_mode else pm.video_driver()
         # gl workarounds; some of them only take effect before the app is created
         setupGL(pm, driver)
+<<<<<<< HEAD
 =======
     if pm:
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         # apply user-provided scale factor
         os.environ["QT_SCALE_FACTOR"] = str(pm.uiScale())
 
@@ -783,6 +792,7 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
 
     # create the app
 <<<<<<< HEAD
+<<<<<<< HEAD
     QCoreApplication.setApplicationName("Anki")
     QGuiApplication.setDesktopFileName("anki")
     app = AnkiApp(argv, safe_mode)
@@ -791,22 +801,33 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
     QGuiApplication.setDesktopFileName("anki-portable" if is_portable() else "anki")
     app = AnkiApp(argv)
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    QCoreApplication.setApplicationName(application_name())
+    QGuiApplication.setDesktopFileName("anki-portable" if is_portable() else "anki")
+    app = AnkiApp(argv, safe_mode)
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     if app.secondInstance():
         # we've signaled the primary instance, so we should close
         return None
 
     if pm:
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if app.safeMode and driver != VideoDriver.Software:
             # Shift was only detected by Qt (e.g. on Linux, where the settings
             # setupGL() makes still take effect after the app is created)
             driver = VideoDriver.Software
             setupGL(pm, driver)
+<<<<<<< HEAD
 =======
         driver = pm.video_driver() if not app.safeMode else VideoDriver.Software
         # gl workarounds
         setupGL(pm, driver)
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     else:
         if i18n_setup:
             QMessageBox.critical(
@@ -818,10 +839,12 @@ def _run(argv: list[str] | None = None, exec: bool = True) -> AnkiApp | None:
             QMessageBox.critical(None, "Startup Failed", "Unable to create data folder")
         return None
 
-    setup_logging(
+    app.execution_log = setup_logging(
         pm.addon_logs(),
         level=logging.DEBUG if int(os.getenv("ANKIDEV", "0")) else logging.INFO,
     )
+
+    logging.getLogger(__name__).info("Anki %s (%s) started", _version, buildhash)
 
     # disable icons on mac; this must be done before window created
     if is_mac:

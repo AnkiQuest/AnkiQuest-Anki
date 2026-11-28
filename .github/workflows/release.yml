@@ -188,10 +188,14 @@ jobs:
     needs: prepare
     runs-on: macos-15
 <<<<<<< HEAD
+<<<<<<< HEAD
     timeout-minutes: 90
 =======
     timeout-minutes: 120
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    timeout-minutes: 120
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     environment: ${{ inputs.sign == true && 'release' || '' }}
     env:
       ANKI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.pep440_version }}
@@ -244,21 +248,29 @@ jobs:
           path: out/installer/logs/
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-portable-macos
           path: out/portable/logs/
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-macos
           path: out/installer/dist/
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         with:
           name: portable-macos
           path: out/portable/dist/
@@ -327,21 +339,29 @@ jobs:
           path: out/installer/logs/
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-portable-macos-intel
           path: out/portable/logs/
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-macos-intel
           path: out/installer/dist/
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         with:
           name: portable-macos-intel
           path: out/portable/dist/
@@ -453,7 +473,7 @@ jobs:
       - name: Build portable app
         run: just portable-build
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         if: always()
         with:
           name: logs-portable-windows
@@ -485,7 +505,7 @@ jobs:
       - name: Package portable app
         run: just portable-archive ${{ needs.prepare.outputs.pep440_version }}
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         with:
           name: portable-windows
           path: out/portable/dist/
@@ -500,10 +520,14 @@ jobs:
 
   # Windows ARM uses a 4-job chain because azure/artifact-signing-action does not
 <<<<<<< HEAD
+<<<<<<< HEAD
   # support ARM runners: build on ARM → sign binaries on x64 → package MSI on ARM → sign MSI on x64.
 =======
   # support ARM runners: build on ARM → sign EXEs on x64 → package on ARM → sign MSI on x64.
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+  # support ARM runners: build on ARM → sign binaries on x64 → package MSI on ARM → sign MSI on x64.
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
   build-windows-arm:
     needs: prepare
     runs-on: windows-11-vs2026-arm
@@ -525,6 +549,7 @@ jobs:
         run: tools\ninja installer:build
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - name: Build portable app
@@ -532,22 +557,36 @@ jobs:
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Build portable app
+        run: just portable-build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-windows-arm-build
           path: out/installer/logs/
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-portable-windows-arm-build
           path: out/portable/logs/
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: build-windows-arm
           path: |
@@ -612,8 +651,11 @@ jobs:
           .github/scripts/VerifySignatures.ps1 ARM64
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
       - name: Sign portable app binary
         if: inputs.sign == true
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 #v2.0.0
@@ -637,8 +679,12 @@ jobs:
           }
           Write-Host "Portable EXE signed successfully: $($sig.SignerCertificate.Subject)"
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: signed-build-windows-arm
           path: |
@@ -685,8 +731,12 @@ jobs:
       - name: Package portable app
         run: just portable-archive ${{ needs.prepare.outputs.pep440_version }}
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-windows-arm-package
@@ -697,7 +747,7 @@ jobs:
           name: unsigned-installer-windows-arm
           path: out/installer/dist/
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         with:
           name: portable-windows-arm
           path: out/portable/dist/
@@ -806,6 +856,7 @@ jobs:
         run: ./tools/build-installer
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - name: Build portable app
@@ -813,27 +864,41 @@ jobs:
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Build portable app
+        run: just portable
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-linux-x86
           path: out/installer/logs/
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-portable-linux-x86
           path: out/portable/logs/
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-linux-x86
           path: out/installer/dist/
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         with:
           name: portable-linux-x86
           path: out/portable/dist/
@@ -907,6 +972,7 @@ jobs:
         run: ./tools/build-installer
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - name: Build portable app
@@ -914,27 +980,41 @@ jobs:
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Build portable app
+        run: just portable
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-installer-linux-arm
           path: out/installer/logs/
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
 =======
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         if: always()
         with:
           name: logs-portable-linux-arm
           path: out/portable/logs/
 
+<<<<<<< HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           name: installer-linux-arm
           path: out/installer/dist/
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2
         with:
           name: portable-linux-arm
           path: out/portable/dist/
@@ -976,7 +1056,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c #v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8.0.2
         with:
           pattern: portable-*
           path: dist

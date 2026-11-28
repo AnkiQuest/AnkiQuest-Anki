@@ -511,10 +511,112 @@ fn ensure_u32_valid(val: &mut u32, default: u32, min: u32, max: u32) {
 #[cfg(test)]
 mod tests {
 <<<<<<< HEAD
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     use std::assert_matches;
 
     use super::*;
+
+    #[test]
+    fn intraday_learning_mix_reads_modes_and_legacy_toggle() -> Result<()> {
+        for (metadata, expected) in [
+            (serde_json::json!({}), ReviewMix::MixWithReviews),
+            (
+                serde_json::json!({"intraday_learning_before_reviews": false}),
+                ReviewMix::MixWithReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_before_reviews": true}),
+                ReviewMix::BeforeReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_mix": 0}),
+                ReviewMix::MixWithReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_mix": 1}),
+                ReviewMix::AfterReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_mix": 2}),
+                ReviewMix::BeforeReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_mix": 99}),
+                ReviewMix::MixWithReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_mix": "before"}),
+                ReviewMix::MixWithReviews,
+            ),
+            (
+                serde_json::json!({"intraday_learning_mix": 1, "intraday_learning_before_reviews": true}),
+                ReviewMix::AfterReviews,
+            ),
+        ] {
+            let mut config = DeckConfig::default();
+            config.inner.other = serde_json::to_vec(&serde_json::json!({
+                "jschoreels.deckoptions": metadata,
+            }))?;
+            assert_eq!(config.intraday_learning_mix(), expected, "{metadata}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fsrs_params_respects_selected_version_when_usable() {
+        let mut config = DeckConfig::default();
+        config.inner.fsrs_version = FsrsVersion::Six as i32;
+        config.inner.fsrs_params_6 = vec![1.0_f32; 21];
+        config.inner.fsrs_params_7 = vec![2.0_f32; 34];
+
+        assert_eq!(config.fsrs_params(), &[1.0_f32; 21]);
+    }
+
+    #[test]
+    fn unoptimized_fsrs7_uses_fsrs7_defaults() {
+        let mut config = DeckConfig::default();
+        config.inner.fsrs_version = FsrsVersion::Seven as i32;
+        config.inner.fsrs_params_7.clear();
+        config.inner.fsrs_params_6 = vec![2.0_f32; 21];
+
+        assert_eq!(config.fsrs_params(), fsrs::DEFAULT_PARAMETERS);
+    }
+
+    #[test]
+    fn unoptimized_legacy_versions_keep_fsrs6_defaults() {
+        for version in [FsrsVersion::Six, FsrsVersion::Five, FsrsVersion::Four] {
+            let mut config = DeckConfig::default();
+            config.inner.fsrs_version = version as i32;
+
+            assert_eq!(config.fsrs_params(), fsrs::FSRS6_DEFAULT_PARAMETERS);
+        }
+    }
+
+    #[test]
+    fn maximum_rwkv_batch_size_is_preserved() {
+        let mut config = DeckConfig::default().inner;
+        config.rwkv_review_batch_size = 8192;
+
+        ensure_deck_config_values_valid(&mut config);
+
+        assert_eq!(config.rwkv_review_batch_size, 8192);
+    }
+
+    #[test]
+    fn invalid_rwkv_batch_size_uses_default() {
+        let mut config = DeckConfig::default().inner;
+        config.rwkv_review_batch_size = 8193;
+
+        ensure_deck_config_values_valid(&mut config);
+
+        assert_eq!(
+            config.rwkv_review_batch_size,
+            DEFAULT_RWKV_REVIEW_BATCH_SIZE
+        );
+    }
 
     #[test]
     fn get_deck_config_returns_created_config() -> Result<()> {
@@ -705,6 +807,7 @@ mod tests {
         );
 
         Ok(())
+<<<<<<< HEAD
     }
 
     #[test]
@@ -809,5 +912,7 @@ mod tests {
             config.rwkv_review_batch_size,
             DEFAULT_RWKV_REVIEW_BATCH_SIZE
         );
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     }
 }

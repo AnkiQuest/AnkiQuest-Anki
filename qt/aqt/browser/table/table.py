@@ -341,6 +341,7 @@ class Table:
         self._view.setSortingEnabled(True)
         self._view.setModel(self._model)
 <<<<<<< HEAD
+<<<<<<< HEAD
         # On every paint, QHeaderView checks if each column is fully selected
         # by calling flags() for every row, which signficantly slows down selections,
         # so we set an empty model to prevent that.
@@ -348,6 +349,10 @@ class Table:
         # QHeaderView otherwise checks every selected row's flags on each paint.
         # Keep the header's selection empty while the table retains its selection.
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+        # QHeaderView otherwise checks every selected row's flags on each paint.
+        # Keep the header's selection empty while the table retains its selection.
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         self._horizontal_header().setSelectionModel(
             QItemSelectionModel(self._model, self._view)
         )

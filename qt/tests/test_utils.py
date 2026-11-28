@@ -1,9 +1,25 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 # Copyright: Anki Software, LLC and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+from __future__ import annotations
+
+import os
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from anki.utils import is_lin
 from aqt.qt import QMenu
-from aqt.utils import qtMenuShortcutWorkaround
+from aqt.utils import (
+    _available_linux_file_manager,
+    qtMenuShortcutWorkaround,
+    show_in_folder,
+)
 
 
 def test_qt_menu_shortcut_workaround_applies_to_submenus(qapp) -> None:
@@ -24,6 +40,7 @@ def test_qt_menu_shortcut_workaround_applies_to_submenus(qapp) -> None:
     assert top_action.isShortcutVisibleInContextMenu()
     assert nested_action.isShortcutVisibleInContextMenu()
 
+<<<<<<< HEAD
 =======
 # Copyright: Ankitects Pty Ltd and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
@@ -44,6 +61,9 @@ from aqt.utils import _available_linux_file_manager, show_in_folder
 <<<<<<< HEAD
 def test_show_in_folder_passes_path_safely(mocker) -> None:
 =======
+=======
+
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 @pytest.fixture(scope="module")
 def app() -> Any:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -137,7 +157,10 @@ def test_tooltip_uses_available_window_when_parent_deleted(
 
 @pytest.mark.parametrize("path", ["foo.txt", 'quoted "filename".png'])
 def test_show_in_folder_passes_path_safely(mocker, path: str) -> None:
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     mock_popen = mocker.patch("subprocess.Popen")
     proc = mock_popen.return_value
     proc.__enter__.return_value = proc
@@ -146,19 +169,26 @@ def test_show_in_folder_passes_path_safely(mocker, path: str) -> None:
     mocker.patch("aqt.mw")
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     path = "foo.txt"
 =======
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     show_in_folder(path)
 
     if is_lin and not _available_linux_file_manager():
         mock_popen.assert_not_called()
     else:
 <<<<<<< HEAD
+<<<<<<< HEAD
         # Path is only passed as the last argument
 =======
         # Path is only passed as the last argument.
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+        # Path is only passed as the last argument.
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         args = mock_popen.call_args.args[0]
         kwargs = mock_popen.call_args.kwargs
         assert args[-1] == path

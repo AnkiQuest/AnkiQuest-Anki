@@ -3489,6 +3489,7 @@ mod tests {
 
             col.storage.update_card(&card)?;
 
+<<<<<<< HEAD
             let entry = UpdateMemoryStateEntry {
                 req: None,
                 search: Node::Search(SearchNode::WholeCollection),
@@ -3501,6 +3502,14 @@ mod tests {
                 col.update_memory_state(vec![entry])?;
                 Ok(())
             })?;
+=======
+            // Add a revlog entry so the card is found within update_memory_state
+            let mut rev = revlog(RevlogReviewKind::Review, 1);
+            rev.cid = card_id;
+            col.storage.add_revlog_entry(&rev, false)?;
+
+            update_memory_state_for_card(&mut col, card_id, None)?;
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
             let card = col.storage.get_card(card_id)?.unwrap();
             assert_eq!(card.memory_state, None);
@@ -3525,8 +3534,13 @@ mod tests {
 
             let card_id = card.id;
             col.grade_now(anki_proto::scheduler::GradeNowRequest {
+<<<<<<< HEAD
                 card_ids: vec![card_id.0],
                 rating: 3,
+=======
+                card_ids: vec![card_id.into()],
+                rating: anki_proto::scheduler::card_answer::Rating::Easy as i32,
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
                 card_options: vec![],
             })?;
 

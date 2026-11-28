@@ -13,18 +13,26 @@ import pytest
 from mock import MagicMock
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 import anki.lang
 from aqt.addons import (
     AddonManager,
     ChooseAddonsToUpdateList,
 =======
+=======
+import anki.lang
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 import aqt.addons
 from anki.collection import AddonInfo
 from aqt import gui_hooks
 from aqt.addons import (
     AddonManager,
     ChooseAddonsToUpdateDialog,
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    ChooseAddonsToUpdateList,
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     DownloadError,
     DownloadOk,
     InstallOk,
@@ -34,8 +42,11 @@ from aqt.addons import (
     package_name_valid,
 )
 <<<<<<< HEAD
+<<<<<<< HEAD
 from aqt.qt import QApplication, QWidget
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 from aqt.main import AnkiQt
 from aqt.progress import ProgressManager
 from aqt.qt import (
@@ -358,7 +369,10 @@ def test_update_prompt_waits_for_rwkv_modals_and_closes_before_completion(
         mw.taskman._no_collection_executor.shutdown()
         mw.close()
         app.processEvents()
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
 
 def test_readMinimalManifest():

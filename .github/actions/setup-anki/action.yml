@@ -80,10 +80,14 @@ runs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 #v10.3.3
       with:
 <<<<<<< HEAD
+<<<<<<< HEAD
         version-file: ".tool-versions"
 =======
         version: "0.13.6"
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+        version-file: ".tool-versions"
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         enable-cache: true
         cache-python: true
         prune-cache: ${{ runner.os != 'Windows' }} # Windows file-locking breaks cache pruning

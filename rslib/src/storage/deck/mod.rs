@@ -499,10 +499,14 @@ impl SqliteStorage {
 pub(crate) mod test {
     use rand::rngs::StdRng;
 <<<<<<< HEAD
+<<<<<<< HEAD
     use rand::RngExt;
 =======
     use rand::Rng;
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    use rand::RngExt;
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     use rand::SeedableRng;
     use rusqlite::named_params;
 

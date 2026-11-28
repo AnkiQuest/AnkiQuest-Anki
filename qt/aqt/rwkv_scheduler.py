@@ -1,4 +1,4 @@
-# Copyright: Ankitects Pty Ltd and contributors
+# Copyright: Anki Software, LLC and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 from __future__ import annotations
@@ -322,10 +322,17 @@ def _rwkv_historical_answer_sql_condition(alias: str | None = None) -> str:
 def _rwkv_history_reset_after_sql(card_alias: str = "c") -> str:
     data = f"{card_alias}.data"
     return (
-        "coalesce((select case when json_valid(cast(val as text)) then "
-        "case when json_type(cast(val as text), '$.after') = 'integer' "
-        "then max(json_extract(cast(val as text), '$.after'), 0) end end "
-        f"from config where key = 'rwkvHistoryReset_' || {card_alias}.id), "
+        # Read the reset keys once in a non-flattenable subquery (`limit -1`): a
+        # per-card lookup in `config` reads the overflow pages of large add-on
+        # values next to the missing key. The backtick follows `_`, so the range
+        # is exactly the key prefix.
+        "coalesce((select case when json_valid(cast(rwkv_resets.val as text)) then "
+        "case when json_type(cast(rwkv_resets.val as text), '$.after') = 'integer' "
+        "then max(json_extract(cast(rwkv_resets.val as text), '$.after'), 0) end end "
+        "from (select key, val from config "
+        "where key >= 'rwkvHistoryReset_' and key < 'rwkvHistoryReset`' limit -1) "
+        "rwkv_resets "
+        f"where rwkv_resets.key = 'rwkvHistoryReset_' || {card_alias}.id), "
         f"case when json_valid({data}) then "
         f"case when json_type({data}, '$.rwkv_reset_after') = 'integer' "
         f"then max(json_extract({data}, '$.rwkv_reset_after'), 0) "
@@ -3825,6 +3832,7 @@ def _try_reviewer_backend_prediction_access(
     expected_resident_state_generation: int | None = None,
     expected_state_token: _ReviewerBackendPredictionStateToken | None = None,
     wait_for_access: bool = False,
+    raise_on_busy: bool = False,
     wait_timeout_seconds: float | None = None,
 ) -> Iterator[RwkvReviewerBackend | None]:
     """Claim access to resident backend state for prediction."""
@@ -3852,6 +3860,8 @@ def _try_reviewer_backend_prediction_access(
         else _reviewer_backend_execution_lock.acquire(blocking=wait_for_access)
     )
     if not acquired:
+        if raise_on_busy:
+            raise _ReviewerBackendPredictionBusy
         yield None
         return
 
@@ -6125,6 +6135,7 @@ def score_reviewer_queue_order_async_work(
     work: RwkvReviewQueueOrderAsyncWork,
     *,
     wait_for_backend: bool = False,
+    raise_on_busy: bool = False,
 ) -> RwkvReviewQueueOrderAsyncResult:
     if not _rwkv_review_queue_async_collection_is_current(work):
         return _aborted_reviewer_queue_order_async_result(work)
@@ -6135,6 +6146,7 @@ def score_reviewer_queue_order_async_work(
         expected_resident_state_key=work.resident_state_key,
         expected_resident_state_generation=work.resident_state_generation,
         wait_for_access=wait_for_backend,
+        raise_on_busy=raise_on_busy,
     ) as backend:
         if backend is None:
             logger.debug(
@@ -6683,17 +6695,9 @@ def reviewer_queue_order_refresh_due(reviewer: object) -> bool:
 
 
 def reviewer_queue_order_refresh_before_next_card(reviewer: object) -> bool:
-    deck_id = _current_deck_id(reviewer)
-    if deck_id is None:
-        return False
-
-    deck_config = _deck_config_for_deck_id(reviewer, deck_id)
-    if not isinstance(deck_config, dict):
-        return False
-    review_order = deck_config.get("reviewOrder", deck_config.get("review_order"))
-    return not _rwkv_review_precompute_next_card(deck_config) and (
-        review_order == _REVIEW_ORDER_RETRIEVABILITY_ASCENDING
-        or _new_gather_uses_retrievability(deck_config)
+    deck_config = _deck_config_for_deck_id(reviewer, _current_deck_id(reviewer))
+    return isinstance(deck_config, dict) and not _rwkv_review_precompute_next_card(
+        deck_config
     )
 
 
@@ -7707,18 +7711,13 @@ def prepare_deck_browser_rwkv_counts_incrementally(
     start = time.monotonic()
     first_update_elapsed_ms: float | None = None
     updated_scopes = 0
-    deferred_scopes = 0
 
-    def finish(*, clear_pending: bool | None = None) -> None:
-        if clear_pending is None:
-            clear_pending = deferred_scopes == 0
+    def finish() -> None:
         logger.debug(
             "RWKV deck browser incremental counts finished: scopes=%s updated=%s "
-            "deferred=%s clear_pending=%s first_update_elapsed_ms=%s elapsed_ms=%.1f",
+            "first_update_elapsed_ms=%s elapsed_ms=%.1f",
             len(deck_ids),
             updated_scopes,
-            deferred_scopes,
-            clear_pending,
             (
                 f"{first_update_elapsed_ms:.1f}"
                 if first_update_elapsed_ms is not None
@@ -7727,7 +7726,7 @@ def prepare_deck_browser_rwkv_counts_incrementally(
             (time.monotonic() - start) * 1000,
         )
         if on_done is not None:
-            on_done(clear_pending)
+            on_done(True)
 
     def mark_unavailable(deck_id: int, reason: str) -> None:
         logger.info(
@@ -7758,36 +7757,41 @@ def prepare_deck_browser_rwkv_counts_incrementally(
         prepare_deck(deck_id, _RWKV_DECK_BROWSER_STALE_RETRIES)
 
     def prepare_deck(deck_id: int, retries_left: int) -> None:
-        def prepare() -> tuple[RwkvReviewQueueOrderAsyncWork | None, bool]:
+        if not should_continue():
+            finish()
+            return
+
+        def retry_when_idle() -> None:
+            getattr(mw, "progress").single_shot(
+                250, partial(prepare_deck, deck_id, retries_left)
+            )
+
+        def prepare() -> RwkvReviewQueueOrderAsyncWork | None:
             if not should_continue():
-                return None, False
+                return None
             if rwkv_state_cache_loading(mw):
-                return None, True
+                raise _ReviewerBackendPredictionBusy
             work = _rwkv_score_prewarm_work_for_deck(
                 reviewer,
                 deck_id=deck_id,
                 reason="deck browser counts",
+                raise_on_busy=True,
             )
-            return work, rwkv_state_cache_loading(mw)
+            if work is None and rwkv_state_cache_loading(mw):
+                raise _ReviewerBackendPredictionBusy
+            return work
 
-        def prepared(
-            future: Future[tuple[RwkvReviewQueueOrderAsyncWork | None, bool]],
-        ) -> None:
-            nonlocal deferred_scopes
+        def prepared(future: Future[RwkvReviewQueueOrderAsyncWork | None]) -> None:
             try:
-                work, loading = future.result()
+                work = future.result()
+            except _ReviewerBackendPredictionBusy:
+                retry_when_idle()
+                return
             except Exception:
                 fail("preparation", deck_id)
                 return
             if work is None:
-                if loading:
-                    deferred_scopes += 1
-                    logger.debug(
-                        "RWKV deck browser count deferred during state cache load: "
-                        "deck_id=%s",
-                        deck_id,
-                    )
-                elif should_continue():
+                if should_continue():
                     if _rwkv_score_prewarm_applies(reviewer, deck_id):
                         mark_unavailable(deck_id, "scores_not_prepared")
                     else:
@@ -7799,11 +7803,14 @@ def prepare_deck_browser_rwkv_counts_incrementally(
                 return
 
             def score() -> RwkvReviewQueueOrderAsyncResult:
-                return score_reviewer_queue_order_async_work(work)
+                return score_reviewer_queue_order_async_work(work, raise_on_busy=True)
 
             def scored(future: Future[RwkvReviewQueueOrderAsyncResult]) -> None:
                 try:
                     result = future.result()
+                except _ReviewerBackendPredictionBusy:
+                    retry_when_idle()
+                    return
                 except Exception:
                     fail("scoring", deck_id)
                     return
@@ -7883,6 +7890,7 @@ def prepare_deck_browser_rwkv_counts_incrementally(
                     else:
                         with _try_reviewer_backend_prediction_access(
                             expected_backend=result_backend,
+                            raise_on_busy=True,
                             expected_backend_assignment_generation=getattr(
                                 result,
                                 "backend_assignment_generation",
@@ -7991,6 +7999,9 @@ def prepare_deck_browser_rwkv_counts_incrementally(
                     nonlocal first_update_elapsed_ms, updated_scopes
                     try:
                         tree = future.result()
+                    except _ReviewerBackendPredictionBusy:
+                        retry_when_idle()
+                        return
                     except Exception:
                         fail("installation", deck_id)
                         return
@@ -8296,6 +8307,7 @@ def _rwkv_score_prewarm_work_for_deck(
     *,
     deck_id: int,
     reason: str,
+    raise_on_busy: bool = False,
 ) -> RwkvReviewQueueOrderAsyncWork | None:
     """Snapshot optional prewarm work; backend failures intentionally skip fallback."""
 
@@ -8364,6 +8376,7 @@ def _rwkv_score_prewarm_work_for_deck(
         build_start=start,
         fresh_for_backend_state=False,
         expected_backend=backend,
+        raise_on_busy=raise_on_busy,
     )
 
 
@@ -13748,6 +13761,8 @@ def refresh_rwkv_state_after_sync(
     """Reconcile resident RWKV state with the merged review history."""
 
     col = getattr(mw, "col", None)
+    if col is not None:
+        col._rwkv_sync_changes_pending = False
     reviewer = SimpleNamespace(mw=mw)
     if not _rwkv_collection_config_state(reviewer).review_enabled:
         on_done()
@@ -16585,10 +16600,7 @@ def forecast_rwkv_workload(
                         root_config
                     )
                     order = int(scope.study_config.review_order)
-                    if not precompute and (
-                        order == _REVIEW_ORDER_RETRIEVABILITY_ASCENDING
-                        or _new_gather_uses_retrievability(root_config)
-                    ):
+                    if not precompute:
                         refresh_interval = 1
                         candidate_refresh = False
                     learn_ahead = _rwkv_forecast_col_config(col, "learnAheadSecs", 1200)
@@ -24803,16 +24815,13 @@ def _candidate_refreshed_rwkv_review_queue_scores_for_deck(
         deck_id,
     )
 
-    candidate_ids = _rwkv_review_candidate_refresh_card_ids(
+    candidate_ids = _rwkv_reviewer_refresh_card_ids(
+        reviewer,
         deck_config,
         existing_scores,
         existing_target_retentions,
         limit=batch_size,
     )
-    current_card_id = _card_id(getattr(reviewer, "card", None))
-    if current_card_id is not None:
-        candidate_ids.append(current_card_id)
-    candidate_ids = _unique_rwkv_candidate_card_ids(candidate_ids)
     if not candidate_ids:
         return None
 
@@ -24854,38 +24863,61 @@ def _rwkv_review_candidate_refresh_card_ids(
     target_retentions_by_card_id: dict[int, float] | None,
     *,
     limit: int,
+    refresh_round: int = 0,
 ) -> list[int]:
     if limit <= 0:
         return []
 
     review_order = deck_config.get("reviewOrder", deck_config.get("review_order"))
     if review_order == _REVIEW_ORDER_RETRIEVABILITY_DESCENDING:
-        ordered_scores = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
-    elif review_order == _REVIEW_ORDER_RELATIVE_OVERDUENESS:
+        return sorted(scores, key=lambda card: (-scores[card], card))[:limit]
+    if review_order == _REVIEW_ORDER_RELATIVE_OVERDUENESS:
         targets = target_retentions_by_card_id or {}
-        ordered_scores = sorted(
-            scores.items(),
-            key=lambda item: (
-                _rwkv_relative_overdueness(item[1], targets.get(item[0])),
-                item[0],
+        return sorted(
+            scores,
+            key=lambda card: (
+                _rwkv_relative_overdueness(scores[card], targets.get(card)),
+                card,
             ),
+        )[:limit]
+
+    ranked = sorted(scores, key=lambda card: (scores[card], card))
+    probe = limit // 4
+    if (
+        review_order == _REVIEW_ORDER_RETRIEVABILITY_ASCENDING
+        and len(ranked) > limit
+        and probe
+    ):
+        # Keep the leaders and probe a different block of nearby ranks each update.
+        # The Instant workload forecast applies the same window to its ranked cards.
+        leaders = limit - probe
+        blocks = min(8, (len(ranked) - leaders + probe - 1) // probe)
+        start = min(leaders + (refresh_round % blocks) * probe, len(ranked) - probe)
+        return ranked[:leaders] + ranked[start : start + probe]
+    return ranked[:limit]
+
+
+def _rwkv_reviewer_refresh_card_ids(
+    reviewer: object,
+    deck_config: dict[str, object],
+    scores: dict[int, float],
+    targets: dict[int, float] | None,
+    *,
+    limit: int,
+) -> list[int]:
+    answered_count = len(_session_answered_ids(reviewer))
+    refresh_round = answered_count // _rwkv_review_refresh_interval(deck_config)
+    card_ids = _rwkv_review_candidate_refresh_card_ids(
+        deck_config, scores, targets, limit=limit, refresh_round=refresh_round
+    )
+    current_card_id = _card_id(getattr(reviewer, "card", None))
+    if current_card_id is not None:
+        card_ids.append(current_card_id)
+    return list(
+        dict.fromkeys(
+            card_id for card_id in card_ids if _valid_card_id(card_id) is not None
         )
-    else:
-        ordered_scores = sorted(scores.items(), key=lambda item: (item[1], item[0]))
-
-    return [card_id for card_id, _ in ordered_scores[:limit]]
-
-
-def _unique_rwkv_candidate_card_ids(card_ids: Sequence[int]) -> list[int]:
-    seen: set[int] = set()
-    unique: list[int] = []
-    for value in card_ids:
-        card_id = _valid_card_id(value)
-        if card_id is None or card_id in seen:
-            continue
-        seen.add(card_id)
-        unique.append(card_id)
-    return unique
+    )
 
 
 def _candidate_refreshed_rwkv_review_queue_async_work(
@@ -24914,16 +24946,13 @@ def _candidate_refreshed_rwkv_review_queue_async_work(
         deck_id,
     )
 
-    candidate_ids = _rwkv_review_candidate_refresh_card_ids(
+    candidate_ids = _rwkv_reviewer_refresh_card_ids(
+        reviewer,
         deck_config,
         existing_scores,
         existing_target_retentions,
         limit=batch_size,
     )
-    current_card_id = _card_id(getattr(reviewer, "card", None))
-    if current_card_id is not None:
-        candidate_ids.append(current_card_id)
-    candidate_ids = _unique_rwkv_candidate_card_ids(candidate_ids)
     if not candidate_ids:
         return None
 
@@ -24985,6 +25014,7 @@ def _rwkv_review_queue_async_work_from_input_build(  # noqa: PLR0913
     fresh_for_backend_state: bool,
     expected_backend: RwkvReviewerBackend | None = None,
     wait_for_backend: bool = False,
+    raise_on_busy: bool = False,
 ) -> RwkvReviewQueueOrderAsyncWork | None:
     collection_owner = getattr(reviewer, "mw", None)
     collection = _collection(reviewer)
@@ -25006,6 +25036,7 @@ def _rwkv_review_queue_async_work_from_input_build(  # noqa: PLR0913
         expected_backend_assignment_generation=backend_assignment_generation,
         expected_state_generation=state_generation,
         wait_for_access=wait_for_backend,
+        raise_on_busy=raise_on_busy,
     ) as backend:
         if backend is None:
             logger.debug(

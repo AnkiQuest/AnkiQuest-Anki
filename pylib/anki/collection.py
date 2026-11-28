@@ -309,6 +309,9 @@ class Collection(DeprecatedNamesMixin):
         self._backend = backend or RustBackend(server=server)
         self.db: DBProxy | None = None
         self._last_sync_remote_collection_changed: bool | None = None
+        # Sticky: set when a sync brought remote changes, cleared only once the
+        # RWKV state has been reconciled with them.
+        self._rwkv_sync_changes_pending = False
         self.server = server
         self.path = os.path.abspath(path)
         self.reopen()
@@ -521,6 +524,16 @@ class Collection(DeprecatedNamesMixin):
         self.close_for_full_sync()
         self._backend.export_collection_package(
             out_path=out_path, include_media=include_media, legacy=legacy
+        )
+
+    def export_campaign_package(
+        self,
+        out_path: str,
+        selections: Sequence[import_export_pb2.CampaignNotetypeSelection],
+        collection_id: str,
+    ) -> None:
+        self._backend.export_campaign_package(
+            out_path=out_path, selections=selections, collection_id=collection_id
         )
 
     def import_anki_package(
@@ -1387,6 +1400,8 @@ class Collection(DeprecatedNamesMixin):
         self._last_sync_remote_collection_changed = (
             output.remote_collection_changed or output.required != output.NO_CHANGES
         )
+        if self._last_sync_remote_collection_changed:
+            self._rwkv_sync_changes_pending = True
         return output
 
     def sync_media(self, auth: SyncAuth) -> None:

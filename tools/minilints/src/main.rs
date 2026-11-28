@@ -34,6 +34,7 @@ const IGNORED_FOLDERS: &[&str] = &[
     "./tools/workspace-hack",
     "./target",
     "./tmp",
+    "./.local",
     ".mypy_cache",
     "./extra",
     "./ts/.svelte-kit",

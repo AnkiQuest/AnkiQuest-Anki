@@ -1,10 +1,14 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Compact card/note state. Computation and the shared scopes remain f32.
 =======
 // Copyright: Ankitects Pty Ltd and contributors
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Compact card/note state. Computation and the shared scopes remain f32.
@@ -366,7 +370,7 @@ impl StatePrecision {
                 })
                 .collect();
             if lowrank::batch_writes() > 1 {
-                lowrank::encode_layers::<{ lowrank::BATCH_LANES }>(
+                lowrank::encode_layers::<{ lowrank::REPLAY_BATCH_LANES }>(
                     &mut layer_writes,
                     schedule,
                     factors,

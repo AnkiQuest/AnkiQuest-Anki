@@ -1434,12 +1434,17 @@ workload simulation.
 
 When `rwkv_review_candidate_refresh_enabled` is enabled, queue refreshes can
 reuse the existing transient RWKV queue score map as a stale priority queue.
-After the first full score map has been installed, later refreshes score only
-the best stale RWKV candidates and merge those fresh scores back into the map.
-Descending retrievability prioritizes the highest scores; Relative
-Overdueness prioritizes the lowest `retrievability / target retention` values;
-all other review orders prioritize the lowest raw retrievability scores. Anki
-automatically bounds the candidate window.
+After the first full update, Ascending Retrievability uses three quarters of
+its window for the lowest saved R values. The remaining quarter rotates through
+up to eight consecutive blocks immediately below those leaders in the ranking.
+The block advances with each configured answer interval. Small pools fit in
+one update, and the reviewer also includes the visible card. The Instant
+workload forecast uses the same rotation.
+Descending Retrievability prioritizes the highest saved R values. Relative
+Overdueness prioritizes the lowest `retrievability / target retention`, and
+other review orders prioritize the lowest raw R.
+The [ascending-R backtest](rwkv-candidate-refresh-backtest.MD) compares both
+the precomputed next card and the choice after the background update.
 This accelerates frequent review-time refreshes while preserving the full
 installed score map for cards outside the refreshed window. It is approximate:
 cards outside the refreshed window keep their previous RWKV score until a later
@@ -1478,12 +1483,11 @@ bar shows the same uncapped total in grey beside the green review count when
 the total is larger, for example `157 (/959)`. It includes the selected deck's
 subdecks and updates after answers and RWKV queue refreshes. While the review
 count is pending, the total label is hidden until fresh counts are available.
-The currently
-selected scope is processed first. While a scope is pending, its review due count and the
-review due counts of its descendants display an ellipsis instead of the stored
-FSRS count. A completed scope reveals its RWKV count; a skipped or failed scope
-falls back to its stored count. A scope deferred during state-cache restoration
-remains pending until the completion refresh starts a fresh count pass. Leaving
+The deck browser processes the selected scope first. While a scope is pending,
+its deck and descendants show `…`. If RWKV is busy or restoring its state,
+the list retries automatically while it is open. A successful calculation
+replaces the ellipsis with the RWKV count. If the calculation fails, the
+affected rows show `?` with the stored due-date count in the tooltip. Leaving
 or refreshing the deck browser, or unloading the profile, cancels queued
 preparation and later UI updates, and preparing a reviewer queue clears the
 count-only cache. This keeps startup responsive while allowing every displayed
@@ -2347,14 +2351,14 @@ interval updates, Anki refreshes the answered card's score. Full-deck updates
 calculate each cached input's elapsed time from its last review or creation time
 at a single current timestamp; answered cards receive a fresh time reference.
 
-With precomputation disabled and Ascending Retrievability review order or
-retrievability-based new-card gathering selected, Anki waits for a full
-post-answer update before fetching the next card. It reloads current inputs and
-requests dynamic retention targets for all candidates, rather than reusing stale
-elapsed times or limiting the update to the candidate window. The Dynamic DR
+With precomputation disabled, Anki waits for a full post-answer update before
+fetching the next card, regardless of review order or new-card gather order.
+An answer can change which reviews meet their retention target even when the
+sort order is random or based on due date. Anki reloads current inputs and
+requests dynamic retention targets for all candidates. The Dynamic DR
 provider may still reuse session-cached rule matches if configured to do so.
 This takes precedence over the refresh interval and approximate-candidate
-setting. Other review orders continue to use their configured refresh interval.
+setting. The Instant workload forecast applies the same rule after each simulated answer.
 
 Both modes use the scheduler's normal answer, eligibility, review-limit, mixing,
 and repeat-spacing rules. Installed score requests include intervening-review

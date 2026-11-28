@@ -1,4 +1,4 @@
-# Copyright: Ankitects Pty Ltd and contributors
+# Copyright: Anki Software, LLC and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 """Model-level parity vectors for the low-rank card / note state on the big model.
@@ -60,10 +60,10 @@ from rwkv.data_processing import (  # type: ignore[import-not-found]  # noqa: E4
     get_rwkv_data,
 )
 from rwkv.prepare_batch import prepare  # type: ignore[import-not-found]  # noqa: E402
-from scripts import (  # type: ignore[import-not-found]  # noqa: E402
+from scripts import (  # noqa: E402
     compress_common as cc,
 )
-from scripts import (  # type: ignore[import-not-found]  # noqa: E402
+from scripts import (  # noqa: E402
     sm31_inputs,
     state_lowrank,
 )

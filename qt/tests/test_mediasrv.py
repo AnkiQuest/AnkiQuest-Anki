@@ -24,16 +24,22 @@ from aqt.mediasrv import (
     LegacyPage,
     LocalFileRequest,
 <<<<<<< HEAD
+<<<<<<< HEAD
     NotFound,
     PageContext,
     UnsafePathException,
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     MediaServer,
     NotFound,
     PageContext,
     UnsafePathException,
     _editor_content_security_policy,
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     _extract_addon_request,
     _handle_builtin_file_request,
     _handle_local_file_request,
@@ -604,7 +610,10 @@ class TestTrustedPageCSP:
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 class TestBuiltinFileCaching:
     @pytest.mark.parametrize(
         ("path", "development", "expected"),
@@ -917,7 +926,10 @@ class TestCardStats:
         assert output.extra_rows[0].value == "0.71"
 
 
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 class TestAddonRequestExtraction:
     def _mock_mw(self, monkeypatch) -> mock.Mock:
         import aqt

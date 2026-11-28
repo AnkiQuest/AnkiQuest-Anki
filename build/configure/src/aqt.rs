@@ -438,6 +438,7 @@ fn check_python(build: &mut Build) -> Result<()> {
     python_format(build, "qt", py_inputs.clone())?;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     build.add_action(
         "check:pytest:aqt",
         PythonTest {
@@ -446,6 +447,8 @@ fn check_python(build: &mut Build) -> Result<()> {
         },
     )?;
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     for (target, ignore) in [
         ("check:pytest:aqt", None),
         ("check-local:pytest:aqt", Some("qt/tests/test_installer.py")),
@@ -455,17 +458,14 @@ fn check_python(build: &mut Build) -> Result<()> {
             PythonTest {
                 folder: "qt/tests",
                 ignore,
-                python_path: &[
-                    "pylib",
-                    "$builddir/pylib",
-                    "$builddir/qt",
-                    "$builddir/qt/tools",
-                ],
                 deps: inputs![":pylib:anki", ":qt:aqt", glob!["qt/tests/**"]],
             },
         )?;
     }
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
     check_complexity(build, "qt", "qt", py_inputs)?;
 

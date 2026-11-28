@@ -140,6 +140,7 @@ impl Collection {
             },
             desired_retention: card.desired_retention,
 <<<<<<< HEAD
+<<<<<<< HEAD
             fsrs_enabled,
             extra_rows: vec![],
             rwkv_retry_pending: false,
@@ -148,6 +149,12 @@ impl Collection {
             rwkv_retry_pending: false,
             rwkv_answer_time_recall: vec![],
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+            extra_rows: vec![],
+            rwkv_retry_pending: false,
+            rwkv_answer_time_recall: vec![],
+            fsrs_enabled,
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         })
     }
 

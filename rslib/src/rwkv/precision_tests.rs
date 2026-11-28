@@ -1,8 +1,12 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
 =======
 // Copyright: Ankitects Pty Ltd and contributors
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use super::state_scope_bench::load_for_scopes;
@@ -392,9 +396,7 @@ fn rwkv_state_precision_queue_scoring_reports_invalid_resident_state() {
 
 fn check_queue_scoring_reports_invalid_resident_state(weights: &Path) {
     let mut inference = runtime(weights, StatePrecision::Int4CardsInt8Notes, [false; 3]);
-    let mut answer = reviews(1).remove(0);
-    // Malformed historical data can produce a non-finite in-memory state.
-    answer.duration_millis = Some(-10);
+    let answer = reviews(1).remove(0);
     inference
         .warm_up_reviews(vec![answer.clone()], false)
         .unwrap();
@@ -403,6 +405,18 @@ fn check_queue_scoring_reports_invalid_resident_state(weights: &Path) {
     query.is_query = true;
     query.ease = None;
     query.duration_millis = None;
+    // A damaged resident state can hold a non-finite shift. Corrupt the packed
+    // card state in place with an f16 NaN: magic, precision byte, layer count,
+    // shift count, then the first shift value.
+    let offset = precision::MAGIC.len() + 1 + 4 + 4;
+    let packed = inference
+        .warm_up_states
+        .card
+        .get_mut(&query.card_id)
+        .and_then(|state| state.packed.as_mut())
+        .unwrap();
+    packed[offset..offset + 2].copy_from_slice(&0x7e00u16.to_le_bytes());
+
     let error = inference
         .predict_retrievability_many_from_warm_up(vec![query.clone()])
         .unwrap_err();

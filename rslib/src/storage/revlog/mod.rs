@@ -29,6 +29,7 @@ const REVIEW_RETRIEVABILITY_CACHE_CLEANUP_FULL_SYNC_MARKER: &str =
     "reviewRetrievabilityCacheCleanupFullSync";
 const REVIEW_RETRIEVABILITY_CACHE_WRITE_SAVEPOINT: &str = "review_retrievability_cache_write";
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// Effective desktop-compatible reset boundary for the card aliased as `c`.
 pub(crate) const RWKV_HISTORY_RESET_AFTER_SQL: &str = "coalesce(
 =======
@@ -38,6 +39,21 @@ const RWKV_HISTORY_RESET_AFTER_SQL: &str = "coalesce(
        case when json_type(cast(val as text), '$.after') = 'integer'
        then max(json_extract(cast(val as text), '$.after'), 0) end end
      from config where key = 'rwkvHistoryReset_' || c.id),
+=======
+// The reset keys are read once through a subquery with `limit -1`, which stops
+// SQLite flattening it: it is then materialized with an automatic index. A
+// per-card point lookup in `config` (a WITHOUT ROWID table) reads the overflow
+// pages of any large unrelated value next to the missing key, which made 66k
+// cards take 1.8 s with a 200 KB add-on value. The backtick follows `_`, so
+// the range is exactly the key prefix.
+const RWKV_HISTORY_RESET_AFTER_SQL: &str = "coalesce(
+    (select case when json_valid(cast(rwkv_resets.val as text)) then
+       case when json_type(cast(rwkv_resets.val as text), '$.after') = 'integer'
+       then max(json_extract(cast(rwkv_resets.val as text), '$.after'), 0) end end
+     from (select key, val from config
+           where key >= 'rwkvHistoryReset_' and key < 'rwkvHistoryReset`' limit -1) rwkv_resets
+     where rwkv_resets.key = 'rwkvHistoryReset_' || c.id),
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     case when json_valid(c.data) then
       case when json_type(c.data, '$.rwkv_reset_after') = 'integer'
       then max(json_extract(c.data, '$.rwkv_reset_after'), 0) else 0 end else 0 end)";
@@ -2059,6 +2075,41 @@ order by e.id, e.cid"
     }
 
     #[test]
+    fn rwkv_history_reset_sql_ignores_large_unrelated_config_values() -> Result<()> {
+        let (col, _tempdir, _col_path) = temp_collection("rwkv-reset-config")?;
+        for card_id in [1_000_i64, 1_001, 1_002] {
+            col.storage.db.execute(
+                "insert into cards (id, nid, did, ord, mod, usn, type, queue, due, ivl,
+                 factor, reps, lapses, left, odue, odid, flags, data)
+                 values (?, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '')",
+                params![card_id],
+            )?;
+        }
+        let large = format!(r#"{{"blob":"{}"}}"#, "x".repeat(200_000));
+        for (key, value) in [
+            ("addonLargeValue", large.as_str()),
+            ("rwkvHistoryReset_1000", r#"{"after":777}"#),
+            ("rwkvHistoryReset_1002", "not json"),
+            ("rwkvHistoryResetZ", r#"{"after":999}"#),
+        ] {
+            col.storage.db.execute(
+                "insert into config (key, val, usn, mtime_secs) values (?, ?, 0, 0)",
+                params![key, value.as_bytes()],
+            )?;
+        }
+        let sql =
+            format!("select c.id, ({RWKV_HISTORY_RESET_AFTER_SQL}) from cards c order by c.id");
+        let rows = col
+            .storage
+            .db
+            .prepare(&sql)?
+            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        assert_eq!(rows, vec![(1_000, 777), (1_001, 0), (1_002, 0)]);
+        Ok(())
+    }
+
+    #[test]
     fn rwkv_historical_review_rows_match_window_query() -> Result<()> {
 <<<<<<< HEAD
         let (mut col, _tempdir, _col_path) = temp_collection("rwkv-historical-rows")?;
@@ -2220,6 +2271,426 @@ order by e.id, e.cid"
             reference_rwkv_historical_review_rows(&col.storage, &format!("and r.id not in {ids}"))?
         );
         Ok(())
+<<<<<<< HEAD
+=======
+    }
+
+    #[test]
+    fn rwkv_history_reset_sql_matches_unguarded_lookup() -> Result<()> {
+        // The lookup as it was before the "any reset key exists" guard.
+        let unguarded = "coalesce(
+    (select case when json_valid(cast(val as text)) then
+       case when json_type(cast(val as text), '$.after') = 'integer'
+       then max(json_extract(cast(val as text), '$.after'), 0) end end
+     from config where key = 'rwkvHistoryReset_' || c.id),
+    case when json_valid(c.data) then
+      case when json_type(c.data, '$.rwkv_reset_after') = 'integer'
+      then max(json_extract(c.data, '$.rwkv_reset_after'), 0) else 0 end else 0 end)";
+        let (col, _tempdir, _col_path) = temp_collection("rwkv-reset-sql")?;
+        let datas = [
+            "",
+            "{}",
+            r#"{"rwkv_reset_after":13000}"#,
+            r#"{"rwkv_reset_after":-5}"#,
+            r#"{"rwkv_reset_after":"x"}"#,
+            "not json",
+        ];
+        for (i, data) in datas.iter().enumerate() {
+            col.storage.db.execute(
+                "insert into cards (id, nid, did, ord, mod, usn, type, queue, due, ivl,
+                 factor, reps, lapses, left, odue, odid, flags, data)
+                 values (?, 1, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?)",
+                params![1_000 + i as i64, data],
+            )?;
+        }
+        let values = |storage: &SqliteStorage, expr: &str| -> Result<Vec<(i64, i64)>> {
+            storage
+                .db
+                .prepare(&format!("select c.id, ({expr}) from cards c order by c.id"))?
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(Into::into)
+        };
+        // Neighbouring keys and a large value must not affect the range check.
+        col.storage.db.execute(
+            "insert into config (key, usn, mtime_secs, val) values
+             ('rwkvHistoryReset', 0, 0, x'7b226166746572223a39397d'),
+             ('rwkvHistoryReset`x', 0, 0, x'7b226166746572223a39397d'),
+             ('sm20_state', 0, 0, zeroblob(200000))",
+            [],
+        )?;
+        let without = values(&col.storage, RWKV_HISTORY_RESET_AFTER_SQL)?;
+        assert_eq!(without, values(&col.storage, unguarded)?);
+        assert_eq!(
+            without.iter().map(|v| v.1).collect::<Vec<_>>(),
+            [0, 0, 13000, 0, 0, 0]
+        );
+
+        // Keys that override card data, including malformed and negative ones.
+        let reset = |id: i64, json: &str| {
+            col.storage.db.execute(
+                "insert into config (key, usn, mtime_secs, val) values (?, 0, 0, ?)",
+                params![format!("rwkvHistoryReset_{id}"), json.as_bytes()],
+            )
+        };
+        reset(1_000, r#"{"after":7000}"#)?;
+        reset(1_002, r#"{"after":-1}"#)?;
+        reset(1_003, "garbage")?;
+        reset(1_004, r#"{"after":"x"}"#)?;
+        let with = values(&col.storage, RWKV_HISTORY_RESET_AFTER_SQL)?;
+        assert_eq!(with, values(&col.storage, unguarded)?);
+        assert_eq!(
+            with.iter().map(|v| v.1).collect::<Vec<_>>(),
+            [7000, 0, 0, 0, 0, 0]
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use anki_i18n::I18n;
+
+    use super::*;
+    use crate::card::Card;
+
+    fn create_test_storage() -> SqliteStorage {
+        SqliteStorage::open_or_create(Path::new(":memory:"), &I18n::template_only(), false, false)
+            .unwrap()
+    }
+
+    /// A revlog entry with a fixed card id, used where the card is irrelevant.
+    fn revlog(id: i64, kind: RevlogReviewKind, taken_millis: u32) -> RevlogEntry {
+        RevlogEntry {
+            id: RevlogId(id),
+            cid: CardId(1),
+            button_chosen: 3,
+            taken_millis,
+            review_kind: kind,
+            ..Default::default()
+        }
+    }
+
+    fn review_for_card(id: i64, cid: CardId, button_chosen: u8) -> RevlogEntry {
+        RevlogEntry {
+            id: RevlogId(id),
+            cid,
+            button_chosen,
+            review_kind: RevlogReviewKind::Review,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn add_revlog_entry_returns_new_id_and_persists_unique_entry() {
+        let storage = create_test_storage();
+        let entry = revlog(1000, RevlogReviewKind::Review, 42);
+
+        let added = storage.add_revlog_entry(&entry, false).unwrap();
+
+        assert_eq!(added, Some(RevlogId(1000)));
+        assert_eq!(
+            storage.get_revlog_entry(RevlogId(1000)).unwrap(),
+            Some(entry)
+        );
+    }
+
+    #[test]
+    fn add_revlog_entry_reassigns_id_on_collision_when_uniquify() {
+        let storage = create_test_storage();
+        storage
+            .add_revlog_entry(&revlog(1000, RevlogReviewKind::Review, 0), false)
+            .unwrap();
+
+        let added = storage
+            .add_revlog_entry(&revlog(1000, RevlogReviewKind::Review, 0), true)
+            .unwrap();
+
+        // uniquify picks max(id)+1, so the option is safe to unwrap
+        assert_eq!(added, Some(RevlogId(1001)));
+        assert!(storage.get_revlog_entry(RevlogId(1000)).unwrap().is_some());
+        assert!(storage.get_revlog_entry(RevlogId(1001)).unwrap().is_some());
+    }
+
+    #[test]
+    fn add_revlog_entry_returns_none_on_collision_without_uniquify() {
+        let storage = create_test_storage();
+        let original = revlog(1000, RevlogReviewKind::Review, 5);
+        storage.add_revlog_entry(&original, false).unwrap();
+
+        let dup = revlog(1000, RevlogReviewKind::Manual, 9);
+        let added = storage.add_revlog_entry(&dup, false).unwrap();
+
+        assert_eq!(added, None);
+        // the original row must be left untouched (INSERT OR IGNORE)
+        assert_eq!(
+            storage.get_revlog_entry(RevlogId(1000)).unwrap(),
+            Some(original)
+        );
+    }
+
+    #[test]
+    fn get_revlog_entries_for_card_returns_only_matching_entries() {
+        let storage = create_test_storage();
+        storage
+            .add_revlog_entry(&review_for_card(1, CardId(10), 3), false)
+            .unwrap();
+        storage
+            .add_revlog_entry(&review_for_card(2, CardId(10), 3), false)
+            .unwrap();
+        storage
+            .add_revlog_entry(&review_for_card(3, CardId(20), 3), false)
+            .unwrap();
+
+        let for_card = storage.get_revlog_entries_for_card(CardId(10)).unwrap();
+
+        assert_eq!(for_card.len(), 2);
+        assert!(for_card.iter().all(|e| e.cid == CardId(10)));
+        assert!(storage
+            .get_revlog_entries_for_card(CardId(999))
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn unknown_review_kind_falls_back_to_default() {
+        let storage = create_test_storage();
+        // A future/unknown review kind must not error when read back.
+        storage
+            .db
+            .execute(
+                "insert into revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) \
+                 values (?,?,?,?,?,?,?,?,?)",
+                params![100i64, 1i64, 0, 3, 0, 0, 0, 0, 99],
+            )
+            .unwrap();
+
+        let entry = storage.get_revlog_entry(RevlogId(100)).unwrap().unwrap();
+
+        assert_eq!(entry.review_kind, RevlogReviewKind::default());
+    }
+
+    #[test]
+    fn time_of_last_review_returns_most_recent_qualifying_review() {
+        let storage = create_test_storage();
+        let cid = CardId(42);
+        storage
+            .add_revlog_entry(&review_for_card(1_000_000, cid, 3), false)
+            .unwrap();
+        storage
+            .add_revlog_entry(&review_for_card(3_000_000, cid, 2), false)
+            .unwrap();
+        storage
+            .add_revlog_entry(&review_for_card(2_000_000, cid, 4), false)
+            .unwrap();
+
+        let last = storage.time_of_last_review(cid).unwrap();
+
+        // id is in millis; the stored review time is id / 1000
+        assert_eq!(last, Some(TimestampSecs(3_000)));
+    }
+
+    #[test]
+    fn time_of_last_review_ignores_entries_without_a_rating() {
+        let storage = create_test_storage();
+        let cid = CardId(7);
+        // a reset entry has ease 0, so it is not a real review
+        let reset = RevlogEntry {
+            id: RevlogId(5_000_000),
+            cid,
+            button_chosen: 0,
+            review_kind: RevlogReviewKind::Manual,
+            ..Default::default()
+        };
+        storage.add_revlog_entry(&reset, false).unwrap();
+
+        assert_eq!(storage.time_of_last_review(cid).unwrap(), None);
+        assert_eq!(storage.time_of_last_review(CardId(999)).unwrap(), None);
+    }
+
+    #[test]
+    fn studied_today_counts_reviews_in_window_excluding_manual_and_rescheduled() {
+        let storage = create_test_storage();
+        let day_cutoff = TimestampSecs(1_000_000);
+        // window start (in millis) is (1_000_000 - 86_400) * 1000 = 913_600_000
+        storage
+            .add_revlog_entry(&revlog(950_000_000, RevlogReviewKind::Review, 5000), false)
+            .unwrap();
+        storage
+            .add_revlog_entry(
+                &revlog(950_000_001, RevlogReviewKind::Learning, 3000),
+                false,
+            )
+            .unwrap();
+        // excluded by kind
+        storage
+            .add_revlog_entry(&revlog(950_000_002, RevlogReviewKind::Manual, 9999), false)
+            .unwrap();
+        storage
+            .add_revlog_entry(
+                &revlog(950_000_003, RevlogReviewKind::Rescheduled, 9999),
+                false,
+            )
+            .unwrap();
+        // excluded by being before the window
+        storage
+            .add_revlog_entry(&revlog(900_000_000, RevlogReviewKind::Review, 9999), false)
+            .unwrap();
+
+        let studied = storage.studied_today(day_cutoff).unwrap();
+
+        assert_eq!(studied.cards, 2);
+        assert_eq!(studied.seconds, 8.0);
+    }
+
+    #[test]
+    fn studied_today_returns_zero_for_empty_revlog() {
+        let storage = create_test_storage();
+
+        let studied = storage.studied_today(TimestampSecs(1_000_000)).unwrap();
+
+        assert_eq!(studied.cards, 0);
+        assert_eq!(studied.seconds, 0.0);
+    }
+
+    #[test]
+    fn studied_today_by_deck_groups_by_home_deck_and_skips_unrated() {
+        let mut col = Collection::new();
+        let mut in_deck_100 = Card::default();
+        let mut in_deck_200 = Card::default();
+        let mut filtered_from_999 = Card::default();
+        col.add_card(&mut in_deck_100).unwrap();
+        col.add_card(&mut in_deck_200).unwrap();
+        col.add_card(&mut filtered_from_999).unwrap();
+        col.storage
+            .db
+            .execute(
+                "update cards set did = 100, odid = 0 where id = ?",
+                params![in_deck_100.id],
+            )
+            .unwrap();
+        col.storage
+            .db
+            .execute(
+                "update cards set did = 200, odid = 0 where id = ?",
+                params![in_deck_200.id],
+            )
+            .unwrap();
+        // a card currently in a filtered deck reports its original deck (odid)
+        col.storage
+            .db
+            .execute(
+                "update cards set did = 5, odid = 999 where id = ?",
+                params![filtered_from_999.id],
+            )
+            .unwrap();
+
+        let add = |id: i64, cid: CardId, button: u8| {
+            col.storage
+                .add_revlog_entry(&review_for_card(id, cid, button), false)
+                .unwrap();
+        };
+        add(950_000_000, in_deck_100.id, 3);
+        add(950_000_010, in_deck_200.id, 3);
+        add(950_000_020, filtered_from_999.id, 3);
+        // Repeated reviews still count as one studied card.
+        add(950_000_025, in_deck_100.id, 3);
+        // ease 0 is filtered out by the query
+        add(950_000_030, in_deck_100.id, 0);
+
+        let mut by_deck: Vec<(i64, usize)> = col
+            .storage
+            .studied_today_by_deck(TimestampSecs(1_000_000))
+            .unwrap()
+            .into_iter()
+            .map(|(deck, count)| (deck.0, count))
+            .collect();
+        by_deck.sort();
+
+        assert_eq!(by_deck, vec![(100, 1), (200, 1), (999, 1)]);
+    }
+
+    #[test]
+    fn studied_today_by_deck_counts_only_cards_reviewed_after_day_start() {
+        let storage = create_test_storage();
+        let day_cutoff = TimestampSecs(1_000_000);
+        let start = 913_600_000;
+        for (id, stamp) in [(1, start - 1), (2, start), (3, start + 1)] {
+            let card = Card {
+                id: CardId(id),
+                deck_id: DeckId(id),
+                ..Default::default()
+            };
+            storage.add_card_if_unique(&card).unwrap();
+            storage
+                .add_revlog_entry(&review_for_card(stamp, card.id, 3), false)
+                .unwrap();
+        }
+
+        assert_eq!(
+            storage.studied_today_by_deck(day_cutoff).unwrap(),
+            vec![(DeckId(3), 1)]
+        );
+    }
+
+    #[test]
+    fn studied_today_by_deck_requires_rating_and_review_kind_or_factor() {
+        let cases = [
+            (RevlogReviewKind::Learning, 3, 0, true),
+            (RevlogReviewKind::Review, 3, 0, true),
+            (RevlogReviewKind::Relearning, 3, 0, true),
+            (RevlogReviewKind::Filtered, 3, 0, false),
+            (RevlogReviewKind::Filtered, 3, 2500, true),
+            (RevlogReviewKind::Manual, 3, 0, false),
+            (RevlogReviewKind::Rescheduled, 3, 0, false),
+            (RevlogReviewKind::Review, 0, 2500, false),
+        ];
+        for (kind, button, factor, counted) in cases {
+            let storage = create_test_storage();
+            let card = Card {
+                id: CardId(1),
+                ..Default::default()
+            };
+            storage.add_card_if_unique(&card).unwrap();
+            let entry = RevlogEntry {
+                review_kind: kind,
+                ease_factor: factor,
+                ..review_for_card(950_000_000, card.id, button)
+            };
+            storage.add_revlog_entry(&entry, false).unwrap();
+
+            let expected = if counted {
+                vec![(card.deck_id, 1)]
+            } else {
+                vec![]
+            };
+            assert_eq!(
+                storage
+                    .studied_today_by_deck(TimestampSecs(1_000_000))
+                    .unwrap(),
+                expected,
+                "kind {kind:?}, button {button}, factor {factor}"
+            );
+        }
+    }
+
+    #[test]
+    fn revlog_review_kind_from_sql_rejects_invalid_values() {
+        assert!(matches!(
+            <RevlogReviewKind as FromSql>::column_result(ValueRef::Integer(1)),
+            Ok(RevlogReviewKind::Review)
+        ));
+        assert!(matches!(
+            <RevlogReviewKind as FromSql>::column_result(ValueRef::Integer(99)),
+            Err(FromSqlError::InvalidType)
+        ));
+        assert!(matches!(
+            <RevlogReviewKind as FromSql>::column_result(ValueRef::Text(b"x")),
+            Err(FromSqlError::InvalidType)
+        ));
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     }
 }
 <<<<<<< HEAD

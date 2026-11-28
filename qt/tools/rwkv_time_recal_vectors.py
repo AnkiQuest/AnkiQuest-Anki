@@ -1,4 +1,4 @@
-# Copyright: Ankitects Pty Ltd and contributors
+# Copyright: Anki Software, LLC and contributors
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 """Parity vectors for the rolling recalibration of the timed answer-time
@@ -87,8 +87,8 @@ def main() -> None:
     repo, out = Path(sys.argv[1]).resolve(), Path(sys.argv[2])
     sys.path.insert(0, str(repo))
     import numpy as np  # type: ignore[import-not-found]
-    from scripts import sm125_recal as r  # type: ignore[import-not-found]
-    from scripts.sm117_head import cdf_at  # type: ignore[import-not-found]
+    from scripts import sm125_recal as r
+    from scripts.sm117_head import cdf_at
 
     rng = np.random.default_rng(SEED)
     standard = {

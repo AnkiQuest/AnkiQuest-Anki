@@ -1,8 +1,12 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
 =======
 // Copyright: Ankitects Pty Ltd and contributors
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! Instant forecast driven by recorded review timing patterns.
@@ -984,7 +988,12 @@ impl RwkvInference {
                                         .cmp(&cards[b].input.input.review_input.card_id)
                                 })
                         });
-                        indexes.truncate(config.candidate_refresh_limit.max(1));
+                        trim_refresh_window(
+                            &mut indexes,
+                            config.candidate_refresh_limit.max(1),
+                            config.review_order,
+                            (answers_today / refresh_interval) as usize,
+                        );
                     }
                     let queries = indexes
                         .iter()
@@ -1508,6 +1517,24 @@ impl RwkvInference {
     }
 }
 
+/// Mirrors the reviewer's partial refresh of a stale, priority-sorted score
+/// map.
+fn trim_refresh_window(
+    ranked: &mut Vec<usize>,
+    limit: usize,
+    order: ReviewCardOrder,
+    refresh_round: usize,
+) {
+    let probe = limit / 4;
+    if order == ReviewCardOrder::RetrievabilityAscending && ranked.len() > limit && probe > 0 {
+        let leaders = limit - probe;
+        let blocks = (ranked.len() - leaders).div_ceil(probe).min(8);
+        let start = (leaders + refresh_round % blocks * probe).min(ranked.len() - probe);
+        ranked.copy_within(start..start + probe, leaders);
+    }
+    ranked.truncate(limit);
+}
+
 /// The `queue_members` slot of an Instant forecast queue, if it is tracked.
 fn queue_slot(queue: i32) -> Option<usize> {
     usize::try_from(queue).ok().filter(|queue| *queue < 4)
@@ -1616,6 +1643,20 @@ fn increment_study_counts(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ascending_refresh_keeps_leaders_and_rotates_nearby_candidates() {
+        for (round, expected) in [(0, [1, 2, 3, 4]), (1, [1, 2, 3, 5]), (8, [1, 2, 3, 4])] {
+            let mut ranked = (1..=16).collect();
+            trim_refresh_window(
+                &mut ranked,
+                4,
+                ReviewCardOrder::RetrievabilityAscending,
+                round,
+            );
+            assert_eq!(ranked, expected);
+        }
+    }
 
     #[test]
     fn review_duration_uses_recall_and_grade_with_historical_variation() {

@@ -162,6 +162,7 @@ jobs:
         uses: ./.github/actions/setup-anki
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
         with:
@@ -173,10 +174,15 @@ jobs:
       - name: Install cargo-llvm-cov, cargo-nextest and cargo-deny
         uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 #v2.85.7
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+      - name: Install cargo-llvm-cov, cargo-nextest and cargo-deny
+        uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 #v2.90.0
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         with:
           tool: |
             cargo-llvm-cov@0.8.4
             cargo-nextest@0.9.99
+            cargo-deny@0.20.2
 
       - name: Symlink node_modules
         run: ln -sf out/node_modules .
@@ -261,7 +267,10 @@ jobs:
         run: ./run
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
       # Release preflight waits for this workflow, so keep its security gate
       # even though upstream also runs cargo-deny in a separate workflow.
       - name: Check Rust dependencies
@@ -279,7 +288,10 @@ jobs:
         shell: bash
         run: cargo deny check
 
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
       - name: Upload coverage for SonarCloud
         if: >-
           github.event_name == 'push'

@@ -127,6 +127,7 @@ candidates, and the stable release all come from the same branch.
    repeat steps 3-5 with the new version (e.g. `26.05b2`, `26.05rc1`, `26.05`).
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 7. Merge the release branch back to `main`. When a stable release is published,
    `.github/workflows/sync-release.yml` opens a PR from `release/26.05` to
    `main`, which brings in the `.version` bump, the translation updates, and any
@@ -135,6 +136,8 @@ candidates, and the stable release all come from the same branch.
 8. Delete the release branch after the merge PR is merged.
 
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     The release-sync automation in steps 7-10 runs only in `ankitects/anki`;
     fork releases use their own release workflow and do not update upstream
     Flathub or website resources.
@@ -146,7 +149,10 @@ candidates, and the stable release all come from the same branch.
 
 8. Delete the release branch after the merge PR is merged.
 
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 9. Submit the Flathub update. When a stable release is published,
    `.github/workflows/sync-release.yml` makes a patch that moves
    [flathub/net.ankiweb.Anki](https://github.com/flathub/net.ankiweb.Anki)
@@ -390,8 +396,12 @@ Audio playback and recording is handled by the `anki-audio` package under **`qt/
 6. Once the package is published, update the pinned `anki-audio` version in **`qt/pyproject.toml`** to the new version.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 <!-- <<<<end>>>> -->
 =======
 <!-- <<<end>>> -->
 
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+<!-- <<<<end>>>> -->
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345

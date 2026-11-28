@@ -11,7 +11,10 @@ AnkiQuest's fork of [ankitects/anki](https://github.com/ankitects/anki): upstrea
 
 This is an unofficial Anki desktop build focused on trying FSRS7 scheduling
 changes before they are available in the official Anki app.
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
 It is not maintained by Ankitects and should not be confused with the official
 Anki desktop app. The original upstream README is preserved in
@@ -57,9 +60,12 @@ of FSRS7 settings before committing to them:
 ## Before You Use It
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 If you'd like to try development builds of Anki but don't feel comfortable
 building the code, please see [Anki betas](https://docs.ankiweb.net/releases/betas/intro).
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 This fork changes scheduling behavior. Before relying on it for an important
 collection, make sure you are comfortable with the experimental nature of the
 build and keep normal Anki backups.
@@ -111,7 +117,10 @@ Desired Retention's Python resolver before recomputing a card interval, so
 `Reschedule All Cards` can use the same ordered search rules as normal review.
 If Dynamic Desired Retention is not installed or does not expose the resolver,
 FSRS Helper falls back to the deck or preset desired retention.
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
 ## License
 

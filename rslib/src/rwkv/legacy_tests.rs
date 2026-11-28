@@ -1,8 +1,12 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Copyright: Anki Software, LLC and contributors
 =======
 // Copyright: Ankitects Pty Ltd and contributors
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+// Copyright: Anki Software, LLC and contributors
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 //! The bundled big model (the Big size, profile key `legacy`): the show-time
@@ -826,4 +830,49 @@ fn check_big_answer_time_head(model: &SrsModel, head_stem: &str, users: Vec<Answ
         );
     }
 }
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+
+/// A revlog row with a negative duration (a past clock jump) must not poison
+/// the state: the duration feature stays finite and the compact state that
+/// the review produces still decodes. Durations below zero count as zero.
+#[test]
+fn rwkv_negative_review_duration_keeps_state_finite() {
+    for duration in [-3_658, -10, -9, 0] {
+        let input = ReviewInput {
+            card_id: 1,
+            deck_id: Some(1),
+            note_id: Some(1),
+            preset_id: Some(1),
+            is_query: false,
+            ease: Some(3),
+            duration_millis: Some(duration),
+            card_type: Some(0),
+            day_offset: Some(0),
+            current_elapsed_days: Some(-1),
+            current_elapsed_seconds: Some(-1),
+            target_retentions: [None; 4],
+            enforce_grade_order: true,
+        };
+        let features = FeatureState::default().features_for(&input);
+        assert!(
+            features.iter().all(|value| value.is_finite()),
+            "duration {duration}: non-finite feature"
+        );
+        let mut zero = input.clone();
+        zero.duration_millis = Some(0);
+        assert_eq!(features, FeatureState::default().features_for(&zero));
+
+        let mut model = legacy_model();
+        let (card, note) = StatePrecision::CompactCardsInt8.module_precisions();
+        model.modules[0].precision = card;
+        model.modules[2].precision = note;
+        let mut states = ReviewStateMaps::default();
+        let heads = model.review(&features, states.state_ref(&input));
+        states.store(&input, heads.next_state);
+        let heads = model.review(&features, states.state_ref(&input));
+        assert!(heads.retrievability.is_finite(), "duration {duration}");
+    }
+}
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345

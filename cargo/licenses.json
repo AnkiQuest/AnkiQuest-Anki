@@ -81,6 +81,7 @@
   },
   {
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
     "authors": "David Roundy <roundyd@physics.oregonstate.edu>",
     "description": "Macros to take array references of slices",
@@ -91,6 +92,8 @@
   },
   {
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "authors": "bluss",
     "description": "A vector with fixed capacity, backed by an array (it can be stored on the stack too). Implements fixed capacity ArrayVec and ArrayString.",
     "license": "Apache-2.0 OR MIT",
@@ -333,10 +336,14 @@
   {
     "authors": "Frank Denis <github@pureftpd.org>",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "description": "Coarse monotonic clock, cached timestamps, and duration measurements for fast timekeeping",
 =======
     "description": "Time and duration crate optimized for speed",
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "description": "Coarse monotonic clock, cached timestamps, and duration measurements for fast timekeeping",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "license": "BSD-2-Clause",
     "license_file": null,
     "name": "coarsetime",
@@ -931,10 +938,14 @@
   },
   {
 <<<<<<< HEAD
+<<<<<<< HEAD
     "authors": null,
 =======
     "authors": "Amanieu d'Antras <amanieu@gmail.com>",
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "authors": null,
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "description": "A Rust port of Google's SwissTable hash map",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -1847,6 +1858,9 @@
   },
   {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "authors": "David Tolnay <dtolnay@gmail.com>",
     "description": "A minimal `syn` syntax tree pretty-printer",
     "license": "Apache-2.0 OR MIT",
@@ -1855,8 +1869,11 @@
     "repository": "https://github.com/dtolnay/prettyplease"
   },
   {
+<<<<<<< HEAD
 =======
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "authors": "Bastian Köcher <git@kchr.de>",
     "description": "Replacement for crate (macro_rules keyword) in proc-macros",
     "license": "Apache-2.0 OR MIT",
@@ -2135,14 +2152,6 @@
     "license_file": null,
     "name": "ring",
     "repository": "https://github.com/briansmith/ring"
-  },
-  {
-    "authors": null,
-    "description": "Helping to implement SQLite VFS.",
-    "license": "MIT",
-    "license_file": null,
-    "name": "rsqlite-vfs",
-    "repository": "https://github.com/Spxg/sqlite-wasm-rs"
   },
   {
     "authors": "The rusqlite developers",
@@ -2519,14 +2528,6 @@
     "license_file": null,
     "name": "spin",
     "repository": "https://github.com/mvdnes/spin-rs.git"
-  },
-  {
-    "authors": "Spxg <noz@live.com>",
-    "description": "`wasm32-unknown-unknown` bindings to the libsqlite3 library.",
-    "license": "MIT",
-    "license_file": null,
-    "name": "sqlite-wasm-rs",
-    "repository": "https://github.com/Spxg/sqlite-wasm-rs"
   },
   {
     "authors": "Robert Grosse <n210241048576@gmail.com>",
@@ -3183,10 +3184,14 @@
     "license_file": null,
     "name": "wasm-bindgen-macro-support",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/main/crates/macro-support"
 =======
     "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support"
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/main/crates/macro-support"
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
   },
   {
     "authors": "The wasm-bindgen Developers",
@@ -3290,14 +3295,6 @@
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
     "name": "windows-collections",
-    "repository": "https://github.com/microsoft/windows-rs"
-  },
-  {
-    "authors": "Microsoft",
-    "description": "Core type support for COM and Windows",
-    "license": "Apache-2.0 OR MIT",
-    "license_file": null,
-    "name": "windows-core",
     "repository": "https://github.com/microsoft/windows-rs"
   },
   {
@@ -3406,14 +3403,6 @@
   },
   {
     "authors": "Microsoft",
-    "description": "Rust for Windows",
-    "license": "Apache-2.0 OR MIT",
-    "license_file": null,
-    "name": "windows-sys",
-    "repository": "https://github.com/microsoft/windows-rs"
-  },
-  {
-    "authors": null,
     "description": "Rust for Windows",
     "license": "Apache-2.0 OR MIT",
     "license_file": null,
@@ -3767,10 +3756,14 @@
   {
     "authors": "David Tolnay <dtolnay@gmail.com>",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "description": "A double-to-string conversion algorithm based on Schubfach and xjb",
 =======
     "description": "A double-to-string conversion algorithm based on Schubfach and yy",
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    "description": "A double-to-string conversion algorithm based on Schubfach and xjb",
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     "license": "MIT",
     "license_file": null,
     "name": "zmij",

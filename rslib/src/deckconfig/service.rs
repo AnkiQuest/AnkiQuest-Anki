@@ -235,6 +235,9 @@ impl From<anki_proto::deck_config::DeckConfigId> for DeckConfigId {
 #[cfg(test)]
 mod tests {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     use std::assert_matches;
 
     use anki_proto::generic::Json;
@@ -250,6 +253,41 @@ mod tests {
     use crate::services::DeckConfigService;
     use crate::tests::CardAdder;
     use crate::tests::DeckAdder;
+
+    #[test]
+    fn update_deck_configs_request_defaults_missing_review_fuzz() {
+        let request = anki_proto::deck_config::UpdateDeckConfigsRequest::default();
+
+        let converted = UpdateDeckConfigsRequest::from(request);
+
+        assert_eq!(
+            converted.review_fuzz_config,
+            StoredReviewFuzzConfig::default()
+        );
+    }
+
+    #[test]
+    fn update_deck_configs_request_preserves_review_fuzz() {
+        let expected = StoredReviewFuzzConfig {
+            enabled: false,
+            base: 2.0,
+            factor_short: 0.3,
+            factor_mid: 0.2,
+            factor_long: 0.1,
+        };
+        let request = anki_proto::deck_config::UpdateDeckConfigsRequest {
+            review_fuzz_enabled: Some(expected.enabled),
+            review_fuzz_base: Some(expected.base),
+            review_fuzz_factor_short: Some(expected.factor_short),
+            review_fuzz_factor_mid: Some(expected.factor_mid),
+            review_fuzz_factor_long: Some(expected.factor_long),
+            ..Default::default()
+        };
+
+        let converted = UpdateDeckConfigsRequest::from(request);
+
+        assert_eq!(converted.review_fuzz_config, expected);
+    }
 
     fn deck_config_json() -> Result<generic::Json> {
         serde_json::to_vec(&DeckConfSchema11::default())
@@ -391,7 +429,12 @@ mod tests {
         let config_json = DeckConfigService::new_deck_config_legacy(&mut col)?;
         let config: DeckConfSchema11 =
             serde_json::from_slice(&config_json.json).expect("deck config JSON deserialize");
-        assert_eq!(config, DeckConfSchema11::default());
+        // The fork stores a default FSRS minimum interval as 0 in legacy JSON and
+        // restores it when converting, so compare the converted configs.
+        assert_eq!(
+            DeckConfig::from(config),
+            DeckConfig::from(DeckConfSchema11::default())
+        );
 
         Ok(())
     }
@@ -577,6 +620,10 @@ mod tests {
 
         let mut retentions: Vec<u32> = response.costs.into_keys().collect();
         retentions.sort_unstable();
+<<<<<<< HEAD
+=======
+        // The fork computes the workload graph from 10% (upstream starts at 70%).
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         assert_eq!(retentions, (10..=99).collect::<Vec<_>>());
 
         Ok(())
@@ -613,6 +660,7 @@ mod tests {
 
         let result = get_retention_workload(&mut col, vec![1.0; 5], "");
 
+<<<<<<< HEAD
         assert_matches!(result, Err(AnkiError::InvalidInput { .. }));
     }
 =======
@@ -652,5 +700,9 @@ mod tests {
         let converted = UpdateDeckConfigsRequest::from(request);
 
         assert_eq!(converted.review_fuzz_config, expected);
+=======
+        // The fork validates the parameter count before building the model.
+        assert_matches!(result, Err(AnkiError::InvalidInput { .. }));
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     }
 }

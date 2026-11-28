@@ -2712,6 +2712,7 @@ pub(crate) mod tests {
                 .map(|row| (row.revlog_id.0, row.prediction))
                 .collect_vec();
             expected.sort_by_key(|row| row.0);
+<<<<<<< HEAD
             let actual = bytes
 <<<<<<< HEAD
                 .as_chunks::<12>()
@@ -2720,6 +2721,12 @@ pub(crate) mod tests {
 =======
                 .chunks_exact(12)
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+            let (chunks, remainder) = bytes.as_chunks::<12>();
+            assert!(remainder.is_empty());
+            let actual = chunks
+                .iter()
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
                 .map(|chunk| {
                     (
                         i64::from_le_bytes(chunk[..8].try_into().unwrap()),

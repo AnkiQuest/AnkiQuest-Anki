@@ -135,6 +135,7 @@ class DataModel(QAbstractTableModel):
 
     def count_enabled_cells(self, selection: QItemSelection) -> int:
 <<<<<<< HEAD
+<<<<<<< HEAD
         """Return len(selection.indexes()) without calling flags() for every
         cell, which is very slow for large selections (e.g. Ctrl+A).
         Cells of disabled (deleted) rows are not counted, as in flags().
@@ -142,6 +143,8 @@ class DataModel(QAbstractTableModel):
         disabled = {item for item, row in self._rows.items() if row.is_disabled}
         count = 0
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         """The same number as `len(selection.indexes())`: the cells of the
         selection whose `flags()` are enabled and selectable. Qt calls
         `flags()` in Python for every cell to get it, which takes seconds for
@@ -151,11 +154,15 @@ class DataModel(QAbstractTableModel):
             return len(selection.indexes())
         disabled = {item for item, row in self._rows.items() if row.is_disabled}
         cells = 0
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         for i in range(len(selection)):
             selection_range = selection[i]
             if not selection_range.isValid():
                 continue
+<<<<<<< HEAD
 <<<<<<< HEAD
             rows = range(selection_range.top(), selection_range.bottom() + 1)
             if disabled:
@@ -167,6 +174,8 @@ class DataModel(QAbstractTableModel):
             count += enabled_rows * selection_range.width()
         return count
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
             top, bottom = selection_range.top(), selection_range.bottom()
             enabled = bottom - top + 1
             if disabled:
@@ -175,7 +184,10 @@ class DataModel(QAbstractTableModel):
                 )
             cells += enabled * selection_range.width()
         return cells
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
     # Reset
 
@@ -251,9 +263,12 @@ class DataModel(QAbstractTableModel):
 
     def get_item_rows(self, items: Sequence[ItemId]) -> list[int]:
 <<<<<<< HEAD
+<<<<<<< HEAD
         wanted = set(items)
         return [row for row, i in enumerate(self._items) if i in wanted]
 =======
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
         # Set membership keeps large selection restoration linear.
         wanted = set(items)
         return list(compress(count(), map(wanted.__contains__, self._items)))
@@ -261,7 +276,10 @@ class DataModel(QAbstractTableModel):
     def get_item_row_among(self, item: ItemId, rows: Sequence[int]) -> int | None:
         """Find the first row of an item known to be among these selected rows."""
         return next((row for row in rows if self._items[row] == item), None)
+<<<<<<< HEAD
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
 
     def get_card_row(self, card_id: CardId) -> int | None:
         return self.get_item_row(self._state.get_item_from_card_id(card_id))

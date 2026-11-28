@@ -47,7 +47,7 @@ from anki.utils import (
     is_win,
     split_fields,
 )
-from aqt import gui_hooks
+from aqt import execution_logs, gui_hooks
 from aqt.addons import DownloadLogEntry, check_and_prompt_for_updates, show_log_to_user
 from aqt.debug_console import show_debug_console
 from aqt.flags import FlagManager
@@ -598,7 +598,11 @@ class AnkiQt(QMainWindow):
 
     def loadProfile(self, onsuccess: Callable | None = None) -> None:
         from aqt import rwkv_scheduler
+        from aqt.donation_campaign import check_campaign
 
+        profile_ready: Future[None] = Future()
+        if not self.safeMode and not self.restoring_backup:
+            check_campaign(self, profile_ready=profile_ready)
         rwkv_scheduler.begin_rwkv_state_cache_startup(self)
         if not self.loadCollection():
             rwkv_scheduler.finish_rwkv_state_cache_startup(self)
@@ -632,6 +636,7 @@ class AnkiQt(QMainWindow):
                 self._refresh_after_sync()
             if onsuccess:
                 onsuccess()
+            profile_ready.set_result(None)
             if self.safeMode:
                 # Disable all experiments in safe mode
                 self.col._experiments = {}
@@ -1326,7 +1331,10 @@ title="{}" {}>{}</button>""".format(
             def finish_sync() -> None:
                 after_sync()
 
-            if refresh_rwkv_state and remote_collection_changes.collection_changed:
+            if refresh_rwkv_state and (
+                remote_collection_changes.collection_changed
+                or getattr(self.col, "_rwkv_sync_changes_pending", False)
+            ):
                 rwkv_scheduler.refresh_rwkv_state_after_sync(
                     self,
                     finish_sync,
@@ -1353,7 +1361,9 @@ title="{}" {}>{}</button>""".format(
         col = self.col
         if col is None or col.db is None:
             return
-        if getattr(col, "_last_sync_remote_collection_changed", None) is False:
+        if getattr(col, "_last_sync_remote_collection_changed", None) is False and not (
+            getattr(col, "_rwkv_sync_changes_pending", False)
+        ):
             return
 
         from aqt import rwkv_scheduler
@@ -1702,8 +1712,20 @@ title="{}" {}>{}</button>""".format(
         qconnect(m.action_open_backup.triggered, self.onOpenBackup)
         qconnect(m.actionExit.triggered, self.close)
 
+        from aqt.donation_campaign import setup_support_menu
+
+        setup_support_menu(self)
+
         # Help
         qconnect(m.actionDocumentation.triggered, self.onDocumentation)
+        qconnect(
+            m.actionExportExecutionLog.triggered,
+            lambda: execution_logs.export_log(self, self.app.execution_log),
+        )
+        qconnect(
+            m.actionPostLogs.triggered,
+            lambda: execution_logs.post_logs(self, self.app.execution_log),
+        )
         qconnect(m.actionDonate.triggered, self.onDonate)
         qconnect(m.actionAbout.triggered, self.onAbout)
         m.actionAbout.setText(tr.qt_accel_about_mac())

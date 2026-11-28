@@ -4698,6 +4698,36 @@ mod tests {
             .iter()
             .all(|c| (c.desired_retention - 0.7).abs() < 1e-6));
     }
+}
+
+/// Regression tests added upstream (Anki 26.11), adapted to the fork's
+/// simulator API.
+#[cfg(test)]
+mod upstream_tests {
+    use anki_proto::scheduler::SimulateFsrsReviewRequest;
+
+    use super::*;
+
+    fn base_request() -> SimulateFsrsReviewRequest {
+        SimulateFsrsReviewRequest {
+            params: vec![], // leave empty so fsrs fills defaults in tests
+            desired_retention: 0.85f32,
+            deck_size: 50u32,
+            days_to_simulate: 20u32,
+            new_limit: 5u32,
+            review_limit: 1000u32,
+            max_interval: 365u32,
+            search: "".to_string(),
+            new_cards_ignore_review_limit: false,
+            easy_days_percentages: vec![0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32],
+            review_order: ReviewCardOrder::Random as i32,
+            suspend_after_lapse_count: Some(3u32),
+            historical_retention: 0.9f32,
+            learning_step_count: 3u32,
+            relearning_step_count: 2u32,
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn simulator_does_not_crash_with_review_priority_functions() {
@@ -4760,13 +4790,14 @@ mod tests {
 
     fn convert(card: Card) -> Option<fsrs::Card> {
         let params = Arc::new(fsrs::check_and_fill_parameters(&[]).unwrap());
+        let model = FSRS::new(&params).unwrap();
         let memory_state = FsrsMemoryState {
             stability: 10.0,
             stability_internal: 10.0,
             stability_fast: None,
             difficulty: 3.0,
         };
-        Card::convert(card, 10, memory_state, 0.85, params.clone())
+        Card::convert(card, 10, memory_state, 0.85, params.clone(), &model)
     }
 
     #[test]
@@ -4944,13 +4975,22 @@ mod tests {
             *cards[0].parameters, params,
             "expected the converted card to carry the requested params"
         );
-        // The memory state must be the one derived from the card's ease and interval
-        let expected = FSRS::new(&req.params)?.memory_state_from_sm2(
+        // The memory state must be the one derived from the card's ease and interval.
+        // The fork starts FSRS-7 cards at the state's 90% recall interval, so the
+        // expected stability goes through the same conversion as the simulator.
+        let model = FSRS::new(&req.params)?;
+        let expected: FsrsMemoryState = memory_state_from_sm2_with_params(
+            &model,
+            &req.params,
             card.ease_factor(),
             card.interval as f32,
             req.historical_retention,
-        )?;
-        assert_eq!(cards[0].stability, expected.stability);
+        )?
+        .into();
+        assert_eq!(
+            cards[0].stability,
+            simulation_stability(&model, expected, &req.params)
+        );
         assert_eq!(cards[0].difficulty, expected.difficulty);
         assert!(
             cards[0].stability > 0.0,

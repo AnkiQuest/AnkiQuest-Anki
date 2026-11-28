@@ -1758,9 +1758,13 @@ mod test {
     use crate::decks::DeckId;
     use crate::decks::NativeDeckName;
 <<<<<<< HEAD
+<<<<<<< HEAD
     use crate::notes::NoteId;
 =======
 >>>>>>> 36c4f39d7a9880063656981b7d1f35dd23a38007
+=======
+    use crate::notes::NoteId;
+>>>>>>> 9fe094a700d1815eb4cd7070637b5cb84399a345
     use crate::revlog::RevlogEntry;
     use crate::revlog::RevlogId;
     use crate::revlog::RevlogReviewKind;
